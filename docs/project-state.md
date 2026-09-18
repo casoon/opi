@@ -21,8 +21,8 @@ proven tooling.
 **No functionality is implemented yet.** The repository holds a crate skeleton:
 `Cargo.toml` with its registry metadata, a `src/main.rs` that prints the version
 and a development notice through runemark, the supporting repository files, and
-CI and release workflows. That is version `0.0.1`, whose only purpose is to hold
-the crate name on crates.io.
+CI and release workflows. That is version `0.0.1`, published to crates.io with
+the sole purpose of holding the crate name.
 
 Everything below described as a decision or constraint is therefore a statement
 of intent, not yet validated against working code.
