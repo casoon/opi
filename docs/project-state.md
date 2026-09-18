@@ -18,16 +18,15 @@ proven tooling.
 
 ## Current status
 
-**Project detection works; nothing else does.** `src/project.rs` establishes the
-project name, the package manager and the Node version; `src/main.rs` renders
-that and exits. There is no script list, no task execution and no maintenance
-area yet.
+**The script list works; the maintenance areas do not.** `opi` detects the
+project, groups its `package.json` scripts and runs the one you pick, either
+from an interactive list or by name. Health, dependency updates, clean,
+security and the fuzzy search are not built.
 
-`0.0.1` is published to crates.io and holds the crate name. It predates the
-detection layer and contains no functionality at all.
+`0.0.1` on crates.io is a placeholder that holds the crate name and predates
+all of this. Nothing functional has been released yet.
 
-Most of what is described as a decision or constraint below is therefore still a
-statement of intent rather than something validated against working code.
+See [architecture.md](architecture.md) for how the pieces fit.
 
 The build plan lives in the gitignored `plan/` directory. The first functional
 release (`0.1.0`) is scoped to project detection, the grouped script list,
@@ -39,8 +38,9 @@ interactive selection and direct execution — nothing else.
 | --- | --- |
 | Language | Rust, edition 2024 |
 | Distribution | crates.io as `opi`, installed via `cargo install opi` |
-| Terminal presentation | [runemark](https://github.com/casoon/runemark) — the only presentation dependency |
+| Terminal presentation | [runemark](https://github.com/casoon/runemark) `0.4` with its `select` feature — the only presentation dependency |
 | Project input | `package.json` — no separate config file |
+| Platforms | Unix only; building on Windows fails with an explicit message |
 
 ## Documentation in this directory
 
@@ -48,6 +48,7 @@ interactive selection and direct execution — nothing else.
   respect
 - [decisions.md](decisions.md) — the decisions currently in force, and why
 
-`architecture.md` and `conventions.md` are intentionally absent. Both describe
-how code is actually structured and written, and there is no code yet. They are
-written alongside the first implementation rather than invented in advance.
+- [architecture.md](architecture.md) — the modules that exist and how they fit
+
+`conventions.md` is still absent. It records the rules future changes follow,
+and those are better written once the first release has settled what they are.

@@ -1,7 +1,7 @@
 //! `opi` — Operations Interface.
 //!
-//! A project control center for the terminal. This build lists a project's
-//! scripts and runs them by name; the interactive list is not implemented yet.
+//! A project control center for the terminal. `opi` lists a project's scripts
+//! and runs the one you pick; `opi <script>` skips the list entirely.
 
 #[cfg(not(unix))]
 compile_error!(
@@ -15,11 +15,11 @@ mod project;
 mod run;
 mod task;
 
-use std::io::{self, Write};
+use std::io::{self, IsTerminal, Write};
 use std::path::Path;
 use std::process::ExitCode;
 
-use runemark::{ColorMode, Console, ErrorBlock, Tone};
+use runemark::{ColorMode, Console, ErrorBlock, Group, Item, Menu, Outcome, SelectMode, Tone};
 
 use crate::cli::Invocation;
 use crate::manifest::{Manifest, ManifestError};
@@ -70,10 +70,7 @@ fn main() -> ExitCode {
     let tasks = Task::from_manifest(&manifest);
 
     match invocation {
-        Invocation::List => {
-            report(&project, &tasks, &directory);
-            ExitCode::SUCCESS
-        }
+        Invocation::List => list(&project, &tasks, &directory),
         Invocation::Run { name, args } => start(&project, &tasks, &name, &args),
         // An unknown flag is only reported once a project is present, so the
         // missing-package.json message wins where both are true — that is the
@@ -87,6 +84,96 @@ fn main() -> ExitCode {
         }
         Invocation::Help | Invocation::Version => unreachable!("handled above"),
     }
+}
+
+/// Shows the project's scripts and runs whichever one is chosen.
+fn list(project: &Project, tasks: &[Task], directory: &Path) -> ExitCode {
+    let manager = project.package_manager;
+
+    if tasks.is_empty() {
+        let console = Console::stdout(ColorMode::Auto);
+        println!(
+            "{}  {}",
+            console.paint(Tone::Title, project.display_name(directory)),
+            console.paint(Tone::Muted, manager.manager)
+        );
+        println!(
+            "{}",
+            console.paint(Tone::Muted, "This project defines no scripts.")
+        );
+        return ExitCode::SUCCESS;
+    }
+
+    if !manager.is_certain() {
+        let console = Console::stderr(ColorMode::Auto);
+        eprintln!(
+            "{}",
+            console.paint(
+                Tone::Warning,
+                format!(
+                    "No lockfile and no packageManager field — assuming {}.",
+                    manager.manager
+                ),
+            )
+        );
+    }
+
+    let menu = build_menu(project, tasks, directory);
+
+    // Both streams have to be terminals. stdout decides whether the list is
+    // being captured rather than read, and the menu draws its frames on
+    // stderr, so a redirect on either one means plain text is what is wanted.
+    let interactive = io::stdout().is_terminal() && io::stderr().is_terminal();
+
+    let outcome = match menu.run(
+        Console::stderr(ColorMode::Auto),
+        SelectMode::Auto,
+        interactive,
+    ) {
+        Ok(outcome) => outcome,
+        Err(error) => {
+            let block = ErrorBlock::new("Cannot open the terminal")
+                .with_explanation(format!("{error}"))
+                .with_remedy("Run opi <script> to start a script without the list.");
+            write_block(&block, Console::stderr(ColorMode::Auto));
+            return ExitCode::FAILURE;
+        }
+    };
+
+    match outcome {
+        Outcome::Selected(name) => start(project, tasks, &name, &[]),
+        // Nothing was chosen; that is not a failure.
+        Outcome::Cancelled => ExitCode::SUCCESS,
+        // No hints are registered until the maintenance areas exist.
+        Outcome::Hotkey(_) => ExitCode::SUCCESS,
+        Outcome::Unavailable => {
+            print!("{}", menu.render(Console::stdout(ColorMode::Auto)));
+            ExitCode::SUCCESS
+        }
+    }
+}
+
+/// Turns the task list into a menu.
+///
+/// The item id is the script name, so a selection is ready to run as-is.
+fn build_menu(project: &Project, tasks: &[Task], directory: &Path) -> Menu {
+    let mut menu = Menu::new()
+        .with_heading(project.display_name(directory))
+        .with_note(project.package_manager.manager.to_string());
+
+    for (group, section) in by_group(tasks) {
+        let mut rendered = Group::new(group.label());
+        for task in section {
+            let mut item = Item::new(&task.name, &task.name);
+            if let Some(description) = &task.description {
+                item = item.with_description(description);
+            }
+            rendered = rendered.add_item(item);
+        }
+        menu = menu.add_group(rendered);
+    }
+
+    menu
 }
 
 /// Runs `name`, or explains why it cannot.
@@ -137,68 +224,6 @@ fn write_block(block: &ErrorBlock, console: Console) {
     let mut stderr = io::stderr().lock();
     let _ = block.write_to(console, &mut stderr);
     let _ = stderr.flush();
-}
-
-fn report(project: &Project, tasks: &[Task], directory: &Path) {
-    let console = Console::stdout(ColorMode::Auto);
-    let manager = project.package_manager;
-
-    println!(
-        "{}  {}",
-        console.paint(Tone::Title, project.display_name(directory)),
-        console.paint(Tone::Muted, manager.manager)
-    );
-
-    if !manager.is_certain() {
-        println!(
-            "{}",
-            console.paint(
-                Tone::Warning,
-                format!(
-                    "No lockfile and no packageManager field — assuming {}.",
-                    manager.manager
-                ),
-            )
-        );
-    }
-
-    println!();
-
-    if tasks.is_empty() {
-        println!(
-            "{}",
-            console.paint(Tone::Muted, "This project defines no scripts.")
-        );
-        return;
-    }
-
-    // Names share one column width across all groups, so the descriptions line
-    // up down the whole list rather than per section.
-    let width = tasks.iter().map(|task| task.name.len()).max().unwrap_or(0);
-
-    for (group, section) in by_group(tasks) {
-        println!("{}", console.paint(Tone::Info, group.label()));
-        for task in section {
-            let name = format!("  {:width$}", task.name);
-            match &task.description {
-                Some(description) => println!(
-                    "{}  {}",
-                    console.paint(Tone::Success, name),
-                    console.paint(Tone::Muted, description)
-                ),
-                None => println!("{}", console.paint(Tone::Success, name.trim_end())),
-            }
-        }
-    }
-
-    println!();
-    println!(
-        "{}",
-        console.paint(
-            Tone::Muted,
-            format!("opi {VERSION} — run a script with: opi <script>"),
-        )
-    );
 }
 
 fn report_error(error: &ManifestError) {
