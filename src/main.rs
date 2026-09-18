@@ -241,7 +241,7 @@ fn report_error(error: &ManifestError) {
     let block = match error {
         ManifestError::Missing { directory } => ErrorBlock::new("No package.json found")
             .with_explanation(format!(
-                "{} does not contain a package.json, so there is no project to show.",
+                "Searched {} and every directory above it.",
                 directory.display()
             ))
             .with_remedy("Change into a project directory and run opi again."),

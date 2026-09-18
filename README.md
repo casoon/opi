@@ -5,43 +5,41 @@
 Go into any repository, type `opi`, and get a usable interface for that
 project — without configuring anything first.
 
-> **Status: `0.0.1` is a placeholder that reserves the crate name.**
-> The tool is not implemented yet. The first working release (`0.1.0`) will do
-> one thing: make a project's `package.json` scripts immediately runnable.
+> **Status: `0.1.0` does one thing — makes a project's `package.json` scripts
+> immediately runnable.** Health, dependency updates, clean and security are
+> designed but not built.
 
-## What it will do
+## What it does
 
 Its primary job is to be a better `npm run`. The start screen shows the
 project's scripts — grouped by prefix, labelled from `scripts-info`, with the
 package manager detected rather than typed:
 
 ```
-casoon.dev                                      pnpm
-  Scripts
-  ─────────────────────────────────────────────────────────
-  Development
-  › dev              Startet casoon.dev
-    dev:landings     Startet die Produkt-Landingpages
-  Build
-    build            Baut Website + Landingpages
-    build:landings   Baut nur die Landingpages
-  Check
-    check            Lint + Formatierung prüfen
-    check:fix        Fehler automatisch beheben
-  ─────────────────────────────────────────────────────────
-  U  Updates       C  Clean       S  Secrets       H  Health
-  /  Search        ?  Help
+astro-v7-workspace  pnpm
+
+Development
+› dev              Startet die Starter-App im Dev-Modus
+  dev:blog         Startet die Blog-App im Dev-Modus
+Build
+  build            Baut Starter- und Blog-App
+  build:blog       Baut die Blog-App
+Preview
+  preview          Vorschau des Starter-Builds
+Quality
+  check            Prüft das Repo mit Biome
+  check:fix        Behebt Lint- und Formatfehler
 ```
 
 `Enter` runs the highlighted script. That is the shortest path, and nothing is
-placed in front of it — maintenance areas sit behind hotkeys.
+placed in front of it. A list taller than the terminal scrolls.
 
 Three speeds, all backed by the same task model:
 
 ```bash
-opi              # navigate:  ↓ ↓ Enter
-opi              # search:    /dev land ↵
+opi              # navigate: ↓ ↓ Enter
 opi dev          # direct, no interface
+opi build --verbose   # arguments are forwarded to the script
 ```
 
 In a monorepo each workspace member's scripts appear under the member's name.
@@ -56,10 +54,14 @@ opi blog/dev     # the blog package's dev
 `opi` also works from anywhere inside a project, not only from the directory
 holding `package.json`.
 
+The script replaces the `opi` process, so `Ctrl-C` reaches your dev server
+rather than killing a wrapper, and the script's exit code is what your shell
+sees — `opi build && …` works.
+
 Later releases add project health with parallel checks, dependency updates,
-clean with real sizes, and secret scanning — each orchestrating an established
-tool (`tsc`, ESLint, Biome, Vitest, Knip, No Secrets, `pnpm audit`, Taze) rather
-than reimplementing it.
+clean with real sizes, a fuzzy search and secret scanning — each orchestrating
+an established tool (`tsc`, ESLint, Biome, Vitest, Knip, No Secrets,
+`pnpm audit`, Taze) rather than reimplementing it.
 
 ## Design rules
 

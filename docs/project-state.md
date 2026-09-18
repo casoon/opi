@@ -18,13 +18,13 @@ proven tooling.
 
 ## Current status
 
-**The script list works; the maintenance areas do not.** `opi` detects the
-project, groups its `package.json` scripts and runs the one you pick, either
-from an interactive list or by name. Health, dependency updates, clean,
-security and the fuzzy search are not built.
+**The script list works; the maintenance areas do not.** `opi` finds the nearest
+`package.json`, groups its scripts, adds any workspace members' scripts, and
+runs the one you pick — from an interactive list or by name. Health, dependency
+updates, clean, security and the fuzzy search are not built.
 
-`0.0.1` on crates.io is a placeholder that holds the crate name and predates
-all of this. Nothing functional has been released yet.
+`0.1.0` is the first functional release. `0.0.1` before it was a placeholder
+that held the crate name.
 
 See [architecture.md](architecture.md) for how the pieces fit.
 
@@ -49,6 +49,4 @@ interactive selection and direct execution — nothing else.
 - [decisions.md](decisions.md) — the decisions currently in force, and why
 
 - [architecture.md](architecture.md) — the modules that exist and how they fit
-
-`conventions.md` is still absent. It records the rules future changes follow,
-and those are better written once the first release has settled what they are.
+- [conventions.md](conventions.md) — the rules future changes follow
