@@ -45,16 +45,28 @@ impl PackageManager {
         }
     }
 
-    /// The argument list that runs `script`.
+    /// The argument list that runs `script`, forwarding `args` to it.
     ///
     /// Yarn takes the script name directly; the others need `run`.
-    // Covered by tests; the executor that calls it arrives with the script list.
-    #[allow(dead_code)]
-    pub fn run_args(self, script: &str) -> Vec<String> {
-        match self {
+    ///
+    /// npm is the one package manager that needs `--` to tell its own flags
+    /// from the script's, and it strips the separator before the script sees
+    /// it. The others forward trailing arguments as they are, and would hand a
+    /// literal `--` straight to the script.
+    pub fn run_args(self, script: &str, args: &[String]) -> Vec<String> {
+        let mut argv = match self {
             Self::Yarn => vec![script.to_owned()],
             _ => vec!["run".to_owned(), script.to_owned()],
+        };
+
+        if !args.is_empty() {
+            if self == Self::Npm {
+                argv.push("--".to_owned());
+            }
+            argv.extend_from_slice(args);
         }
+
+        argv
     }
 
     /// Parses the name out of a `packageManager` field such as
@@ -251,9 +263,44 @@ mod tests {
 
     #[test]
     fn run_args_follow_each_package_manager() {
-        assert_eq!(PackageManager::Yarn.run_args("dev"), ["dev"]);
-        assert_eq!(PackageManager::Pnpm.run_args("dev"), ["run", "dev"]);
-        assert_eq!(PackageManager::Npm.run_args("dev"), ["run", "dev"]);
-        assert_eq!(PackageManager::Bun.run_args("dev"), ["run", "dev"]);
+        assert_eq!(PackageManager::Yarn.run_args("dev", &[]), ["dev"]);
+        assert_eq!(PackageManager::Pnpm.run_args("dev", &[]), ["run", "dev"]);
+        assert_eq!(PackageManager::Npm.run_args("dev", &[]), ["run", "dev"]);
+        assert_eq!(PackageManager::Bun.run_args("dev", &[]), ["run", "dev"]);
+    }
+
+    #[test]
+    fn only_npm_needs_a_separator_for_forwarded_args() {
+        let args = ["--verbose".to_owned()];
+        assert_eq!(
+            PackageManager::Npm.run_args("build", &args),
+            ["run", "build", "--", "--verbose"]
+        );
+        assert_eq!(
+            PackageManager::Pnpm.run_args("build", &args),
+            ["run", "build", "--verbose"]
+        );
+        assert_eq!(
+            PackageManager::Yarn.run_args("build", &args),
+            ["build", "--verbose"]
+        );
+        assert_eq!(
+            PackageManager::Bun.run_args("build", &args),
+            ["run", "build", "--verbose"]
+        );
+    }
+
+    #[test]
+    fn no_separator_is_added_without_forwarded_args() {
+        assert_eq!(PackageManager::Npm.run_args("build", &[]), ["run", "build"]);
+    }
+
+    #[test]
+    fn forwarded_arguments_stay_single_values() {
+        let args = ["--grep".to_owned(), "two words".to_owned()];
+        assert_eq!(
+            PackageManager::Pnpm.run_args("test", &args),
+            ["run", "test", "--grep", "two words"]
+        );
     }
 }

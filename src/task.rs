@@ -142,6 +142,69 @@ fn is_implicit_lifecycle(name: &str, manifest: &Manifest) -> bool {
     })
 }
 
+/// Task names close enough to `query` to be worth offering, best first.
+///
+/// Substring matches come first — someone typing `land` for `build:landings`
+/// wants that offered, and edit distance alone would never surface it.
+pub fn suggestions<'a>(tasks: &'a [Task], query: &str) -> Vec<&'a str> {
+    let query = query.to_lowercase();
+    // A short name tolerates fewer typos than a long one.
+    let tolerance = (query.chars().count() / 3).max(1);
+
+    let mut scored: Vec<(usize, &str)> = tasks
+        .iter()
+        .filter_map(|task| {
+            let name = task.name.to_lowercase();
+            if name.contains(&query) || query.contains(&name) {
+                return Some((0, task.name.as_str()));
+            }
+            let distance = edit_distance(&name, &query);
+            (distance <= tolerance).then_some((distance, task.name.as_str()))
+        })
+        .collect();
+
+    scored.sort_by(|a, b| a.0.cmp(&b.0).then_with(|| a.1.cmp(b.1)));
+    scored.into_iter().take(3).map(|(_, name)| name).collect()
+}
+
+/// Optimal string alignment distance.
+///
+/// Levenshtein alone is the wrong measure here: it charges 2 for a
+/// transposition, so `biuld` scores as far from `build` as a two-letter
+/// mistake — and transposing two letters is the typo people actually make.
+/// This counts an adjacent swap as one edit.
+///
+/// Script names are short, so the full matrix is cheaper than being clever.
+fn edit_distance(a: &str, b: &str) -> usize {
+    let a: Vec<char> = a.chars().collect();
+    let b: Vec<char> = b.chars().collect();
+    let mut distance = vec![vec![0usize; b.len() + 1]; a.len() + 1];
+
+    for (i, row) in distance.iter_mut().enumerate() {
+        row[0] = i;
+    }
+    for (j, cell) in distance[0].iter_mut().enumerate() {
+        *cell = j;
+    }
+
+    for i in 1..=a.len() {
+        for j in 1..=b.len() {
+            let cost = usize::from(a[i - 1] != b[j - 1]);
+            let mut best = (distance[i - 1][j] + 1)
+                .min(distance[i][j - 1] + 1)
+                .min(distance[i - 1][j - 1] + cost);
+
+            if i > 1 && j > 1 && a[i - 1] == b[j - 2] && a[i - 2] == b[j - 1] {
+                best = best.min(distance[i - 2][j - 2] + 1);
+            }
+
+            distance[i][j] = best;
+        }
+    }
+
+    distance[a.len()][b.len()]
+}
+
 /// Groups a sorted task list into its sections, preserving order.
 pub fn by_group(tasks: &[Task]) -> Vec<(&Group, &[Task])> {
     let mut sections = Vec::new();
@@ -316,6 +379,45 @@ mod tests {
         let tasks = Task::from_manifest(&manifest(r#"{"scripts":{}}"#));
         assert!(tasks.is_empty());
         assert!(by_group(&tasks).is_empty());
+    }
+
+    #[test]
+    fn suggestions_offer_a_near_miss() {
+        let tasks = Task::from_manifest(&manifest(r#"{"scripts":{"build":"x","dev":"x"}}"#));
+        assert_eq!(suggestions(&tasks, "biuld"), ["build"]);
+    }
+
+    #[test]
+    fn a_transposition_counts_as_one_edit() {
+        assert_eq!(edit_distance("biuld", "build"), 1);
+        assert_eq!(edit_distance("build", "build"), 0);
+        assert_eq!(edit_distance("build", "bulid"), 1);
+    }
+
+    #[test]
+    fn suggestions_offer_substring_matches_edit_distance_would_miss() {
+        let tasks = Task::from_manifest(&manifest(r#"{"scripts":{"build:landings":"x"}}"#));
+        assert_eq!(suggestions(&tasks, "land"), ["build:landings"]);
+    }
+
+    #[test]
+    fn suggestions_stay_silent_when_nothing_is_close() {
+        let tasks = Task::from_manifest(&manifest(r#"{"scripts":{"build":"x","dev":"x"}}"#));
+        assert!(suggestions(&tasks, "qqqqqqqq").is_empty());
+    }
+
+    #[test]
+    fn suggestions_are_capped() {
+        let tasks = Task::from_manifest(&manifest(
+            r#"{"scripts":{"test:a":"x","test:b":"x","test:c":"x","test:d":"x"}}"#,
+        ));
+        assert_eq!(suggestions(&tasks, "test").len(), 3);
+    }
+
+    #[test]
+    fn suggestions_ignore_case() {
+        let tasks = Task::from_manifest(&manifest(r#"{"scripts":{"Build":"x"}}"#));
+        assert_eq!(suggestions(&tasks, "build"), ["Build"]);
     }
 
     #[test]
