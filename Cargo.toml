@@ -1,0 +1,16 @@
+[package]
+name = "opi"
+version = "0.0.1"
+edition = "2024"
+rust-version = "1.85"
+description = "Operations Interface — a project control center for your terminal"
+license = "MIT"
+readme = "README.md"
+documentation = "https://docs.rs/opi"
+repository = "https://github.com/casoon/opi"
+keywords = ["cli", "package-json", "scripts", "task-runner", "terminal"]
+categories = ["command-line-utilities", "development-tools"]
+exclude = ["plan/**", "konzept.txt", "docs/**"]
+
+[dependencies]
+runemark = "0.3"
