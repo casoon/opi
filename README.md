@@ -68,6 +68,13 @@ than reimplementing it.
 cargo install opi
 ```
 
+**Unix only.** `opi` runs a script by replacing its own process with `exec`, so
+`Ctrl-C` reaches the dev server rather than killing a wrapper, and its
+interactive list drives termios directly. Windows offers neither, and a second
+execution model that nothing exercises would be worse than an honest boundary.
+Building on Windows fails with that message rather than producing a degraded
+binary.
+
 ## Documentation
 
 - [docs/project-state.md](docs/project-state.md) — what this is and where it stands

@@ -28,7 +28,7 @@ jobs:
     strategy:
       matrix:
         toolchain: ["1.85", stable]
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [ubuntu-latest, macos-latest]
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@master

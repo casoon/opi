@@ -107,10 +107,11 @@ checksum = "f8dcc9c7d52a811697d2151c701e0d08956f92b0e24136cf4cf27b57a6a0d9bf"
 
 [[package]]
 name = "runemark"
-version = "0.3.3"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "028c19ecab5530d92980cbb4126b055b8272979268004f4c6a336d815d5caa6b"
+checksum = "66c3da2969112e9ba1f3a6d1040473aecb8f5c6401948a6e7cc181315627f21b"
 dependencies = [
+ "libc",
  "unicode-width",
 ]
 

@@ -13,7 +13,7 @@ categories = ["command-line-utilities", "development-tools"]
 exclude = ["plan/**", "konzept.txt", "docs/**"]
 
 [dependencies]
-runemark = "0.3"
+runemark = { version = "0.4", features = ["select"] }
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"
 

@@ -3,11 +3,18 @@
 Hard boundaries the implementation must respect. Where something is an
 assumption rather than a settled requirement, it is marked as such.
 
-## Toolchain
+## Toolchain and platforms
 
 Rust edition 2024, minimum supported Rust version `1.85` — matching runemark,
 which `opi` depends on. CI runs the test suite against `1.85` and stable on
-Linux, macOS and Windows.
+Linux and macOS.
+
+**Unix only, deliberately.** Two things `opi` relies on have no Windows
+equivalent: running a script by replacing its own process with `exec`, and
+driving termios for the interactive list. Supporting Windows would mean a
+second execution model — spawn and supervise — with different `Ctrl-C`
+semantics and no test coverage. Building on Windows fails with an explicit
+message instead.
 
 ## Zero configuration
 
@@ -67,6 +74,9 @@ compliance and piped output in ways that are hard to notice and hard to undo.
 
 - `NO_COLOR` is honoured, colour is TTY-aware by default (inherited from
   runemark's existing policy).
+- A signal that kills the process outright while the interactive list is open
+  leaves the terminal in raw mode; no destructor runs. `Ctrl-C` is unaffected —
+  in raw mode it arrives as a key and closes the list normally.
 - Without a TTY, nothing may block waiting for input. `opi | cat` and `opi` in
   CI must terminate.
 - Raw mode must be restored on abort, error, panic and signal.
@@ -85,9 +95,6 @@ preview and require confirmation before writing.
 
 ## Assumptions, not yet settled
 
-- **Supported platforms.** CI runs tests on Linux, macOS and Windows, but
-  Windows terminal behaviour — particularly raw mode and restoration — has not
-  been considered in the design.
 - **Monorepos.** `opi` is assumed to operate on the `package.json` in the current
   directory. Workspaces with multiple manifests are the most common case where
   this is insufficient. Either solved or documented as a limitation before

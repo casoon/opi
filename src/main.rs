@@ -3,6 +3,12 @@
 //! A project control center for the terminal. This build lists a project's
 //! scripts and runs them by name; the interactive list is not implemented yet.
 
+#[cfg(not(unix))]
+compile_error!(
+    "opi is Unix-only: it runs a script by replacing its own process with exec, \
+     and its interactive list drives termios directly."
+);
+
 mod cli;
 mod manifest;
 mod project;

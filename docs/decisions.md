@@ -34,19 +34,30 @@ state — it is not a history.
 
 > **runemark is extended rather than paired with a second library**
 >
-> runemark `0.3.3` explicitly excludes "prompts and full-screen TUIs" from its
-> scope. The interactive selection layer `opi` needs is being added to runemark
-> as a generic, feature-gated module. `opi` takes on no other presentation
-> dependency — no ratatui, no inquire.
+> The interactive selection layer lives in runemark `0.4.0`, behind its `select`
+> feature. `opi` takes on no other presentation dependency — no ratatui, no
+> inquire.
 >
 > *Reason:* one presentation layer across the CLI tools in this ecosystem,
 > rather than two competing rendering models inside one binary.
 >
-> *Consequence:* runemark's documented design boundary becomes untrue and must
-> be updated in that repository. The new API must stay generic — it may not know
-> about scripts, `package.json` or package managers. If the generic form turns
-> out not to carry `opi`'s interface, that is grounds to revisit this decision,
-> not to widen the boundary further.
+> *Consequence:* runemark's design boundary now covers grouped selection, and
+> its documentation says so. The API stays generic — it knows nothing about
+> scripts, `package.json` or package managers. If that generic form turns out
+> not to carry `opi`'s interface, that is grounds to revisit this decision, not
+> to widen the boundary further.
+
+> **Unix only**
+>
+> `opi` does not build on Windows, and says so at compile time.
+>
+> *Reason:* running a script by replacing the process with `exec`, and driving
+> termios for the interactive list, have no Windows equivalent. Supporting it
+> would mean a second execution model with different `Ctrl-C` semantics and no
+> coverage.
+>
+> *Consequence:* runemark's `select` feature is Unix-only for the same reason,
+> while the rest of runemark stays cross-platform for its other consumers.
 
 > **The crate is named `opi`, with a known collision**
 >
