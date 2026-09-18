@@ -1,9 +1,11 @@
 //! `opi` — Operations Interface.
 //!
-//! A project control center for the terminal. This build detects the project
-//! and reports what it found; the script list is not implemented yet.
+//! A project control center for the terminal. This build lists a project's
+//! scripts; selecting and running them is not implemented yet.
 
+mod manifest;
 mod project;
+mod task;
 
 use std::io::{self, Write};
 use std::path::Path;
@@ -11,7 +13,9 @@ use std::process::ExitCode;
 
 use runemark::{ColorMode, Console, ErrorBlock, Tone};
 
-use crate::project::{DetectError, Project};
+use crate::manifest::{Manifest, ManifestError};
+use crate::project::Project;
+use crate::task::{Task, by_group};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -31,24 +35,24 @@ fn main() -> ExitCode {
         }
     };
 
-    match Project::detect(&directory) {
-        Ok(project) => {
-            report(&project, &directory);
-            ExitCode::SUCCESS
-        }
+    let manifest = match Manifest::load(&directory) {
+        Ok(manifest) => manifest,
         Err(error) => {
             report_error(&error);
-            ExitCode::FAILURE
+            return ExitCode::FAILURE;
         }
-    }
+    };
+
+    let project = Project::detect(&manifest, &directory);
+    let tasks = Task::from_manifest(&manifest);
+    report(&project, &tasks, &directory);
+    ExitCode::SUCCESS
 }
 
-fn report(project: &Project, directory: &Path) {
+fn report(project: &Project, tasks: &[Task], directory: &Path) {
     let console = Console::stdout(ColorMode::Auto);
     let manager = project.package_manager;
 
-    // The header of the eventual script screen: project on the left, the
-    // package manager its scripts will be run with on the right.
     println!(
         "{}  {}",
         console.paint(Tone::Title, project.display_name(directory)),
@@ -68,8 +72,33 @@ fn report(project: &Project, directory: &Path) {
         );
     }
 
-    if let Some(node) = &project.node_version {
-        println!("{}", console.paint(Tone::Muted, format!("Node {node}")));
+    println!();
+
+    if tasks.is_empty() {
+        println!(
+            "{}",
+            console.paint(Tone::Muted, "This project defines no scripts.")
+        );
+        return;
+    }
+
+    // Names share one column width across all groups, so the descriptions line
+    // up down the whole list rather than per section.
+    let width = tasks.iter().map(|task| task.name.len()).max().unwrap_or(0);
+
+    for (group, section) in by_group(tasks) {
+        println!("{}", console.paint(Tone::Info, group.label()));
+        for task in section {
+            let name = format!("  {:width$}", task.name);
+            match &task.description {
+                Some(description) => println!(
+                    "{}  {}",
+                    console.paint(Tone::Success, name),
+                    console.paint(Tone::Muted, description)
+                ),
+                None => println!("{}", console.paint(Tone::Success, name.trim_end())),
+            }
+        }
     }
 
     println!();
@@ -77,26 +106,28 @@ fn report(project: &Project, directory: &Path) {
         "{}",
         console.paint(
             Tone::Muted,
-            format!("opi {VERSION} — the script list is not implemented yet."),
+            format!("opi {VERSION} — selecting and running is not implemented yet."),
         )
     );
 }
 
-fn report_error(error: &DetectError) {
+fn report_error(error: &ManifestError) {
     let console = Console::stderr(ColorMode::Auto);
     let block = match error {
-        DetectError::NoManifest { directory } => ErrorBlock::new("No package.json found")
+        ManifestError::Missing { directory } => ErrorBlock::new("No package.json found")
             .with_explanation(format!(
                 "{} does not contain a package.json, so there is no project to show.",
                 directory.display()
             ))
             .with_remedy("Change into a project directory and run opi again."),
-        DetectError::Unreadable { path, error } => ErrorBlock::new("package.json is unreadable")
+        ManifestError::Unreadable { path, error } => ErrorBlock::new("package.json is unreadable")
             .with_explanation(format!("{}: {error}", path.display()))
             .with_remedy("Check the file permissions."),
-        DetectError::Malformed { path, error } => ErrorBlock::new("package.json is not valid JSON")
-            .with_explanation(format!("{}: {error}", path.display()))
-            .with_remedy("Fix the syntax error and run opi again."),
+        ManifestError::Malformed { path, error } => {
+            ErrorBlock::new("package.json is not valid JSON")
+                .with_explanation(format!("{}: {error}", path.display()))
+                .with_remedy("Fix the syntax error and run opi again.")
+        }
     };
 
     let mut stderr = io::stderr().lock();
