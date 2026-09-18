@@ -18,14 +18,16 @@ proven tooling.
 
 ## Current status
 
-**No functionality is implemented yet.** The repository holds a crate skeleton:
-`Cargo.toml` with its registry metadata, a `src/main.rs` that prints the version
-and a development notice through runemark, the supporting repository files, and
-CI and release workflows. That is version `0.0.1`, published to crates.io with
-the sole purpose of holding the crate name.
+**Project detection works; nothing else does.** `src/project.rs` establishes the
+project name, the package manager and the Node version; `src/main.rs` renders
+that and exits. There is no script list, no task execution and no maintenance
+area yet.
 
-Everything below described as a decision or constraint is therefore a statement
-of intent, not yet validated against working code.
+`0.0.1` is published to crates.io and holds the crate name. It predates the
+detection layer and contains no functionality at all.
+
+Most of what is described as a decision or constraint below is therefore still a
+statement of intent rather than something validated against working code.
 
 The build plan lives in the gitignored `plan/` directory. The first functional
 release (`0.1.0`) is scoped to project detection, the grouped script list,
