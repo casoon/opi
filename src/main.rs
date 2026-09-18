@@ -14,6 +14,7 @@ mod manifest;
 mod project;
 mod run;
 mod task;
+mod workspace;
 
 use std::io::{self, IsTerminal, Write};
 use std::path::Path;
@@ -24,7 +25,7 @@ use runemark::{ColorMode, Console, ErrorBlock, Group, Item, Menu, Outcome, Selec
 use crate::cli::Invocation;
 use crate::manifest::{Manifest, ManifestError};
 use crate::project::Project;
-use crate::task::{Task, by_group, suggestions};
+use crate::task::{Task, by_group, find, suggestions};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -58,19 +59,22 @@ fn main() -> ExitCode {
         }
     };
 
-    let manifest = match Manifest::load(&directory) {
-        Ok(manifest) => manifest,
+    // The manifest may sit above the working directory; everything downstream
+    // resolves against the directory it was actually found in.
+    let (manifest, root) = match Manifest::discover(&directory) {
+        Ok(found) => found,
         Err(error) => {
             report_error(&error);
             return ExitCode::FAILURE;
         }
     };
 
-    let project = Project::detect(&manifest, &directory);
-    let tasks = Task::from_manifest(&manifest);
+    let project = Project::detect(&manifest, &root);
+    let members = workspace::members(&root, &manifest);
+    let tasks = Task::from_workspace(&manifest, &members);
 
     match invocation {
-        Invocation::List => list(&project, &tasks, &directory),
+        Invocation::List => list(&project, &tasks, &root),
         Invocation::Run { name, args } => start(&project, &tasks, &name, &args),
         // An unknown flag is only reported once a project is present, so the
         // missing-package.json message wins where both are true — that is the
@@ -141,7 +145,7 @@ fn list(project: &Project, tasks: &[Task], directory: &Path) -> ExitCode {
     };
 
     match outcome {
-        Outcome::Selected(name) => start(project, tasks, &name, &[]),
+        Outcome::Selected(id) => start(project, tasks, &id, &[]),
         // Nothing was chosen; that is not a failure.
         Outcome::Cancelled => ExitCode::SUCCESS,
         // No hints are registered until the maintenance areas exist.
@@ -164,7 +168,13 @@ fn build_menu(project: &Project, tasks: &[Task], directory: &Path) -> Menu {
     for (group, section) in by_group(tasks) {
         let mut rendered = Group::new(group.label());
         for task in section {
-            let mut item = Item::new(&task.name, &task.name);
+            // The id has to disambiguate: root and member scripts share names
+            // in every workspace repository measured.
+            let id = match &task.workspace {
+                Some(member) => format!("{member}/{}", task.name),
+                None => task.name.clone(),
+            };
+            let mut item = Item::new(id, &task.name);
             if let Some(description) = &task.description {
                 item = item.with_description(description);
             }
@@ -180,7 +190,7 @@ fn build_menu(project: &Project, tasks: &[Task], directory: &Path) -> Menu {
 ///
 /// Returns only on failure: a started script replaces this process.
 fn start(project: &Project, tasks: &[Task], name: &str, args: &[String]) -> ExitCode {
-    let Some(task) = tasks.iter().find(|task| task.name == name) else {
+    let Some(task) = find(tasks, name) else {
         let console = Console::stderr(ColorMode::Auto);
         let mut block = ErrorBlock::new(format!("No script named {name}"));
 
@@ -199,7 +209,7 @@ fn start(project: &Project, tasks: &[Task], name: &str, args: &[String]) -> Exit
     };
 
     let manager = project.package_manager;
-    let error = run::execute(manager.manager, &task.name, args);
+    let error = run::execute(manager.manager, &task.name, task.workspace.as_deref(), args);
 
     let console = Console::stderr(ColorMode::Auto);
     let block = ErrorBlock::new(format!("Cannot run {}", manager.manager))

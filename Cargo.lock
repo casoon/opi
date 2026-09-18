@@ -42,6 +42,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "glob"
+version = "0.3.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e4eba85ea1d0a966a983acd07deee566e67395d2d96b6fb39e62b5a833f1eb0b"
+
+[[package]]
 name = "itoa"
 version = "1.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -75,6 +81,7 @@ checksum = "9f7c3e4beb33f85d45ae3e3a1792185706c8e16d043238c593331cc7cd313b50"
 name = "opi"
 version = "0.0.1"
 dependencies = [
+ "glob",
  "runemark",
  "serde",
  "serde_json",
@@ -107,9 +114,9 @@ checksum = "f8dcc9c7d52a811697d2151c701e0d08956f92b0e24136cf4cf27b57a6a0d9bf"
 
 [[package]]
 name = "runemark"
-version = "0.4.0"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "66c3da2969112e9ba1f3a6d1040473aecb8f5c6401948a6e7cc181315627f21b"
+checksum = "33b644f27439b8557e3a73ee0c4e3cdd0e224f19219830d55e2e2c7ecf08fb7b"
 dependencies = [
  "libc",
  "unicode-width",

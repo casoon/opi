@@ -23,11 +23,16 @@ use crate::project::PackageManager;
 ///
 /// Returns only when the command could not be started at all; on success this
 /// process has been replaced by the script.
-pub fn execute(manager: PackageManager, script: &str, args: &[String]) -> io::Error {
+pub fn execute(
+    manager: PackageManager,
+    script: &str,
+    workspace: Option<&str>,
+    args: &[String],
+) -> io::Error {
     use std::os::unix::process::CommandExt;
 
     let mut command = Command::new(manager.program());
-    command.args(manager.run_args(script, args));
+    command.args(manager.run_args(script, workspace, args));
     // Returns only on failure.
     command.exec()
 }

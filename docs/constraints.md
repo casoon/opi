@@ -95,7 +95,3 @@ preview and require confirmation before writing.
 
 ## Assumptions, not yet settled
 
-- **Monorepos.** `opi` is assumed to operate on the `package.json` in the current
-  directory. Workspaces with multiple manifests are the most common case where
-  this is insufficient. Either solved or documented as a limitation before
-  `0.1.0`.

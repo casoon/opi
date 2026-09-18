@@ -44,6 +44,18 @@ opi              # search:    /dev land ↵
 opi dev          # direct, no interface
 ```
 
+In a monorepo each workspace member's scripts appear under the member's name.
+Root and member scripts share names in practice, so a bare name runs the
+root's and `blog/dev` runs the member's:
+
+```bash
+opi dev          # the root's dev
+opi blog/dev     # the blog package's dev
+```
+
+`opi` also works from anywhere inside a project, not only from the directory
+holding `package.json`.
+
 Later releases add project health with parallel checks, dependency updates,
 clean with real sizes, and secret scanning — each orchestrating an established
 tool (`tsc`, ESLint, Biome, Vitest, Knip, No Secrets, `pnpm audit`, Taze) rather

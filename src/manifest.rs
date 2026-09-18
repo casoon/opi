@@ -8,12 +8,12 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::path::{Path, PathBuf};
 
-use serde::Deserialize;
+use serde::{Deserialize, Deserializer};
 
 /// The parts of `package.json` that `opi` uses.
 ///
 /// Unknown fields are ignored, so any real-world manifest parses.
-#[derive(Debug, Default, Deserialize)]
+#[derive(Debug, Default, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Manifest {
     pub name: Option<String>,
@@ -24,9 +24,54 @@ pub struct Manifest {
     /// field `nr` already uses, so projects that maintain it benefit unchanged.
     #[serde(default, rename = "scripts-info")]
     pub scripts_info: BTreeMap<String, String>,
+    /// Workspace member patterns. npm, yarn and bun declare these here; pnpm
+    /// uses `pnpm-workspace.yaml` instead.
+    #[serde(default, deserialize_with = "workspace_patterns")]
+    pub workspaces: Vec<String>,
+}
+
+/// Accepts both shapes the `workspaces` field takes: a bare list, or an object
+/// with a `packages` list. yarn introduced the second for its `nohoist` option
+/// and real manifests still use it.
+fn workspace_patterns<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Vec<String>, D::Error> {
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum Field {
+        List(Vec<String>),
+        Object {
+            #[serde(default)]
+            packages: Vec<String>,
+        },
+    }
+
+    Ok(match Field::deserialize(deserializer)? {
+        Field::List(patterns) | Field::Object { packages: patterns } => patterns,
+    })
 }
 
 impl Manifest {
+    /// Finds the nearest `package.json`, searching `dir` and then its parents.
+    ///
+    /// Running `opi` from somewhere inside a project should work the way `npm`
+    /// does, rather than only from the directory holding the manifest.
+    ///
+    /// Returns the directory it was found in, which is the project root for
+    /// everything downstream — workspace patterns resolve against it, and it
+    /// names the project when the manifest does not.
+    pub fn discover(dir: &Path) -> Result<(Self, PathBuf), ManifestError> {
+        for candidate in dir.ancestors() {
+            match Self::load(candidate) {
+                Ok(manifest) => return Ok((manifest, candidate.to_path_buf())),
+                Err(ManifestError::Missing { .. }) => {}
+                Err(error) => return Err(error),
+            }
+        }
+
+        Err(ManifestError::Missing {
+            directory: dir.to_path_buf(),
+        })
+    }
+
     /// Loads and parses `package.json` from `dir`.
     pub fn load(dir: &Path) -> Result<Self, ManifestError> {
         let path = dir.join("package.json");
@@ -139,6 +184,56 @@ mod tests {
     fn unknown_fields_are_ignored() {
         let manifest = load(r#"{"dependencies":{"astro":"^6"},"type":"module"}"#).expect("parse");
         assert!(manifest.name.is_none());
+    }
+
+    #[test]
+    fn workspaces_accepts_a_bare_list() {
+        let manifest = load(r#"{"workspaces":["packages/*","apps/*"]}"#).expect("parse");
+        assert_eq!(manifest.workspaces, ["packages/*", "apps/*"]);
+    }
+
+    #[test]
+    fn workspaces_accepts_the_object_form() {
+        let manifest = load(r#"{"workspaces":{"packages":["packages/*"],"nohoist":["**/x"]}}"#)
+            .expect("parse");
+        assert_eq!(manifest.workspaces, ["packages/*"]);
+    }
+
+    #[test]
+    fn no_workspaces_field_is_empty() {
+        assert!(
+            load(r#"{"name":"x"}"#)
+                .expect("parse")
+                .workspaces
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn discover_walks_up_to_the_nearest_manifest() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        fs::write(dir.path().join("package.json"), r#"{"name":"root"}"#).expect("write");
+        let deep = dir.path().join("src").join("components");
+        fs::create_dir_all(&deep).expect("mkdir");
+
+        let (manifest, root) = Manifest::discover(&deep).expect("discover");
+        assert_eq!(manifest.name.as_deref(), Some("root"));
+        assert_eq!(
+            root.canonicalize().expect("canonicalize"),
+            dir.path().canonicalize().expect("canonicalize")
+        );
+    }
+
+    #[test]
+    fn discover_stops_at_the_closest_manifest() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        fs::write(dir.path().join("package.json"), r#"{"name":"root"}"#).expect("write");
+        let inner = dir.path().join("apps").join("blog");
+        fs::create_dir_all(&inner).expect("mkdir");
+        fs::write(inner.join("package.json"), r#"{"name":"blog"}"#).expect("write");
+
+        let (manifest, _) = Manifest::discover(&inner).expect("discover");
+        assert_eq!(manifest.name.as_deref(), Some("blog"));
     }
 
     #[test]

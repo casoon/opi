@@ -9,6 +9,7 @@
 //! interface.** A flat alphabetical list of raw names is what `opi` is for.
 
 use crate::manifest::Manifest;
+use crate::workspace::Member;
 
 /// The section a task appears under.
 ///
@@ -25,6 +26,11 @@ pub enum Group {
     Custom(String),
     /// Scripts with no prefix and no recognised meaning.
     Other,
+    /// A workspace member's scripts, under the member's name.
+    ///
+    /// Last, because the root's own scripts are what someone standing in the
+    /// root reached for.
+    Workspace(String),
 }
 
 impl Group {
@@ -40,6 +46,8 @@ impl Group {
             Self::Quality => "Quality".to_owned(),
             Self::Custom(prefix) => capitalize(prefix),
             Self::Other => "Other".to_owned(),
+            // A package name is an identifier, not prose; shown unchanged.
+            Self::Workspace(name) => name.clone(),
         }
     }
 
@@ -96,6 +104,9 @@ pub struct Task {
     /// The underlying command, for execution — not for display.
     pub command: String,
     pub group: Group,
+    /// The workspace member this belongs to, if any. Running it needs the
+    /// package manager to be pointed at that member.
+    pub workspace: Option<String>,
 }
 
 impl Task {
@@ -114,10 +125,40 @@ impl Task {
                 description: manifest.description(name).map(str::to_owned),
                 command: command.clone(),
                 group: Group::of(name, manifest.scripts.keys().map(String::as_str)),
+                workspace: None,
             })
             .collect();
 
         tasks.sort_by(|a, b| a.group.cmp(&b.group).then_with(|| a.name.cmp(&b.name)));
+        tasks
+    }
+
+    /// Builds the task list from a manifest and its workspace members.
+    ///
+    /// Member scripts keep their own names and are grouped under the member,
+    /// so `dev` appears once per package rather than being renamed into
+    /// something like `blog:dev` that matches nothing in that package.
+    pub fn from_workspace(manifest: &Manifest, members: &[Member]) -> Vec<Self> {
+        let mut tasks = Self::from_manifest(manifest);
+
+        for member in members {
+            let mut member_tasks: Vec<Self> = member
+                .manifest
+                .scripts
+                .iter()
+                .filter(|(name, _)| !is_implicit_lifecycle(name, &member.manifest))
+                .map(|(name, command)| Self {
+                    name: name.clone(),
+                    description: member.manifest.description(name).map(str::to_owned),
+                    command: command.clone(),
+                    group: Group::Workspace(member.name.clone()),
+                    workspace: Some(member.name.clone()),
+                })
+                .collect();
+            member_tasks.sort_by(|a, b| a.name.cmp(&b.name));
+            tasks.extend(member_tasks);
+        }
+
         tasks
     }
 }
@@ -142,28 +183,72 @@ fn is_implicit_lifecycle(name: &str, manifest: &Manifest) -> bool {
     })
 }
 
+/// Finds the task `query` names.
+///
+/// A bare name is matched exactly, and the root's own scripts win — a project
+/// with a `dev` script must keep `opi dev` meaning that one.
+///
+/// `member/script` addresses a workspace member. Every workspace repository
+/// measured had root and member scripts sharing names, so without a way to
+/// say which one is meant, a member's `dev` would be unreachable from the
+/// command line. No script name among 382 real ones contained a `/`, and an
+/// exact match is tried first regardless, so the syntax takes nothing away.
+pub fn find<'a>(tasks: &'a [Task], query: &str) -> Option<&'a Task> {
+    if let Some(task) = tasks.iter().find(|task| task.name == query) {
+        return Some(task);
+    }
+
+    // Split at the last slash: a scoped package name contains one of its own,
+    // so "@casoon/blog/dev" is the member "@casoon/blog" and the script "dev".
+    let (member, script) = query.rsplit_once('/')?;
+    tasks.iter().find(|task| {
+        task.name == script
+            && task.workspace.as_deref().is_some_and(|name| {
+                // Scoped packages are addressable by their short name too:
+                // "ui/build" reaches "@casoon/ui".
+                name == member
+                    || name
+                        .rsplit_once('/')
+                        .is_some_and(|(_, short)| short == member)
+            })
+    })
+}
+
 /// Task names close enough to `query` to be worth offering, best first.
 ///
 /// Substring matches come first — someone typing `land` for `build:landings`
 /// wants that offered, and edit distance alone would never surface it.
-pub fn suggestions<'a>(tasks: &'a [Task], query: &str) -> Vec<&'a str> {
-    let query = query.to_lowercase();
+pub fn suggestions(tasks: &[Task], query: &str) -> Vec<String> {
+    // An addressed query is compared on its script part. Measuring "blog/previw"
+    // against "preview" counts the member name as six typos and offers nothing.
+    let query = query
+        .rsplit_once('/')
+        .map_or(query, |(_, script)| script)
+        .to_lowercase();
     // A short name tolerates fewer typos than a long one.
     let tolerance = (query.chars().count() / 3).max(1);
 
-    let mut scored: Vec<(usize, &str)> = tasks
+    // A member's script is only runnable in its addressed form, so that is
+    // what a suggestion has to offer.
+    let addressed = |task: &Task| match &task.workspace {
+        Some(member) => format!("{member}/{}", task.name),
+        None => task.name.clone(),
+    };
+
+    let mut scored: Vec<(usize, String)> = tasks
         .iter()
         .filter_map(|task| {
             let name = task.name.to_lowercase();
             if name.contains(&query) || query.contains(&name) {
-                return Some((0, task.name.as_str()));
+                return Some((0, addressed(task)));
             }
             let distance = edit_distance(&name, &query);
-            (distance <= tolerance).then_some((distance, task.name.as_str()))
+            (distance <= tolerance).then_some((distance, addressed(task)))
         })
         .collect();
 
-    scored.sort_by(|a, b| a.0.cmp(&b.0).then_with(|| a.1.cmp(b.1)));
+    scored.sort_by(|a, b| a.0.cmp(&b.0).then_with(|| a.1.cmp(&b.1)));
+    scored.dedup_by(|a, b| a.1 == b.1);
     scored.into_iter().take(3).map(|(_, name)| name).collect()
 }
 
@@ -379,6 +464,87 @@ mod tests {
         let tasks = Task::from_manifest(&manifest(r#"{"scripts":{}}"#));
         assert!(tasks.is_empty());
         assert!(by_group(&tasks).is_empty());
+    }
+
+    fn workspace_tasks() -> Vec<Task> {
+        let root = manifest(r#"{"scripts":{"dev":"x","build":"x"}}"#);
+        let member = Member {
+            name: "@casoon/blog".to_owned(),
+            manifest: manifest(r#"{"scripts":{"dev":"x","preview":"x"}}"#),
+        };
+        Task::from_workspace(&root, &[member])
+    }
+
+    #[test]
+    fn a_bare_name_reaches_the_root_script() {
+        let tasks = workspace_tasks();
+        let found = find(&tasks, "dev").expect("dev");
+        assert_eq!(found.workspace, None, "the root's own script wins");
+    }
+
+    #[test]
+    fn an_addressed_name_reaches_the_member() {
+        let tasks = workspace_tasks();
+        let found = find(&tasks, "@casoon/blog/dev").expect("member dev");
+        assert_eq!(found.workspace.as_deref(), Some("@casoon/blog"));
+    }
+
+    #[test]
+    fn a_scoped_member_answers_to_its_short_name() {
+        let tasks = workspace_tasks();
+        let found = find(&tasks, "blog/dev").expect("short form");
+        assert_eq!(found.workspace.as_deref(), Some("@casoon/blog"));
+    }
+
+    #[test]
+    fn a_member_only_script_needs_no_address() {
+        let tasks = workspace_tasks();
+        let found = find(&tasks, "preview").expect("preview");
+        assert_eq!(
+            found.workspace.as_deref(),
+            Some("@casoon/blog"),
+            "nothing at the root shadows it"
+        );
+    }
+
+    #[test]
+    fn an_unknown_address_finds_nothing() {
+        let tasks = workspace_tasks();
+        assert!(find(&tasks, "shop/dev").is_none());
+        assert!(find(&tasks, "blog/nope").is_none());
+    }
+
+    #[test]
+    fn member_scripts_are_grouped_under_the_member() {
+        let tasks = workspace_tasks();
+        let member_group = Group::Workspace("@casoon/blog".to_owned());
+        assert_eq!(
+            tasks
+                .iter()
+                .filter(|task| task.group == member_group)
+                .count(),
+            2
+        );
+        // Workspace groups come after everything the root owns.
+        assert_eq!(tasks.last().expect("last").group, member_group);
+    }
+
+    #[test]
+    fn suggestions_offer_the_runnable_form_of_a_member_script() {
+        let tasks = workspace_tasks();
+        assert!(
+            suggestions(&tasks, "previw").contains(&"@casoon/blog/preview".to_owned()),
+            "suggesting a bare name that does not run would be useless"
+        );
+    }
+
+    #[test]
+    fn a_typo_in_an_addressed_name_is_still_caught() {
+        let tasks = workspace_tasks();
+        assert!(
+            suggestions(&tasks, "blog/previw").contains(&"@casoon/blog/preview".to_owned()),
+            "the member name must not be counted as part of the typo"
+        );
     }
 
     #[test]
