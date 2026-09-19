@@ -83,8 +83,8 @@ position: `pnpm --filter <m> run <s>`, `yarn workspace <m> run <s>`,
 
 ## The task model is the single abstraction
 
-`Task` is what the interactive list, the command line and — later — the search
-all operate on. It carries the workspace member it belongs to, if any. `opi dev` and selecting `dev` from the list reach
+`Task` is what the interactive list, the command line and the search all
+operate on. It carries the workspace member it belongs to, if any. `opi dev` and selecting `dev` from the list reach
 `run::execute` by different routes but with the same value.
 
 This is deliberate: if the two ever need separate handling, the boundary has
@@ -127,6 +127,9 @@ Every user-facing string comes from [runemark](https://github.com/casoon/runemar
   script names, so a selection is ready to run.
 - A list larger than the terminal is fitted to it by runemark: taller lists
   scroll, and entries are shortened rather than wrapped.
+- `/` filters the menu. Matching lives in runemark and works on what the menu
+  displays; `task::suggestions` is a separate thing, correcting a mistyped name
+  on the command line where there is no list to filter.
 - Interactive selection needs runemark's `select` feature and both stdout and
   stderr to be terminals — stdout decides whether output is being captured,
   and the menu draws its frames on stderr.

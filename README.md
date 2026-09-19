@@ -5,7 +5,7 @@
 Go into any repository, type `opi`, and get a usable interface for that
 project — without configuring anything first.
 
-> **Status: `0.1.1` does one thing — makes a project's `package.json` scripts
+> **Status: `0.2.0` does one thing — makes a project's `package.json` scripts
 > immediately runnable.** Health, dependency updates, clean and security are
 > designed but not built.
 
@@ -32,13 +32,16 @@ Quality
 ```
 
 `Enter` runs the highlighted script. That is the shortest path, and nothing is
-placed in front of it. A list taller than the terminal scrolls.
+placed in front of it. A list taller than the terminal scrolls, and `/` filters
+it as you type — in a monorepo that is the difference between scrolling past
+thirty entries and typing three letters.
 
 Three speeds, all backed by the same task model:
 
 ```bash
-opi              # navigate: ↓ ↓ Enter
-opi dev          # direct, no interface
+opi                   # navigate: ↓ ↓ Enter
+opi                   # or filter: /dep ↵
+opi dev               # direct, no interface
 opi build --verbose   # arguments are forwarded to the script
 ```
 

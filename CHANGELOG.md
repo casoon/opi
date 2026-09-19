@@ -6,6 +6,20 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-09-19
+
+### Added
+
+- `/` filters the list as you type. Groups with nothing left disappear and the
+  cursor sits on the best match. In one real project this narrows 29 entries to
+  3 for `dep`; `og` finds a workspace member's `generate:og` that would
+  otherwise be twenty rows down.
+- The footer shows `/ search`, so the key is discoverable rather than folklore.
+
+Matching ranks a name the user is typing towards above a description that
+happens to share letters, and a tight run of characters above the same letters
+scattered through a longer name (runemark 0.5.1).
+
 ## [0.1.1] - 2026-09-19
 
 Both changes come from running `0.1.0` against a real project, where a list of
@@ -63,7 +77,8 @@ Placeholder release. Reserves the crate name on crates.io and establishes the
 repository skeleton. The binary prints its version and a development notice; no
 functionality is implemented.
 
-[Unreleased]: https://github.com/casoon/opi/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/casoon/opi/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/casoon/opi/releases/tag/v0.2.0
 [0.1.1]: https://github.com/casoon/opi/releases/tag/v0.1.1
 [0.1.0]: https://github.com/casoon/opi/releases/tag/v0.1.0
 [0.0.1]: https://github.com/casoon/opi/releases/tag/v0.0.1
