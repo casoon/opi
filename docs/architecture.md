@@ -231,6 +231,29 @@ would be counted twice. `node_modules` is never bundled with build artefacts.
 
 Every user-facing string comes from [runemark](https://github.com/casoon/runemark).
 
+### Where a `Report` is used, and where it is not
+
+runemark's `Report` carries a verdict, metrics, grouped findings and next
+steps. It is used for the two screens whose data is **parsed** — the dependency
+audit and the update list — where it earns its keep: severity counts become
+metrics, the safe/breaking split becomes two groups rather than a sentence
+under a list, and an advisory's fixed version range becomes a `Remedy`.
+
+It is deliberately **not** used for health, workflows or the secret scan, and
+the reason is the same for all three: those relay a tool's own output rather
+than parsing it. Tried both ways against real output:
+
+- Everything in one `Finding` collapses the newlines, so a tool's box rules and
+  its indentation — which file, which line — turn into a run-on paragraph.
+- One `Finding` per line prefixes each with a bullet, flattening the same
+  indentation, and reports a count of lines as if it were a count of findings.
+
+Two further reasons hold for health specifically. Its results **stream**: each
+check prints as it finishes so a slow test run does not look like a hang, while
+a report is built and rendered once. And a `Metric` carries a `Tone` but no
+symbol, so with colour off a failing check is indistinguishable from a passing
+one — which matters because `opi` is piped and run in CI.
+
 - The list is a `runemark::Menu`, built in `main::build_menu`. Item ids are
   script names, so a selection is ready to run.
 - A list larger than the terminal is fitted to it by runemark: taller lists

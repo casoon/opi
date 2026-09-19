@@ -27,7 +27,8 @@ use std::path::Path;
 use std::process::ExitCode;
 
 use runemark::{
-    ColorMode, Console, ErrorBlock, Group, Hint, Item, Menu, Outcome, SelectMode, Tone,
+    ColorMode, Console, DetailLevel, ErrorBlock, Finding, FindingGroup, Group, Hint, Item, Menu,
+    Metric, NextStep, Outcome, Report, SelectMode, Tone, Verdict,
 };
 
 use crate::cli::Invocation;
@@ -744,49 +745,49 @@ fn security(
                 .any(|advisory| advisory.severity.serious());
             clean = clean && !serious;
 
-            let summary = found
-                .counts()
-                .iter()
-                .map(|(severity, count)| format!("{count} {}", severity.label()))
-                .collect::<Vec<_>>()
-                .join(", ");
-            println!(
-                "{} {}",
-                console.paint(if serious { Tone::Error } else { Tone::Warning }, "!"),
-                console.paint(
-                    if serious { Tone::Error } else { Tone::Warning },
-                    format!("Dependencies — {summary}")
-                )
-            );
+            // Parsed rather than relayed, so this is where a report earns its
+            // keep: severity counts as metrics, each advisory with the version
+            // range that fixes it as its remedy.
+            let mut report = Report::new(
+                "Dependencies",
+                if serious {
+                    Verdict::Failed
+                } else {
+                    Verdict::Warning
+                },
+            )
+            .with_detail_level(DetailLevel::Detailed);
 
-            // Summarised by default: a tree of six hundred dependencies
-            // produces far more prose than anyone reads.
-            let width = found
-                .advisories
-                .iter()
-                .map(|advisory| advisory.module.chars().count())
-                .max()
-                .unwrap_or(0);
-            for advisory in found.advisories.iter().take(OUTPUT_LINES) {
-                let fix = advisory
-                    .patched
-                    .as_deref()
-                    .map_or_else(String::new, |patched| format!("  → {patched}"));
-                println!(
-                    "  {}  {}{}",
-                    console.paint(Tone::Info, format!("{:width$}", advisory.module)),
-                    console.paint(Tone::Muted, advisory.severity.label()),
-                    console.paint(Tone::Muted, fix),
-                );
+            for (severity, count) in found.counts() {
+                report =
+                    report.add_metric(Metric::new(severity.label(), count.to_string()).with_tone(
+                        if severity.serious() {
+                            Tone::Error
+                        } else {
+                            Tone::Warning
+                        },
+                    ));
             }
-            if let Some(rest) = found
-                .advisories
-                .len()
-                .checked_sub(OUTPUT_LINES)
-                .filter(|n| *n > 0)
-            {
-                println!("  {}", console.paint(Tone::Muted, format!("… {rest} more")));
+
+            let mut group = FindingGroup::new("Vulnerable dependencies");
+            for advisory in &found.advisories {
+                let mut finding = Finding::new(
+                    if advisory.severity.serious() {
+                        Tone::Error
+                    } else {
+                        Tone::Warning
+                    },
+                    &advisory.module,
+                )
+                .with_rule_id(advisory.severity.label());
+                if let Some(patched) = &advisory.patched {
+                    finding = finding.with_remedy(format!("update to {patched}"));
+                }
+                group = group.add_finding(finding);
             }
+            report = report.add_group(group);
+
+            print!("{}", report.render(console));
         }
         Err(error) => println!(
             "{} {}",
@@ -918,16 +919,13 @@ fn run_workflow(
 }
 
 /// Shows which dependencies have moved on, separated by how far.
+///
+/// Rendered as a runemark `Report` rather than a hand-set table: the split
+/// between safe and breaking is the whole value of this screen, and a report's
+/// groups make it structural instead of a sentence underneath a list.
 fn updates(project: &Project, root: &Path) -> ExitCode {
     let console = Console::stdout(ColorMode::Auto);
     let manager = project.package_manager.manager;
-
-    println!(
-        "{}  {}",
-        console.paint(Tone::Title, project.display_name(root)),
-        console.paint(Tone::Muted, "updates")
-    );
-    println!();
 
     let found = match outdated::run(manager, root) {
         Ok(found) => found,
@@ -940,64 +938,63 @@ fn updates(project: &Project, root: &Path) -> ExitCode {
     };
 
     if found.is_empty() {
-        println!("{}", console.paint(Tone::Success, "Everything is current."));
+        println!(
+            "{}  {}",
+            console.paint(Tone::Title, project.display_name(root)),
+            console.paint(Tone::Success, "everything is current")
+        );
         return ExitCode::SUCCESS;
     }
 
-    let width = found
-        .iter()
-        .map(|update| update.name.chars().count())
-        .max()
-        .unwrap_or(0);
-    let versions = found
-        .iter()
-        .map(|update| update.current.chars().count())
-        .max()
-        .unwrap_or(0);
+    let (breaking, safe): (Vec<_>, Vec<_>) =
+        found.iter().partition(|update| update.jump.breaking());
 
-    for update in &found {
-        println!(
-            "  {}  {} → {}  {}",
-            console.paint(Tone::Info, format!("{:width$}", update.name)),
-            console.paint(Tone::Muted, format!("{:>versions$}", update.current)),
-            console.paint(Tone::Muted, &update.latest),
-            console.paint(
-                if update.jump.breaking() {
-                    Tone::Warning
-                } else {
-                    Tone::Muted
-                },
-                update.jump.label()
-            ),
+    let mut report = Report::new(
+        project.display_name(root),
+        if breaking.is_empty() {
+            Verdict::Info
+        } else {
+            Verdict::Warning
+        },
+    )
+    .with_detail_level(DetailLevel::Detailed);
+
+    if !safe.is_empty() {
+        report = report.add_metric(Metric::new("safe", safe.len().to_string()));
+    }
+    if !breaking.is_empty() {
+        report = report
+            .add_metric(Metric::new("major", breaking.len().to_string()).with_tone(Tone::Warning));
+    }
+
+    for (title, tone, group) in [
+        ("Safe to take", Tone::Muted, &safe),
+        ("A decision each", Tone::Warning, &breaking),
+    ] {
+        if group.is_empty() {
+            continue;
+        }
+        let mut findings = FindingGroup::new(title);
+        for update in group.iter() {
+            findings = findings.add_finding(
+                Finding::new(
+                    tone,
+                    format!("{} {} → {}", update.name, update.current, update.latest),
+                )
+                .with_rule_id(update.jump.label()),
+            );
+        }
+        report = report.add_group(findings);
+    }
+
+    if !safe.is_empty() {
+        report = report.add_next_step(
+            NextStep::new("Take the safe ones").with_command(format!("{manager} update")),
         );
     }
 
-    let safe = found
-        .iter()
-        .filter(|update| !update.jump.breaking())
-        .count();
-    let breaking = found.len() - safe;
-    println!();
-
-    // The separation is the point: "four safe, one major" is a decision, a
-    // column of version numbers is homework.
-    let summary = match (safe, breaking) {
-        (0, n) => format!("{n} major update(s) — each one a decision of its own"),
-        (n, 0) => format!("{n} safe update(s)"),
-        (n, m) => format!("{n} safe update(s) · {m} major"),
-    };
-    println!("{}", console.paint(Tone::Info, summary));
-
-    if safe > 0 {
-        // opi stops here on purpose. Applying updates rewrites package.json
-        // and the lockfile, and with pnpm catalogs the versions may not even
-        // live in package.json — a wrong guess there is expensive, and the
-        // package manager already does it correctly.
-        println!(
-            "{}",
-            console.paint(Tone::Muted, format!("Apply them with: {manager} update"))
-        );
-    }
-
+    // No width hint: two metrics read better side by side than stacked, and
+    // the findings wrap on their own.
+    print!("{}", report.render(console));
     ExitCode::SUCCESS
 }

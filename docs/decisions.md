@@ -125,6 +125,20 @@ state — it is not a history.
 > *Consequence:* the value of the screen is the separation — "two safe, one
 > major" is a decision, a column of version numbers is homework.
 
+> **A `Report` where the data is parsed, raw output where it is not**
+>
+> The dependency audit and the update list render as runemark `Report`s. Health,
+> the workflows and the secret scan print the tool's own output instead.
+>
+> *Reason:* a `Finding` is a message. Relayed output is not one — putting it in
+> a single finding collapses its structure, and splitting it per line flattens
+> the tool's indentation and counts lines as findings. Both were tried against
+> real output and both read worse than the tool itself.
+>
+> *Consequence:* `opi` uses roughly half of runemark's surface, and that is the
+> intended answer rather than a gap. The half it does not use is for
+> applications that own their finding types; `opi` deliberately does not.
+
 > **No health score**
 >
 > Health reports concrete results — counts, findings, file locations — and never

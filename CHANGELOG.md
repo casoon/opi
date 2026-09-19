@@ -6,6 +6,22 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-09-19
+
+### Changed
+
+- The dependency audit and the update list render as runemark `Report`s. The
+  split between safe and breaking updates is now two groups rather than a
+  sentence under a flat list, severity counts are metrics, and an advisory's
+  fixed version range is a remedy.
+
+### Notes
+
+Health, the workflows and the secret scan keep printing their tool's own
+output, which was settled by trying the alternative: a relayed blob in one
+`Finding` collapses the tool's structure, and one `Finding` per line flattens
+its indentation and counts lines as if they were findings.
+
 ## [0.5.1] - 2026-09-19
 
 ### Fixed
@@ -187,7 +203,8 @@ Placeholder release. Reserves the crate name on crates.io and establishes the
 repository skeleton. The binary prints its version and a development notice; no
 functionality is implemented.
 
-[Unreleased]: https://github.com/casoon/opi/compare/v0.5.1...HEAD
+[Unreleased]: https://github.com/casoon/opi/compare/v0.5.2...HEAD
+[0.5.2]: https://github.com/casoon/opi/releases/tag/v0.5.2
 [0.5.1]: https://github.com/casoon/opi/releases/tag/v0.5.1
 [0.5.0]: https://github.com/casoon/opi/releases/tag/v0.5.0
 [0.4.0]: https://github.com/casoon/opi/releases/tag/v0.4.0
