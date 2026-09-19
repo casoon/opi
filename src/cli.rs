@@ -19,6 +19,8 @@ pub enum Invocation {
     },
     Help,
     Version,
+    /// Run the project's checks.
+    Health,
     /// A flag `opi` does not know, before any script name.
     UnknownFlag(String),
 }
@@ -46,6 +48,9 @@ where
     match first.as_str() {
         "-h" | "--help" => Invocation::Help,
         "-V" | "--version" => Invocation::Version,
+        // A flag, not a bare word: a project with a script called "health"
+        // must keep "opi health" meaning its own.
+        "--health" => Invocation::Health,
         _ if first.starts_with('-') => Invocation::UnknownFlag(first),
         _ => {
             let mut rest: Vec<String> = args.collect();
@@ -69,7 +74,10 @@ Usage:
   opi                     List the project's scripts
   opi <script> [args…]    Run a script, passing args on to it
 
+In the list, ↑↓ move, Enter runs, / filters, H checks the project.
+
 Options:
+      --health            Run the project's checks
   -h, --help              Show this help
   -V, --version           Show the version
 
@@ -136,6 +144,16 @@ mod tests {
         assert_eq!(parse(["-h"]), Invocation::Help);
         assert_eq!(parse(["--version"]), Invocation::Version);
         assert_eq!(parse(["-V"]), Invocation::Version);
+    }
+
+    #[test]
+    fn health_is_a_flag_so_a_script_can_own_the_word() {
+        assert_eq!(parse(["--health"]), Invocation::Health);
+        assert_eq!(
+            parse(["health"]),
+            run("health", &[]),
+            "a project script named health still wins"
+        );
     }
 
     #[test]

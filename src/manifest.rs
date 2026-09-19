@@ -28,6 +28,10 @@ pub struct Manifest {
     /// uses `pnpm-workspace.yaml` instead.
     #[serde(default, deserialize_with = "workspace_patterns")]
     pub workspaces: Vec<String>,
+    #[serde(default)]
+    dependencies: BTreeMap<String, String>,
+    #[serde(default, rename = "devDependencies")]
+    dev_dependencies: BTreeMap<String, String>,
 }
 
 /// Accepts both shapes the `workspaces` field takes: a bare list, or an object
@@ -86,6 +90,14 @@ impl Manifest {
         };
 
         serde_json::from_str(&contents).map_err(|error| ManifestError::Malformed { path, error })
+    }
+
+    /// Whether the project depends on `package`, in either dependency set.
+    ///
+    /// Which one it is in does not matter here: a tool is available to run
+    /// either way.
+    pub fn depends_on(&self, package: &str) -> bool {
+        self.dependencies.contains_key(package) || self.dev_dependencies.contains_key(package)
     }
 
     /// The description for `script`, if the project provides one.
@@ -234,6 +246,16 @@ mod tests {
 
         let (manifest, _) = Manifest::discover(&inner).expect("discover");
         assert_eq!(manifest.name.as_deref(), Some("blog"));
+    }
+
+    #[test]
+    fn dependencies_are_found_in_either_set() {
+        let manifest =
+            load(r#"{"dependencies":{"astro":"^7"},"devDependencies":{"@biomejs/biome":"^2"}}"#)
+                .expect("parse");
+        assert!(manifest.depends_on("astro"));
+        assert!(manifest.depends_on("@biomejs/biome"));
+        assert!(!manifest.depends_on("eslint"));
     }
 
     #[test]

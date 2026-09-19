@@ -594,6 +594,7 @@ mod tests {
         let root = manifest(r#"{"scripts":{"dev":"x","build":"x"}}"#);
         let member = Member {
             name: "@casoon/blog".to_owned(),
+            path: std::path::PathBuf::new(),
             manifest: manifest(r#"{"scripts":{"dev":"x","preview":"x"}}"#),
         };
         Task::from_workspace(&root, &[member])
@@ -618,6 +619,7 @@ mod tests {
         let root = manifest(r#"{"scripts":{"build":"x"}}"#);
         let member = Member {
             name: "app".to_owned(),
+            path: std::path::PathBuf::new(),
             manifest: manifest(r#"{"scripts":{"build":"x","generate:og":"x","start":"x"}}"#),
         };
         let tasks = Task::from_workspace(&root, &[member]);
@@ -634,6 +636,7 @@ mod tests {
         let root = manifest(r#"{"scripts":{"dev":"x","build":"x"}}"#);
         let member = Member {
             name: "app".to_owned(),
+            path: std::path::PathBuf::new(),
             manifest: manifest(r#"{"scripts":{"dev":"x","build":"x"}}"#),
         };
         let tasks = Task::from_workspace(&root, &[member]);

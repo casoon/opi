@@ -16,6 +16,9 @@ use crate::manifest::Manifest;
 pub struct Member {
     /// The package's `name`, used to address it when running a script.
     pub name: String,
+    /// Where it lives. Its own tools are installed there, not at the root:
+    /// pnpm does not hoist a member's binaries.
+    pub path: PathBuf,
     pub manifest: Manifest,
 }
 
@@ -48,7 +51,11 @@ pub fn members(dir: &Path, manifest: &Manifest) -> Vec<Member> {
                 path.file_name()
                     .map(|name| name.to_string_lossy().into_owned())
             })?;
-            Some(Member { name, manifest })
+            Some(Member {
+                name,
+                path,
+                manifest,
+            })
         })
         .collect();
 

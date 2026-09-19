@@ -9,6 +9,7 @@ compile_error!(
      and its interactive list drives termios directly."
 );
 
+mod check;
 mod cli;
 mod manifest;
 mod project;
@@ -20,7 +21,9 @@ use std::io::{self, IsTerminal, Write};
 use std::path::Path;
 use std::process::ExitCode;
 
-use runemark::{ColorMode, Console, ErrorBlock, Group, Item, Menu, Outcome, SelectMode, Tone};
+use runemark::{
+    ColorMode, Console, ErrorBlock, Group, Hint, Item, Menu, Outcome, SelectMode, Tone,
+};
 
 use crate::cli::Invocation;
 use crate::manifest::{Manifest, ManifestError};
@@ -28,6 +31,9 @@ use crate::project::Project;
 use crate::task::{Task, by_group, find, suggestions};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
+
+/// Lines of a failing tool's output health prints before pointing at the tool.
+const OUTPUT_LINES: usize = 20;
 
 fn main() -> ExitCode {
     let invocation = cli::parse(std::env::args().skip(1));
@@ -74,7 +80,8 @@ fn main() -> ExitCode {
     let tasks = Task::from_workspace(&manifest, &members);
 
     match invocation {
-        Invocation::List => list(&project, &tasks, &root),
+        Invocation::List => list(&manifest, &members, &project, &tasks, &root),
+        Invocation::Health => health(&manifest, &members, &project, &root),
         Invocation::Run { name, args } => start(&project, &tasks, &name, &args),
         // An unknown flag is only reported once a project is present, so the
         // missing-package.json message wins where both are true — that is the
@@ -91,7 +98,13 @@ fn main() -> ExitCode {
 }
 
 /// Shows the project's scripts and runs whichever one is chosen.
-fn list(project: &Project, tasks: &[Task], directory: &Path) -> ExitCode {
+fn list(
+    manifest: &Manifest,
+    members: &[workspace::Member],
+    project: &Project,
+    tasks: &[Task],
+    directory: &Path,
+) -> ExitCode {
     let manager = project.package_manager;
 
     if tasks.is_empty() {
@@ -122,7 +135,13 @@ fn list(project: &Project, tasks: &[Task], directory: &Path) -> ExitCode {
         );
     }
 
-    let menu = build_menu(project, tasks, directory);
+    let mut menu = build_menu(project, tasks, directory);
+    // Offered only where it would do something; a key that answers "nothing
+    // applies" is worse than no key.
+    let checks = check::Check::detect_all(manifest, members, directory);
+    if !checks.is_empty() {
+        menu = menu.add_hint(Hint::new('H', "Health"));
+    }
 
     // Both streams have to be terminals. stdout decides whether the list is
     // being captured rather than read, and the menu draws its frames on
@@ -148,7 +167,7 @@ fn list(project: &Project, tasks: &[Task], directory: &Path) -> ExitCode {
         Outcome::Selected(id) => start(project, tasks, &id, &[]),
         // Nothing was chosen; that is not a failure.
         Outcome::Cancelled => ExitCode::SUCCESS,
-        // No hints are registered until the maintenance areas exist.
+        Outcome::Hotkey('H') => health(manifest, members, project, directory),
         Outcome::Hotkey(_) => ExitCode::SUCCESS,
         Outcome::Unavailable => {
             print!("{}", menu.render(Console::stdout(ColorMode::Auto)));
@@ -256,4 +275,119 @@ fn report_error(error: &ManifestError) {
     };
 
     write_block(&block, console);
+}
+
+/// Runs the project's checks and reports what each tool said.
+fn health(
+    manifest: &Manifest,
+    members: &[workspace::Member],
+    project: &Project,
+    root: &Path,
+) -> ExitCode {
+    let console = Console::stdout(ColorMode::Auto);
+    let checks = check::Check::detect_all(manifest, members, root);
+
+    println!(
+        "{}  {}",
+        console.paint(Tone::Title, project.display_name(root)),
+        console.paint(Tone::Muted, "health")
+    );
+    println!();
+
+    if checks.is_empty() {
+        println!(
+            "{}",
+            console.paint(
+                Tone::Muted,
+                "No checks apply: this project depends on none of the tools opi knows."
+            )
+        );
+        return ExitCode::SUCCESS;
+    }
+
+    // Results print as they arrive rather than after the slowest one, so a
+    // long test run does not look like a hang.
+    let width = checks
+        .iter()
+        .map(|check| check.label().chars().count())
+        .max()
+        .unwrap_or(0);
+    let reports = check::run_all(checks, |report| {
+        let (tone, mark) = match report {
+            report if report.passed() => (Tone::Success, "✓"),
+            report if report.unusable() => (Tone::Warning, "!"),
+            _ => (Tone::Error, "✗"),
+        };
+        println!(
+            "{} {}  {}  {}",
+            console.paint(tone, mark),
+            console.paint(tone, format!("{:width$}", report.check.label())),
+            console.paint(
+                Tone::Muted,
+                format!("{:>6.1}s", report.duration.as_secs_f64())
+            ),
+            console.paint(Tone::Muted, report.check.tool),
+        );
+    });
+
+    let failed: Vec<&check::Report> = reports.iter().filter(|report| !report.passed()).collect();
+    let unusable = failed.iter().filter(|report| report.unusable()).count();
+
+    // No score. A composite number stops meaning anything within weeks; what a
+    // failing tool actually said does not.
+    for report in &failed {
+        println!();
+        let tone = if report.unusable() {
+            Tone::Warning
+        } else {
+            Tone::Error
+        };
+        println!(
+            "{}",
+            console.paint(
+                tone,
+                format!("{} — {}", report.check.label(), report.check.tool)
+            )
+        );
+        // Capped: one failing scanner produced 49 lines on a real project, and
+        // several at once bury the summary that says what to do next.
+        let lines: Vec<&str> = report.output.lines().collect();
+        for line in lines.iter().take(OUTPUT_LINES) {
+            println!("  {line}");
+        }
+        if let Some(hidden) = lines.len().checked_sub(OUTPUT_LINES).filter(|n| *n > 0) {
+            println!(
+                "  {}",
+                console.paint(
+                    Tone::Muted,
+                    format!(
+                        "… {hidden} more lines — run `{}` in {} to see them all",
+                        report.check.command_line(),
+                        report.check.scope.as_deref().unwrap_or("the project root"),
+                    )
+                )
+            );
+        }
+    }
+
+    println!();
+    if failed.is_empty() {
+        println!(
+            "{}",
+            console.paint(Tone::Success, format!("{} checks passed.", reports.len()))
+        );
+        ExitCode::SUCCESS
+    } else {
+        let note = if unusable > 0 {
+            format!(
+                "{} of {} checks failed, {unusable} could not run.",
+                failed.len(),
+                reports.len()
+            )
+        } else {
+            format!("{} of {} checks failed.", failed.len(), reports.len())
+        };
+        println!("{}", console.paint(Tone::Error, note));
+        ExitCode::FAILURE
+    }
 }
