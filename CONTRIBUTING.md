@@ -48,5 +48,15 @@ Behaviour that is easy to break and not fully covered by tests:
 
 ## Commits and releases
 
-Keep [CHANGELOG.md](CHANGELOG.md) current under `## [Unreleased]`. A version tag
-`v*` triggers the release workflow.
+Keep [CHANGELOG.md](CHANGELOG.md) current under `## [Unreleased]`.
+
+Releases are published from a maintainer machine, not from CI, so the registry
+token stays there and releasing is a deliberate step rather than a side effect
+of pushing a tag:
+
+1. Bump the version in `Cargo.toml` and date the release in `CHANGELOG.md`.
+2. Run the gates above, and check the tarball with `cargo package --locked`.
+3. `cargo publish`.
+4. Push the tag `v<version>`. The workflow verifies the tag matches the crate
+   version, confirms the version is on crates.io, and creates the GitHub
+   release. A tag pushed before publishing fails with that reason.

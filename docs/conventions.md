@@ -18,6 +18,13 @@ cargo package --locked
 CI runs these plus `cargo doc` with warnings denied, on `1.85` and stable
 across Linux and macOS.
 
+## Releasing
+
+`cargo publish` is run locally. The release workflow verifies the tag against
+the crate version, confirms the version is on crates.io, and creates the GitHub
+release — it never publishes. The registry token stays on a maintainer machine
+rather than in repository secrets.
+
 ## Modules
 
 One module per layer, named for what it produces: `manifest`, `workspace`,
