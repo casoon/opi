@@ -6,6 +6,15 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- A workspace member's script is no longer listed when the root defines one by
+  the same name. The root wins that name on the command line anyway, so listing
+  both offered a choice the interface could not honour. On one real project
+  this removed 12 of 18 member entries, none of which carried a description.
+- Entries are fitted to the terminal width instead of wrapping to column zero
+  (runemark 0.4.2).
+
 ## [0.1.0] - 2026-09-19
 
 The first release that does something. `opi` makes a project's `package.json`

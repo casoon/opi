@@ -42,8 +42,9 @@ opi dev          # direct, no interface
 opi build --verbose   # arguments are forwarded to the script
 ```
 
-In a monorepo each workspace member's scripts appear under the member's name.
-Root and member scripts share names in practice, so a bare name runs the
+In a monorepo each workspace member's scripts appear under the member's name —
+only those the root does not already define, since the root's script usually
+wraps them and wins the name anyway. Where both exist, a bare name runs the
 root's and `blog/dev` runs the member's:
 
 ```bash

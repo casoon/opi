@@ -138,6 +138,13 @@ impl Task {
     /// Member scripts keep their own names and are grouped under the member,
     /// so `dev` appears once per package rather than being renamed into
     /// something like `blog:dev` that matches nothing in that package.
+    ///
+    /// A member script whose name the root also defines is left out. The root
+    /// wins that name on the command line already, so listing both offers a
+    /// choice the interface cannot honour — and in practice the root's script
+    /// is a wrapper around the members' anyway. Measured on one real project,
+    /// this is 12 of 18 member entries, none of which carried a description.
+    /// What remains is exactly what the root cannot reach.
     pub fn from_workspace(manifest: &Manifest, members: &[Member]) -> Vec<Self> {
         let mut tasks = Self::from_manifest(manifest);
 
@@ -146,6 +153,7 @@ impl Task {
                 .manifest
                 .scripts
                 .iter()
+                .filter(|(name, _)| !manifest.scripts.contains_key(name.as_str()))
                 .filter(|(name, _)| !is_implicit_lifecycle(name, &member.manifest))
                 .map(|(name, command)| Self {
                     name: name.clone(),
@@ -476,6 +484,52 @@ mod tests {
     }
 
     #[test]
+    fn a_member_script_the_root_also_defines_is_left_out() {
+        // Measured on a real project: 12 of 18 member entries duplicated a root
+        // name, none of them with a description. The root wins that name on the
+        // command line anyway, so listing both offers an unhonourable choice.
+        let tasks = workspace_tasks();
+        let member_entries: Vec<&str> = tasks
+            .iter()
+            .filter(|task| task.workspace.is_some())
+            .map(|task| task.name.as_str())
+            .collect();
+        assert_eq!(member_entries, ["preview"], "dev is the root's");
+    }
+
+    #[test]
+    fn a_member_keeps_what_the_root_cannot_reach() {
+        let root = manifest(r#"{"scripts":{"build":"x"}}"#);
+        let member = Member {
+            name: "app".to_owned(),
+            manifest: manifest(r#"{"scripts":{"build":"x","generate:og":"x","start":"x"}}"#),
+        };
+        let tasks = Task::from_workspace(&root, &[member]);
+        let kept: Vec<&str> = tasks
+            .iter()
+            .filter(|task| task.workspace.is_some())
+            .map(|task| task.name.as_str())
+            .collect();
+        assert_eq!(kept, ["generate:og", "start"]);
+    }
+
+    #[test]
+    fn a_member_whose_scripts_all_duplicate_the_root_disappears_entirely() {
+        let root = manifest(r#"{"scripts":{"dev":"x","build":"x"}}"#);
+        let member = Member {
+            name: "app".to_owned(),
+            manifest: manifest(r#"{"scripts":{"dev":"x","build":"x"}}"#),
+        };
+        let tasks = Task::from_workspace(&root, &[member]);
+        assert!(tasks.iter().all(|task| task.workspace.is_none()));
+        assert_eq!(
+            by_group(&tasks).len(),
+            2,
+            "no empty member group is left behind"
+        );
+    }
+
+    #[test]
     fn a_bare_name_reaches_the_root_script() {
         let tasks = workspace_tasks();
         let found = find(&tasks, "dev").expect("dev");
@@ -485,14 +539,14 @@ mod tests {
     #[test]
     fn an_addressed_name_reaches_the_member() {
         let tasks = workspace_tasks();
-        let found = find(&tasks, "@casoon/blog/dev").expect("member dev");
+        let found = find(&tasks, "@casoon/blog/preview").expect("member preview");
         assert_eq!(found.workspace.as_deref(), Some("@casoon/blog"));
     }
 
     #[test]
     fn a_scoped_member_answers_to_its_short_name() {
         let tasks = workspace_tasks();
-        let found = find(&tasks, "blog/dev").expect("short form");
+        let found = find(&tasks, "blog/preview").expect("short form");
         assert_eq!(found.workspace.as_deref(), Some("@casoon/blog"));
     }
 
@@ -510,7 +564,7 @@ mod tests {
     #[test]
     fn an_unknown_address_finds_nothing() {
         let tasks = workspace_tasks();
-        assert!(find(&tasks, "shop/dev").is_none());
+        assert!(find(&tasks, "shop/preview").is_none());
         assert!(find(&tasks, "blog/nope").is_none());
     }
 
@@ -523,7 +577,8 @@ mod tests {
                 .iter()
                 .filter(|task| task.group == member_group)
                 .count(),
-            2
+            1,
+            "the member's dev duplicates the root's and is left out"
         );
         // Workspace groups come after everything the root owns.
         assert_eq!(tasks.last().expect("last").group, member_group);

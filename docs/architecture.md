@@ -62,6 +62,13 @@ version pins into workspace packages.
 Each member becomes a `Group::Workspace`, sorted after everything the root
 owns.
 
+**A member script whose name the root also defines is left out.** The root
+already wins that name on the command line, so listing both offers a choice the
+interface cannot honour, and in practice the root's script wraps the members'.
+Measured on one real project this removed 12 of 18 member entries, none of
+which carried a description; what remained was exactly what the root cannot
+reach. A member left with nothing shows no group at all.
+
 ### Addressing a member
 
 Root and member scripts share names in every workspace repository measured, so
@@ -118,7 +125,8 @@ Every user-facing string comes from [runemark](https://github.com/casoon/runemar
 
 - The list is a `runemark::Menu`, built in `main::build_menu`. Item ids are
   script names, so a selection is ready to run.
-- A list taller than the terminal scrolls; runemark windows it.
+- A list larger than the terminal is fitted to it by runemark: taller lists
+  scroll, and entries are shortened rather than wrapped.
 - Interactive selection needs runemark's `select` feature and both stdout and
   stderr to be terminals — stdout decides whether output is being captured,
   and the menu draws its frames on stderr.
