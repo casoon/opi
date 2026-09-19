@@ -5,9 +5,8 @@
 Go into any repository, type `opi`, and get a usable interface for that
 project — without configuring anything first.
 
-> **Status: `0.2.0` does one thing — makes a project's `package.json` scripts
-> immediately runnable.** Health, dependency updates, clean and security are
-> designed but not built.
+> **Status: `0.3.0`.** Scripts are the main thing; health, security, updates,
+> clean and the commit/release workflows are built on top of them.
 
 ## What it does
 
@@ -62,10 +61,38 @@ The script replaces the `opi` process, so `Ctrl-C` reaches your dev server
 rather than killing a wrapper, and the script's exit code is what your shell
 sees — `opi build && …` works.
 
-Later releases add project health with parallel checks, dependency updates,
-clean with real sizes, a fuzzy search and secret scanning — each orchestrating
-an established tool (`tsc`, ESLint, Biome, Vitest, Knip, No Secrets,
-`pnpm audit`, Taze) rather than reimplementing it.
+## The other areas
+
+Each is a hotkey in the list and a flag on the command line. Never a bare word:
+`health`, `clean` and `release` are script names in real projects, and the bare
+word stays theirs.
+
+| | | |
+| --- | --- | --- |
+| `H` | `opi --health` | Runs every check the project's tools can answer, concurrently |
+| `S` | `opi --security` | Secret scan and a parsed dependency audit |
+| `U` | `opi --updates` | What is outdated, split into safe and major |
+| `C` | `opi --clean` | Removable artefacts, with what each one costs |
+| | `opi --check commit` | The fast checks, before you commit |
+| | `opi --check release` | Everything, plus a clean tree and an untagged version |
+
+```
+astro-v7-workspace  health
+
+✓ Lint & format                     0.2s  biome
+✗ Secrets                           1.0s  nosecrets
+✓ TypeScript (@astro-v7/starter)    5.2s  astro
+✓ TypeScript (@astro-v7/blog)       5.4s  astro
+```
+
+`opi` reimplements none of this. It detects which tool a project depends on —
+Biome, ESLint, Prettier, `tsc`, `astro check`, Vitest, Jest, Knip, fallow, a
+secret scanner — runs it, and relays what came back. In a workspace the checks
+run per member, in the member, because that is where the tools and their config
+live.
+
+There is no health score. A composite number stops meaning anything within
+weeks; what a failing tool actually said does not.
 
 ## Design rules
 

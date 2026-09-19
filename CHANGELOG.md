@@ -6,6 +6,46 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-09-19
+
+Five areas beside the script list, each a hotkey in the list and a flag on the
+command line — never a bare word, since `health`, `clean` and `release` are
+script names in real projects.
+
+### Added
+
+- **Health** (`H`, `--health`) runs every check the project's tools can answer,
+  concurrently. `opi` reimplements none of them: it detects the tool, runs it,
+  and relays the result. Checks run per workspace member, in the member —
+  a monorepo keeps TypeScript and its test runner in the packages, and pnpm does
+  not hoist their binaries.
+- **Security** (`S`, `--security`) scans for secrets and parses the package
+  manager's audit into package, severity and the version that fixes it.
+- **Updates** (`U`, `--updates`) lists what is outdated, split into safe and
+  major. A pre-1.0 minor counts as breaking, as does a version that does not
+  parse.
+- **Clean** (`C`, `--clean`) shows removable artefacts with what each costs, and
+  removes build output without ever bundling `node_modules` along with it.
+- **Workflows** (`--check commit`, `--check release`) run named subsets plus
+  repository gates: a clean tree and an untagged version before a release.
+
+### Changed
+
+- `deploy`, `release`, `clean`, `setup` and similar standalone names now have
+  Deploy and Maintenance groups instead of the catch-all, which halves it.
+- npm's own lifecycle scripts are hidden from the list — `prepare` appeared in
+  49 of 133 measured projects — but remain runnable by name.
+
+### Notes
+
+Two adapters in the plan were replaced by what the measurements found: Knip was
+present in 1 of 133 projects against fallow's 11%, and `taze` in none at all,
+while every package manager ships `outdated`.
+
+Applying updates is deliberately left to the package manager. Rewriting
+`package.json` and a lockfile — which with pnpm catalogs may not even hold the
+versions — is not a guess worth making.
+
 ## [0.2.0] - 2026-09-19
 
 ### Added
@@ -77,7 +117,8 @@ Placeholder release. Reserves the crate name on crates.io and establishes the
 repository skeleton. The binary prints its version and a development notice; no
 functionality is implemented.
 
-[Unreleased]: https://github.com/casoon/opi/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/casoon/opi/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/casoon/opi/releases/tag/v0.3.0
 [0.2.0]: https://github.com/casoon/opi/releases/tag/v0.2.0
 [0.1.1]: https://github.com/casoon/opi/releases/tag/v0.1.1
 [0.1.0]: https://github.com/casoon/opi/releases/tag/v0.1.0

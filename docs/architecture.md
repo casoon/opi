@@ -1,7 +1,8 @@
 # Architecture
 
 What exists today. `opi` lists a project's `package.json` scripts and runs the
-one you pick. Health, updates, clean and security are not built.
+one you pick, and offers five areas beside that: health, security, updates,
+clean, and named workflows.
 
 ## Modules
 
@@ -13,7 +14,12 @@ src/
 ├── workspace.rs workspace patterns → member manifests
 ├── project.rs   Manifest + directory → Project (name, package manager)
 ├── task.rs      Manifest + members → Vec<Task>, grouped and ordered
-└── run.rs       Task → the running script
+├── run.rs       Task → the running script
+├── check.rs     detect a project's tools, run them concurrently
+├── audit.rs     package manager audit → parsed advisories
+├── outdated.rs  package manager outdated → updates by semver jump
+├── clean.rs     removable artefacts, measured before they are offered
+└── workflow.rs  named sequences of checks, plus repository gates
 ```
 
 ## Flow
@@ -34,7 +40,11 @@ flowchart TD
 ```
 
 `package.json` is parsed once, by `manifest.rs`, and the result is shared by
-project detection and the task model. Neither re-reads the file.
+project detection, the task model and the checks. Nothing re-reads the file.
+
+The `opi` block inside it is deliberately held as unparsed JSON and read
+leniently. Typed into a struct, one field of the wrong type would fail the whole
+parse and make `opi` useless in a project whose `scripts` are perfectly fine.
 
 ## Finding the project
 
@@ -118,6 +128,46 @@ This is why `opi` is Unix-only — see [constraints.md](constraints.md).
 npm is the only package manager given a `--` before forwarded arguments; it
 needs the separator to tell its own flags from the script's and strips it,
 while the others would pass a literal `--` through.
+
+## The areas
+
+All five are reachable two ways: a hotkey in the list, and a flag. Never a bare
+word — `health`, `clean`, `release` and `commit` are all script names in real
+projects, and the bare word stays theirs.
+
+| Area | Key | Flag | What it does |
+| --- | --- | --- | --- |
+| Health | `H` | `--health` | Runs every detected check concurrently |
+| Security | `S` | `--security` | Secret scan plus a parsed dependency audit |
+| Updates | `U` | `--updates` | Outdated dependencies, split by semver jump |
+| Clean | `C` | `--clean` | Removable artefacts, with sizes |
+| Workflows | — | `--check commit`/`release` | A named subset, plus git gates |
+
+### Checks
+
+`check.rs` implements none of them. It detects which tool a package depends on,
+finds its binary in a `node_modules/.bin` at or above that package, runs it, and
+relays the result. Which tools to support was measured across 133 real projects
+rather than taken from the plan — Knip, prominent there, was present in one.
+
+Checks run **per workspace member**, not only at the root, and in the member's
+own directory: a monorepo keeps TypeScript and its test runner in the packages,
+and pnpm does not hoist their binaries.
+
+A non-zero exit means findings, which is a successful run with a result. A tool
+that will not start is reported apart from that, since a broken install needs a
+different remedy.
+
+Where several tools answer for the same concern, the first detected one runs and
+its name is shown, so a result is never anonymous.
+
+### Deleting
+
+`clean.rs` is the only code in `opi` that removes data, and is narrow by
+construction: directories inside the project only, never through a symlink,
+and a path from `opi.clean` that escapes the project is refused rather than
+corrected. A candidate contained in another candidate is dropped, or its bytes
+would be counted twice. `node_modules` is never bundled with build artefacts.
 
 ## Presentation
 

@@ -82,8 +82,25 @@ avoided.
 
 ## Measure before deciding
 
-Several rules here came from counting rather than reasoning: the `member/script`
-syntax, because every workspace repository measured had name collisions and
-none of 382 script names contained a slash; dropping the Node version line,
-because it was most of the startup time. Where a question is answerable by
-looking at real projects, look.
+Several rules here came from counting rather than reasoning, and twice the count
+contradicted the plan:
+
+- The plan named Knip as a dead-code adapter. Knip was present in 1 of 133 real
+  projects; `fallow`, absent from the plan, in 11%.
+- The plan called for a `taze` adapter for dependency updates. `taze` was
+  present in **none** of the 133, while every package manager ships `outdated`.
+- The `member/script` syntax, because every workspace repository measured had
+  root and member scripts sharing names, and none of 382 script names contained
+  a slash.
+- Dropping the Node version line, because it was most of the startup time.
+- The Deploy and Maintenance groups, because 273 of 1923 entries were landing in
+  the catch-all and they were a handful of names repeated everywhere.
+
+Where a question is answerable by looking at real projects, look — and where the
+answer contradicts the plan, the plan was a guess and the count is not.
+
+## Commands come from real projects
+
+A tool's invocation is taken from what projects already write in their scripts,
+not from its documentation. That is how `vitest run` got chosen over a bare
+`vitest`, which would have sat in watch mode and never returned.

@@ -18,13 +18,20 @@ proven tooling.
 
 ## Current status
 
-**The script list works; the maintenance areas do not.** `opi` finds the nearest
-`package.json`, groups its scripts, adds any workspace members' scripts, and
-runs the one you pick — from an interactive list or by name. Health, dependency
-updates, clean, security and the fuzzy search are not built.
+`opi` finds the nearest `package.json`, groups its scripts, adds any workspace
+members' scripts, and runs the one you pick — from an interactive list, by name,
+or by filtering with `/`.
 
-`0.1.0` is the first functional release. `0.0.1` before it was a placeholder
-that held the crate name.
+Beside that it offers five areas, each reachable by a hotkey in the list and by
+a flag: health, security, updates, clean, and the `commit` and `release`
+workflows. None of the underlying tools are reimplemented; `opi` detects which
+one a project uses, runs it and reports what came back.
+
+**Not built:** per-script metadata in the `opi` key, and ecosystems other than
+npm.
+
+`0.0.1` was a placeholder that held the crate name; everything since has been
+functional.
 
 See [architecture.md](architecture.md) for how the pieces fit.
 
