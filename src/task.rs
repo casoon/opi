@@ -130,6 +130,18 @@ fn capitalize(value: &str) -> String {
     }
 }
 
+/// How a task is started.
+///
+/// The second variant is what makes more than one ecosystem possible: a script
+/// goes through the package manager, everything else names its own program.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Exec {
+    /// A `package.json` script, run through the detected package manager.
+    Script,
+    /// A fixed command, such as `cargo test`.
+    Direct { program: String, args: Vec<String> },
+}
+
 /// One entry the user can run.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Task {
@@ -141,6 +153,8 @@ pub struct Task {
     /// The underlying command, for execution — not for display.
     pub command: String,
     pub group: Group,
+    /// How to start it.
+    pub exec: Exec,
     /// Whether to ask before running it.
     pub confirm: bool,
     /// The workspace member this belongs to, if any. Running it needs the
@@ -180,6 +194,7 @@ impl Task {
                             Group::named,
                         )
                     },
+                    exec: Exec::Script,
                     confirm: meta.confirm,
                     workspace: None,
                     hidden: is_implicit_lifecycle(name, manifest),
@@ -228,6 +243,7 @@ impl Task {
                         // its scripts into the root's Build would lose which
                         // package it belongs to.
                         group: Group::Workspace(member.name.clone()),
+                        exec: Exec::Script,
                         confirm: meta.confirm,
                         workspace: Some(member.name.clone()),
                         hidden: is_implicit_lifecycle(name, &member.manifest),
@@ -397,6 +413,43 @@ fn edit_distance(a: &str, b: &str) -> usize {
     distance[a.len()][b.len()]
 }
 
+/// Turns a Rust project's commands into tasks.
+///
+/// They carry no `scripts-info` and no `opi` metadata: a Rust project declares
+/// none, and inventing descriptions for it would be `opi` talking about itself.
+/// The descriptions here are fixed because the commands are.
+pub fn from_cargo(project: &crate::cargo::Project) -> Vec<Task> {
+    crate::cargo::commands(project)
+        .into_iter()
+        .map(|command| Task {
+            name: format!("cargo {}", command.name),
+            description: Some(command.description.to_owned()),
+            command: format!("cargo {}", command.args.join(" ")),
+            group: Group::named(command.group),
+            exec: Exec::Direct {
+                program: "cargo".to_owned(),
+                args: command.args.iter().map(|arg| (*arg).to_owned()).collect(),
+            },
+            confirm: false,
+            workspace: None,
+            hidden: false,
+        })
+        .collect()
+}
+
+/// Orders a combined task list and puts the hidden ones last.
+///
+/// Called once over everything rather than per source, so a list assembled
+/// from two ecosystems is still one list.
+pub fn arrange(tasks: &mut [Task]) {
+    tasks.sort_by(|a, b| {
+        a.hidden
+            .cmp(&b.hidden)
+            .then_with(|| a.group.cmp(&b.group))
+            .then_with(|| a.name.cmp(&b.name))
+    });
+}
+
 /// Groups a sorted task list into its sections, preserving order.
 pub fn by_group(tasks: &[Task]) -> Vec<(&Group, &[Task])> {
     let mut sections = Vec::new();
@@ -497,6 +550,79 @@ mod tests {
             .find(|task| task.name == "present")
             .expect("present");
         assert_eq!(present.group, Group::Other);
+    }
+
+    #[test]
+    fn a_rust_project_offers_its_standard_commands() {
+        let rust = crate::cargo::Project {
+            name: Some("demo".to_owned()),
+            runnable: true,
+        };
+        let tasks = from_cargo(&rust);
+        let names: Vec<&str> = tasks.iter().map(|task| task.name.as_str()).collect();
+        assert!(names.contains(&"cargo test"));
+        assert!(names.contains(&"cargo clippy"));
+        assert!(names.contains(&"cargo run"));
+    }
+
+    #[test]
+    fn a_cargo_task_runs_cargo_rather_than_a_package_manager() {
+        let rust = crate::cargo::Project {
+            name: None,
+            runnable: false,
+        };
+        let build = from_cargo(&rust)
+            .into_iter()
+            .find(|task| task.name == "cargo build")
+            .expect("build");
+        match build.exec {
+            Exec::Direct { program, args } => {
+                assert_eq!(program, "cargo");
+                assert_eq!(args, ["build", "--release"]);
+            }
+            Exec::Script => panic!("a cargo task is not a package.json script"),
+        }
+    }
+
+    #[test]
+    fn cargo_tasks_land_in_the_groups_the_names_already_mean() {
+        let rust = crate::cargo::Project {
+            name: None,
+            runnable: false,
+        };
+        let tasks = from_cargo(&rust);
+        let group_of = |name: &str| {
+            tasks
+                .iter()
+                .find(|task| task.name == name)
+                .map(|task| task.group.clone())
+                .expect("task")
+        };
+        assert_eq!(group_of("cargo build"), Group::Build);
+        assert_eq!(group_of("cargo test"), Group::Quality);
+    }
+
+    #[test]
+    fn both_ecosystems_share_one_ordered_list() {
+        // Twelve real repositories carry both manifests; neither wins.
+        let npm = manifest(r#"{"scripts":{"dev":"x","build":"x"}}"#);
+        let rust = crate::cargo::Project {
+            name: None,
+            runnable: false,
+        };
+        let mut tasks = Task::from_manifest(&npm);
+        tasks.extend(from_cargo(&rust));
+        arrange(&mut tasks);
+
+        let listed = names(&tasks);
+        assert!(listed.contains(&"dev") && listed.contains(&"cargo test"));
+        // Build groups them together rather than by where they came from.
+        let build = by_group(&tasks)
+            .into_iter()
+            .find(|(group, _)| **group == Group::Build)
+            .expect("Build group");
+        let in_build: Vec<&str> = build.1.iter().map(|task| task.name.as_str()).collect();
+        assert_eq!(in_build, ["build", "cargo build", "cargo check"]);
     }
 
     #[test]

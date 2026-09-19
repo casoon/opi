@@ -32,7 +32,12 @@ a description that wins over `scripts-info`, an explicit group, a favourite, a
 confirmation before running. All of it optional: a project with none of it
 still gets a usable list.
 
-**Not built:** ecosystems other than npm.
+`opi` also recognises Rust projects, and a repository can be both at once: the
+list, health and clean cover `package.json` and `Cargo.toml` together rather
+than choosing one.
+
+**Not built:** .NET, which appeared in none of the measured directories on its
+own.
 
 `0.0.1` was a placeholder that held the crate name; everything since has been
 functional.
@@ -50,7 +55,7 @@ interactive selection and direct execution — nothing else.
 | Language | Rust, edition 2024 |
 | Distribution | crates.io as `opi`, installed via `cargo install opi` |
 | Terminal presentation | [runemark](https://github.com/casoon/runemark) `0.4` with its `select` feature — the only presentation dependency |
-| Project input | `package.json` — no separate config file |
+| Project input | `package.json` and `Cargo.toml` — no separate config file |
 | Platforms | Unix only; building on Windows fails with an explicit message |
 
 ## Documentation in this directory

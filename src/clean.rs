@@ -54,7 +54,12 @@ pub struct Candidate {
 ///
 /// Sizes are measured concurrently; walking several large trees one after
 /// another is the slow part, not the deleting.
-pub fn candidates(manifest: &Manifest, members: &[Member], root: &Path) -> Vec<Candidate> {
+pub fn candidates(
+    manifest: &Manifest,
+    members: &[Member],
+    rust_root: Option<&Path>,
+    root: &Path,
+) -> Vec<Candidate> {
     let mut paths: Vec<(PathBuf, bool)> = Vec::new();
     let mut add = |dir: &Path| {
         for artefact in ARTEFACTS {
@@ -72,6 +77,16 @@ pub fn candidates(manifest: &Manifest, members: &[Member], root: &Path) -> Vec<C
     add(root);
     for member in members {
         add(&member.path);
+    }
+
+    // Rust's build directory is routinely the largest thing in a repository,
+    // and unlike node_modules it is rebuilt by the next build rather than by a
+    // network round trip — so it is an artefact, not a heavy item.
+    if let Some(rust_root) = rust_root {
+        let target = rust_root.join("target");
+        if target.is_dir() {
+            paths.push((target, false));
+        }
     }
 
     // A project may name its own; anything escaping the project is refused
@@ -252,6 +267,22 @@ mod tests {
     }
 
     #[test]
+    fn a_rust_target_directory_is_an_artefact_not_a_heavy_item() {
+        // Unlike node_modules it is rebuilt by the next build, not by a
+        // network round trip.
+        let dir = tempfile::tempdir().expect("temp dir");
+        fs::create_dir(dir.path().join("target")).expect("mkdir");
+        let manifest: Manifest = serde_json::from_str("{}").expect("manifest");
+
+        let found = candidates(&manifest, &[], Some(dir.path()), dir.path());
+        let target = found
+            .iter()
+            .find(|candidate| candidate.display == "target")
+            .expect("target");
+        assert!(!target.heavy);
+    }
+
+    #[test]
     fn a_path_inside_another_candidate_is_dropped() {
         // Found on a real workspace: node_modules/.vite was offered alongside
         // node_modules, so a total promised twice what removing it would free.
@@ -261,7 +292,7 @@ mod tests {
         fs::create_dir(dir.path().join("dist")).expect("mkdir");
         let manifest: Manifest = serde_json::from_str("{}").expect("manifest");
 
-        let found = candidates(&manifest, &[], dir.path());
+        let found = candidates(&manifest, &[], None, dir.path());
         let shown: Vec<&str> = found
             .iter()
             .map(|candidate| candidate.display.as_str())
@@ -281,7 +312,7 @@ mod tests {
         fs::create_dir(dir.path().join("node_modules")).expect("mkdir");
         let manifest: Manifest = serde_json::from_str("{}").expect("manifest");
 
-        let found = candidates(&manifest, &[], dir.path());
+        let found = candidates(&manifest, &[], None, dir.path());
         let heavy: Vec<&str> = found
             .iter()
             .filter(|candidate| candidate.heavy)

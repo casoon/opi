@@ -5,7 +5,7 @@
 Go into any repository, type `opi`, and get a usable interface for that
 project — without configuring anything first.
 
-> **Status: `0.4.0`.** Scripts are the main thing; health, security, updates,
+> **Status: `0.5.0`.** Scripts are the main thing; health, security, updates,
 > clean and the commit/release workflows are built on top of them.
 
 ## What it does
@@ -60,6 +60,27 @@ holding `package.json`.
 The script replaces the `opi` process, so `Ctrl-C` reaches your dev server
 rather than killing a wrapper, and the script's exit code is what your shell
 sees — `opi build && …` works.
+
+## More than one kind of project
+
+A repository can be several things at once, and `opi` does not make it choose.
+`package.json` and `Cargo.toml` are both read, and their commands share one
+list:
+
+```
+llmux-dashboard  npm · cargo
+
+Development
+  cargo run     Build and run the binary
+  dev
+Build
+  build
+  cargo build   Build in release mode
+  cargo check   Type-check without building
+```
+
+Health and clean follow: `cargo fmt --check`, `cargo clippy` and `cargo test`
+run alongside the npm checks, and `target/` is listed with the build artefacts.
 
 ## Saying more about a script
 

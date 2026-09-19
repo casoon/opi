@@ -6,6 +6,30 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-09-19
+
+### Added
+
+- Rust projects. `Cargo.toml` is discovered the same way `package.json` is, and
+  its commands join the same list, groups and search. Health gains
+  `cargo fmt --check`, `cargo clippy` and `cargo test`; clean gains `target/`.
+- A repository can be both at once, and neither wins. Measured across 231
+  directories: 133 carry a `package.json`, 51 a `Cargo.toml`, and twelve both.
+- A repository with only a `Cargo.toml` is now a project. 39 of them were
+  previously turned away with "No package.json found".
+
+### Notes
+
+.NET is deliberately not built: it appeared in none of those directories on its
+own, and building for a marker nobody has is what retired Knip and taze earlier.
+
+A Rust project declares no scripts, so its commands are a fixed set — the ones
+these repositories actually run in CI. `cargo run` appears only where something
+is runnable, since offering it for a library would fail on use.
+
+`Cargo.toml` is read without a TOML parser. Two facts are wanted and a
+dependency to learn them would cost more than they are worth.
+
 ## [0.4.0] - 2026-09-19
 
 ### Added
@@ -147,7 +171,8 @@ Placeholder release. Reserves the crate name on crates.io and establishes the
 repository skeleton. The binary prints its version and a development notice; no
 functionality is implemented.
 
-[Unreleased]: https://github.com/casoon/opi/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/casoon/opi/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/casoon/opi/releases/tag/v0.5.0
 [0.4.0]: https://github.com/casoon/opi/releases/tag/v0.4.0
 [0.3.0]: https://github.com/casoon/opi/releases/tag/v0.3.0
 [0.2.0]: https://github.com/casoon/opi/releases/tag/v0.2.0

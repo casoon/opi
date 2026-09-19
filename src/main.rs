@@ -10,6 +10,7 @@ compile_error!(
 );
 
 mod audit;
+mod cargo;
 mod check;
 mod clean;
 mod cli;
@@ -69,27 +70,60 @@ fn main() -> ExitCode {
         }
     };
 
-    // The manifest may sit above the working directory; everything downstream
-    // resolves against the directory it was actually found in.
-    let (manifest, root) = match Manifest::discover(&directory) {
-        Ok(found) => found,
-        Err(error) => {
-            report_error(&error);
-            return ExitCode::FAILURE;
-        }
+    // A repository may be more than one kind of project at once — twelve of
+    // the ones measured carry both a package.json and a Cargo.toml — so both
+    // are looked for and neither is allowed to win.
+    let npm = Manifest::discover(&directory);
+    let rust = cargo::discover(&directory);
+
+    if let (Err(error), None) = (&npm, &rust) {
+        report_error(error);
+        return ExitCode::FAILURE;
+    }
+
+    let (manifest, root) = match npm {
+        Ok((manifest, root)) => (manifest, root),
+        // A Rust-only project still needs somewhere to stand and something to
+        // read; an empty manifest answers both without a special case below.
+        Err(_) => (
+            Manifest::default(),
+            rust.as_ref()
+                .map_or_else(|| directory.clone(), |(_, root)| root.clone()),
+        ),
     };
 
-    let project = Project::detect(&manifest, &root);
+    let project = Project::detect(&manifest, &root)
+        .or_named(rust.as_ref().and_then(|(rust, _)| rust.name.clone()));
     let members = workspace::members(&root, &manifest);
-    let tasks = Task::from_workspace(&manifest, &members);
+    let mut tasks = Task::from_workspace(&manifest, &members);
+    if let Some((rust, _)) = &rust {
+        tasks.extend(task::from_cargo(rust));
+    }
+    task::arrange(&mut tasks);
+
+    let rust_root = rust.as_ref().map(|(_, root)| root.clone());
 
     match invocation {
-        Invocation::List => list(&manifest, &members, &project, &tasks, &root),
-        Invocation::Health => health(&manifest, &members, &project, &root),
-        Invocation::Clean => clean(&manifest, &members, &project, &root),
+        Invocation::List => list(
+            &manifest,
+            &members,
+            rust_root.as_deref(),
+            &project,
+            &tasks,
+            &root,
+        ),
+        Invocation::Health => health(&manifest, &members, rust_root.as_deref(), &project, &root),
+        Invocation::Clean => clean(&manifest, &members, rust_root.as_deref(), &project, &root),
         Invocation::Security => security(&manifest, &members, &project, &root),
         Invocation::Updates => updates(&project, &root),
-        Invocation::Workflow(name) => run_workflow(&name, &manifest, &members, &project, &root),
+        Invocation::Workflow(name) => run_workflow(
+            &name,
+            &manifest,
+            &members,
+            rust_root.as_deref(),
+            &project,
+            &root,
+        ),
         Invocation::Run {
             name,
             args,
@@ -113,6 +147,7 @@ fn main() -> ExitCode {
 fn list(
     manifest: &Manifest,
     members: &[workspace::Member],
+    rust_root: Option<&Path>,
     project: &Project,
     tasks: &[Task],
     directory: &Path,
@@ -133,7 +168,13 @@ fn list(
         return ExitCode::SUCCESS;
     }
 
-    if !manager.is_certain() {
+    // Only worth saying where something would actually be run with it: a
+    // Rust-only project has no use for a package manager and no reason to hear
+    // that one was guessed.
+    let runs_scripts = tasks
+        .iter()
+        .any(|task| matches!(task.exec, task::Exec::Script));
+    if !manager.is_certain() && runs_scripts {
         let console = Console::stderr(ColorMode::Auto);
         eprintln!(
             "{}",
@@ -150,7 +191,7 @@ fn list(
     let mut menu = build_menu(project, tasks, directory);
     // Offered only where it would do something; a key that answers "nothing
     // applies" is worse than no key.
-    let checks = check::Check::detect_all(manifest, members, directory);
+    let checks = check::Check::detect_all(manifest, members, rust_root, directory);
     if !checks.is_empty() {
         menu = menu.add_hint(Hint::new('H', "Health"));
     }
@@ -183,8 +224,8 @@ fn list(
         Outcome::Selected(id) => start(project, tasks, &id, &[], false),
         // Nothing was chosen; that is not a failure.
         Outcome::Cancelled => ExitCode::SUCCESS,
-        Outcome::Hotkey('H') => health(manifest, members, project, directory),
-        Outcome::Hotkey('C') => clean(manifest, members, project, directory),
+        Outcome::Hotkey('H') => health(manifest, members, rust_root, project, directory),
+        Outcome::Hotkey('C') => clean(manifest, members, rust_root, project, directory),
         Outcome::Hotkey('S') => security(manifest, members, project, directory),
         Outcome::Hotkey('U') => updates(project, directory),
         Outcome::Hotkey(_) => ExitCode::SUCCESS,
@@ -195,13 +236,37 @@ fn list(
     }
 }
 
+/// What the header says the project is built with.
+///
+/// A repository carrying both manifests says both. Naming only one would make
+/// the other half of its list look like it arrived from nowhere.
+fn toolchains(tasks: &[Task], project: &Project) -> String {
+    let mut names = Vec::new();
+    if tasks
+        .iter()
+        .any(|task| matches!(task.exec, task::Exec::Script))
+    {
+        names.push(project.package_manager.manager.to_string());
+    }
+    if tasks
+        .iter()
+        .any(|task| matches!(&task.exec, task::Exec::Direct { program, .. } if program == "cargo"))
+    {
+        names.push("cargo".to_owned());
+    }
+    if names.is_empty() {
+        names.push(project.package_manager.manager.to_string());
+    }
+    names.join(" · ")
+}
+
 /// Turns the task list into a menu.
 ///
 /// The item id is the script name, so a selection is ready to run as-is.
 fn build_menu(project: &Project, tasks: &[Task], directory: &Path) -> Menu {
     let mut menu = Menu::new()
         .with_heading(project.display_name(directory))
-        .with_note(project.package_manager.manager.to_string());
+        .with_note(toolchains(tasks, project));
 
     for (group, section) in by_group(tasks) {
         let mut rendered = Group::new(group.label());
@@ -257,7 +322,7 @@ fn start(
     }
 
     let manager = project.package_manager;
-    let error = run::execute(manager.manager, &task.name, task.workspace.as_deref(), args);
+    let error = run::execute(task, manager.manager, args);
 
     let console = Console::stderr(ColorMode::Auto);
     let block = ErrorBlock::new(format!("Cannot run {}", manager.manager))
@@ -345,11 +410,12 @@ fn report_error(error: &ManifestError) {
 fn health(
     manifest: &Manifest,
     members: &[workspace::Member],
+    rust_root: Option<&Path>,
     project: &Project,
     root: &Path,
 ) -> ExitCode {
     let console = Console::stdout(ColorMode::Auto);
-    let checks = check::Check::detect_all(manifest, members, root);
+    let checks = check::Check::detect_all(manifest, members, rust_root, root);
 
     println!(
         "{}  {}",
@@ -460,11 +526,12 @@ fn health(
 fn clean(
     manifest: &Manifest,
     members: &[workspace::Member],
+    rust_root: Option<&Path>,
     project: &Project,
     root: &Path,
 ) -> ExitCode {
     let console = Console::stdout(ColorMode::Auto);
-    let candidates = clean::candidates(manifest, members, root);
+    let candidates = clean::candidates(manifest, members, rust_root, root);
 
     println!(
         "{}  {}",
@@ -610,7 +677,9 @@ fn security(
 
     // Secrets is a check like any other; this only makes it reachable without
     // waiting for the tests to finish.
-    let scans: Vec<check::Check> = check::Check::detect_all(manifest, members, root)
+    // Secrets scanning is about the repository, not a toolchain, so the Rust
+    // side contributes nothing here.
+    let scans: Vec<check::Check> = check::Check::detect_all(manifest, members, None, root)
         .into_iter()
         .filter(|check| check.name == "Secrets")
         .collect();
@@ -740,6 +809,7 @@ fn run_workflow(
     name: &str,
     manifest: &Manifest,
     members: &[workspace::Member],
+    rust_root: Option<&Path>,
     project: &Project,
     root: &Path,
 ) -> ExitCode {
@@ -784,7 +854,7 @@ fn run_workflow(
         );
     }
 
-    let checks: Vec<check::Check> = check::Check::detect_all(manifest, members, root)
+    let checks: Vec<check::Check> = check::Check::detect_all(manifest, members, rust_root, root)
         .into_iter()
         .filter(|check| workflow.includes(check.name))
         .collect();

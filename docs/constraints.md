@@ -27,10 +27,11 @@ Consequence: every screen needs sensible defaults without configuration. If a
 screen is useless without the optional `opi` key in `package.json`, the default
 is wrong, not the configuration missing.
 
-## `package.json` is the only interface
+## The project's own files are the only interface
 
-`opi` reads `package.json` and nothing else. There is no `opi.toml`, no
-`.opirc`, no second source of truth.
+`opi` reads `package.json` and `Cargo.toml` — the files a project already has.
+There is no `opi.toml`, no `.opirc`, no second source of truth of `opi`'s own
+making.
 
 Three levels, each optional:
 

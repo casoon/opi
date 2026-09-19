@@ -166,6 +166,15 @@ pub struct Project {
 }
 
 impl Project {
+    /// Names the project after `name` where `package.json` does not.
+    ///
+    /// A Rust-only project has no npm name; its crate name beats the directory
+    /// it happens to sit in.
+    pub fn or_named(mut self, name: Option<String>) -> Self {
+        self.name = self.name.or(name);
+        self
+    }
+
     /// Detects the project in `dir` from its already-parsed manifest.
     pub fn detect(manifest: &Manifest, dir: &Path) -> Self {
         Self {

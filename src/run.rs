@@ -18,21 +18,30 @@ use std::io;
 use std::process::Command;
 
 use crate::project::PackageManager;
+use crate::task::{Exec, Task};
 
 /// Runs `script` through `manager`, forwarding `args` to it.
 ///
 /// Returns only when the command could not be started at all; on success this
 /// process has been replaced by the script.
-pub fn execute(
-    manager: PackageManager,
-    script: &str,
-    workspace: Option<&str>,
-    args: &[String],
-) -> io::Error {
+pub fn execute(task: &Task, manager: PackageManager, args: &[String]) -> io::Error {
     use std::os::unix::process::CommandExt;
 
-    let mut command = Command::new(manager.program());
-    command.args(manager.run_args(script, workspace, args));
+    let mut command = match &task.exec {
+        Exec::Script => {
+            let mut command = Command::new(manager.program());
+            command.args(manager.run_args(&task.name, task.workspace.as_deref(), args));
+            command
+        }
+        Exec::Direct {
+            program,
+            args: fixed,
+        } => {
+            let mut command = Command::new(program);
+            command.args(fixed).args(args);
+            command
+        }
+    };
     // Returns only on failure.
     command.exec()
 }

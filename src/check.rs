@@ -188,7 +188,12 @@ impl Check {
     /// workspace, the root declared only Biome, the secret scanner and a dead
     /// code tool, while `typescript` and `@astrojs/check` lived in both apps.
     /// Checking only the root would have reported two checks and missed four.
-    pub fn detect_all(manifest: &Manifest, members: &[Member], root: &Path) -> Vec<Self> {
+    pub fn detect_all(
+        manifest: &Manifest,
+        members: &[Member],
+        rust_root: Option<&Path>,
+        root: &Path,
+    ) -> Vec<Self> {
         let mut checks = Self::detect_in(manifest, root, None);
         for member in members {
             checks.extend(Self::detect_in(
@@ -197,7 +202,29 @@ impl Check {
                 Some(member.name.clone()),
             ));
         }
+        if let Some(rust_root) = rust_root {
+            checks.extend(Self::cargo(rust_root));
+        }
         checks
+    }
+
+    /// The checks a Rust project answers.
+    ///
+    /// Scoped as "rust" even in a Rust-only project: in the twelve
+    /// repositories carrying both manifests, "Tests" would otherwise mean two
+    /// different things on two lines.
+    fn cargo(root: &Path) -> Vec<Self> {
+        crate::cargo::CHECKS
+            .iter()
+            .map(|(name, args)| Self {
+                name,
+                tool: "cargo",
+                scope: Some("rust".to_owned()),
+                program: PathBuf::from("cargo"),
+                args: args.to_vec(),
+                dir: root.to_path_buf(),
+            })
+            .collect()
     }
 
     /// The checks that apply to one package, rooted at `dir`.

@@ -11,6 +11,7 @@ src/
 ├── main.rs      entry point, wiring, all user-facing output
 ├── cli.rs       argument parsing → Invocation
 ├── manifest.rs  package.json → Manifest, searching upwards
+├── cargo.rs     Cargo.toml → a Rust project and its commands
 ├── workspace.rs workspace patterns → member manifests
 ├── project.rs   Manifest + directory → Project (name, package manager)
 ├── task.rs      Manifest + members → Vec<Task>, grouped and ordered
@@ -58,6 +59,16 @@ for a screen to work, or the zero-configuration rule is broken.
 `opi` works from anywhere inside a project, as `npm` does. Everything
 downstream resolves against the directory the manifest was found in.
 
+`cargo::discover` does the same for `Cargo.toml`, and **both run**. A
+repository may be more than one kind of project at once — measured across 231
+directories here, 133 carry a `package.json`, 51 a `Cargo.toml`, and twelve
+both — so neither is allowed to win. A repository with only a `Cargo.toml` is a
+project too; 39 of them were previously turned away with "No package.json
+found".
+
+A .NET marker appeared in none of those directories on its own, so that half of
+the original plan is not built. The same reasoning retired Knip and taze.
+
 Package manager detection searches upwards too. In a workspace the lockfile and
 the `packageManager` field live at the root, so a member package carries no
 evidence of its own — defaulting to npm there would run the wrong package
@@ -100,7 +111,19 @@ position: `pnpm --filter <m> run <s>`, `yarn workspace <m> run <s>`,
 ## The task model is the single abstraction
 
 `Task` is what the interactive list, the command line and the search all
-operate on. It carries the workspace member it belongs to, if any. `opi dev` and selecting `dev` from the list reach
+operate on. It carries the workspace member it belongs to, if any, and how to
+start it — `Exec::Script` goes through the package manager, `Exec::Direct`
+names its own program. That second variant is what lets a second ecosystem
+exist without a second list.
+
+A Rust project defines no scripts, so its commands are a fixed set rather than
+something read out of the manifest. They are the ones these repositories
+actually run in CI: `fmt --check`, `clippy` with warnings denied, `test
+--all-features`. `cargo run` is offered only where something is runnable.
+
+`Cargo.toml` is read without a TOML parser. Two facts are wanted — the package
+name and whether a binary exists — and a dependency to learn them would cost
+more than they are worth. `opi dev` and selecting `dev` from the list reach
 `run::execute` by different routes but with the same value.
 
 This is deliberate: if the two ever need separate handling, the boundary has
@@ -158,6 +181,12 @@ projects, and the bare word stays theirs.
 | Updates | `U` | `--updates` | Outdated dependencies, split by semver jump |
 | Clean | `C` | `--clean` | Removable artefacts, with sizes |
 | Workflows | — | `--check commit`/`release` | A named subset, plus git gates |
+
+Rust checks are scoped as `rust` even in a Rust-only project: in a repository
+carrying both manifests, "Tests" would otherwise mean two different things on
+two lines. Rust's `target/` is a clean candidate but not a heavy one — unlike
+`node_modules` it is rebuilt by the next build rather than by a network round
+trip.
 
 A script the project marked `confirm` is asked about before it runs. Without a
 terminal that refuses rather than assuming yes — skipping the question where it
