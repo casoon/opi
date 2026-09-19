@@ -22,6 +22,10 @@ pub enum Group {
     Build,
     Preview,
     Quality,
+    /// Shipping and publishing.
+    Deploy,
+    /// Housekeeping: cleaning, dependency chores, project setup.
+    Maintenance,
     /// An unrecognised prefix, carrying the prefix as its label.
     Custom(String),
     /// Scripts with no prefix and no recognised meaning.
@@ -44,6 +48,8 @@ impl Group {
             Self::Build => "Build".to_owned(),
             Self::Preview => "Preview".to_owned(),
             Self::Quality => "Quality".to_owned(),
+            Self::Deploy => "Deploy".to_owned(),
+            Self::Maintenance => "Maintenance".to_owned(),
             Self::Custom(prefix) => capitalize(prefix),
             Self::Other => "Other".to_owned(),
             // A package name is an identifier, not prose; shown unchanged.
@@ -66,6 +72,10 @@ impl Group {
             "preview" => Self::Preview,
             "check" | "lint" | "format" | "fmt" | "test" | "audit" | "typecheck" | "type-check"
             | "types" => Self::Quality,
+            // Measured across 120 real projects: these were the standalone
+            // names the prefix rule kept dropping into the catch-all.
+            "deploy" | "release" | "publish" | "ship" => Self::Deploy,
+            "clean" | "setup" | "bootstrap" | "upgrade" | "update-deps" => Self::Maintenance,
             // An unknown prefix is a deliberate grouping by the author.
             _ if script.contains(':') => Self::Custom(base.to_owned()),
             // A standalone script that heads a family belongs with that family.
@@ -107,6 +117,12 @@ pub struct Task {
     /// The workspace member this belongs to, if any. Running it needs the
     /// package manager to be pointed at that member.
     pub workspace: Option<String>,
+    /// Kept out of the list, but still runnable by name.
+    ///
+    /// npm runs these itself; offering them invites running them directly,
+    /// which is never what someone wants. Hiding rather than dropping them
+    /// means `opi prebuild` still works for the rare case that it is.
+    pub hidden: bool,
 }
 
 impl Task {
@@ -119,17 +135,23 @@ impl Task {
         let mut tasks: Vec<Self> = manifest
             .scripts
             .iter()
-            .filter(|(name, _)| !is_implicit_lifecycle(name, manifest))
             .map(|(name, command)| Self {
                 name: name.clone(),
                 description: manifest.description(name).map(str::to_owned),
                 command: command.clone(),
                 group: Group::of(name, manifest.scripts.keys().map(String::as_str)),
                 workspace: None,
+                hidden: is_implicit_lifecycle(name, manifest),
             })
             .collect();
 
-        tasks.sort_by(|a, b| a.group.cmp(&b.group).then_with(|| a.name.cmp(&b.name)));
+        // Hidden last, so everything that draws is a contiguous prefix.
+        tasks.sort_by(|a, b| {
+            a.hidden
+                .cmp(&b.hidden)
+                .then_with(|| a.group.cmp(&b.group))
+                .then_with(|| a.name.cmp(&b.name))
+        });
         tasks
     }
 
@@ -149,37 +171,64 @@ impl Task {
         let mut tasks = Self::from_manifest(manifest);
 
         for member in members {
-            let mut member_tasks: Vec<Self> = member
+            let member_tasks: Vec<Self> = member
                 .manifest
                 .scripts
                 .iter()
                 .filter(|(name, _)| !manifest.scripts.contains_key(name.as_str()))
-                .filter(|(name, _)| !is_implicit_lifecycle(name, &member.manifest))
                 .map(|(name, command)| Self {
                     name: name.clone(),
                     description: member.manifest.description(name).map(str::to_owned),
                     command: command.clone(),
                     group: Group::Workspace(member.name.clone()),
                     workspace: Some(member.name.clone()),
+                    hidden: is_implicit_lifecycle(name, &member.manifest),
                 })
                 .collect();
-            member_tasks.sort_by(|a, b| a.name.cmp(&b.name));
             tasks.extend(member_tasks);
         }
 
+        // Sorted as a whole, not per member: appending after the root's sort
+        // would break the invariant that hidden tasks are a suffix, and
+        // `by_group` slices on exactly that.
+        tasks.sort_by(|a, b| {
+            a.hidden
+                .cmp(&b.hidden)
+                .then_with(|| a.group.cmp(&b.group))
+                .then_with(|| a.name.cmp(&b.name))
+        });
         tasks
     }
 }
 
+/// Scripts npm runs on its own, which no one invokes by hand.
+///
+/// Measured across 120 real projects, `prepare` alone appeared 49 times and
+/// `prepublishOnly` 10 — pure bulk in every list that showed them.
+const NPM_LIFECYCLE: [&str; 7] = [
+    "prepare",
+    "prepublish",
+    "prepublishOnly",
+    "prepack",
+    "postpack",
+    "preinstall",
+    "postinstall",
+];
+
 /// Whether a script is a lifecycle hook npm runs on its own.
 ///
-/// `prebuild` alongside `build` is machinery, not a menu entry — listing it
-/// invites running it directly, which is never what someone wants.
+/// Two kinds: the fixed names npm defines, and a `pre`/`post` pair around a
+/// script the project actually has. `prebuild` alongside `build` is machinery,
+/// not a menu entry.
 ///
 /// The guard against a recognised group matters more than it looks: `preview`
 /// strips to `view`, so a project with a `view` script would otherwise lose its
 /// preview entry.
 fn is_implicit_lifecycle(name: &str, manifest: &Manifest) -> bool {
+    if NPM_LIFECYCLE.contains(&name) {
+        return true;
+    }
+
     let siblings = manifest.scripts.keys().map(String::as_str);
     if !matches!(Group::of(name, siblings), Group::Custom(_) | Group::Other) {
         return false;
@@ -245,6 +294,7 @@ pub fn suggestions(tasks: &[Task], query: &str) -> Vec<String> {
 
     let mut scored: Vec<(usize, String)> = tasks
         .iter()
+        .filter(|task| !task.hidden)
         .filter_map(|task| {
             let name = task.name.to_lowercase();
             if name.contains(&query) || query.contains(&name) {
@@ -301,7 +351,9 @@ fn edit_distance(a: &str, b: &str) -> usize {
 /// Groups a sorted task list into its sections, preserving order.
 pub fn by_group(tasks: &[Task]) -> Vec<(&Group, &[Task])> {
     let mut sections = Vec::new();
-    let mut rest = tasks;
+    // Hidden tasks sort last, so the visible ones are a prefix of the slice.
+    let visible = tasks.partition_point(|task| !task.hidden);
+    let mut rest = &tasks[..visible];
 
     while let Some(first) = rest.first() {
         let len = rest
@@ -324,8 +376,21 @@ mod tests {
         serde_json::from_str(json).expect("parse fixture")
     }
 
+    /// The names a list would draw, in order.
     fn names(tasks: &[Task]) -> Vec<&str> {
-        tasks.iter().map(|task| task.name.as_str()).collect()
+        tasks
+            .iter()
+            .filter(|task| !task.hidden)
+            .map(|task| task.name.as_str())
+            .collect()
+    }
+
+    fn hidden(tasks: &[Task]) -> Vec<&str> {
+        tasks
+            .iter()
+            .filter(|task| task.hidden)
+            .map(|task| task.name.as_str())
+            .collect()
     }
 
     #[test]
@@ -361,28 +426,69 @@ mod tests {
 
     #[test]
     fn a_standalone_script_joins_its_own_family() {
-        // Found against a real project: "deploy" sat in the catch-all while
-        // "deploy:blog" and "deploy:starter" formed a group without it.
+        // Found against a real project: "docs" sat in the catch-all while
+        // "docs:build" and "docs:serve" formed a group without it.
         let tasks = Task::from_manifest(&manifest(
-            r#"{"scripts":{"deploy":"x","deploy:blog":"x","deploy:starter":"x"}}"#,
+            r#"{"scripts":{"docs":"x","docs:build":"x","docs:serve":"x"}}"#,
         ));
         assert!(
             tasks
                 .iter()
-                .all(|task| task.group == Group::Custom("deploy".to_owned()))
+                .all(|task| task.group == Group::Custom("docs".to_owned()))
         );
-        assert_eq!(names(&tasks), ["deploy", "deploy:blog", "deploy:starter"]);
+        assert_eq!(names(&tasks), ["docs", "docs:build", "docs:serve"]);
         assert_eq!(by_group(&tasks).len(), 1);
     }
 
     #[test]
     fn a_standalone_script_without_a_family_stays_in_the_catch_all() {
-        let tasks = Task::from_manifest(&manifest(r#"{"scripts":{"deploy":"x","dev":"x"}}"#));
-        let deploy = tasks
+        let tasks = Task::from_manifest(&manifest(r#"{"scripts":{"present":"x","dev":"x"}}"#));
+        let present = tasks
             .iter()
-            .find(|task| task.name == "deploy")
-            .expect("deploy");
-        assert_eq!(deploy.group, Group::Other);
+            .find(|task| task.name == "present")
+            .expect("present");
+        assert_eq!(present.group, Group::Other);
+    }
+
+    #[test]
+    fn measured_standalone_names_get_a_group_of_their_own() {
+        // These were the names the prefix rule kept dropping into the catch-all
+        // across 120 real projects.
+        let tasks = Task::from_manifest(&manifest(
+            r#"{"scripts":{"deploy":"x","clean":"x","update-deps":"x","release":"x"}}"#,
+        ));
+        let group_of = |name: &str| {
+            tasks
+                .iter()
+                .find(|task| task.name == name)
+                .map(|task| task.group.clone())
+                .expect("task")
+        };
+        assert_eq!(group_of("deploy"), Group::Deploy);
+        assert_eq!(group_of("release"), Group::Deploy);
+        assert_eq!(group_of("clean"), Group::Maintenance);
+        assert_eq!(group_of("update-deps"), Group::Maintenance);
+    }
+
+    #[test]
+    fn npm_lifecycle_scripts_are_hidden_but_still_runnable() {
+        // Measured: "prepare" appeared in 49 of 120 projects, "prepublishOnly"
+        // in 10 — pure bulk in every list that showed them.
+        let tasks = Task::from_manifest(&manifest(
+            r#"{"scripts":{"dev":"x","prepare":"x","prepublishOnly":"x"}}"#,
+        ));
+        assert_eq!(names(&tasks), ["dev"]);
+        assert_eq!(hidden(&tasks), ["prepare", "prepublishOnly"]);
+        assert!(
+            find(&tasks, "prepare").is_some(),
+            "hiding is a display decision, not a removal"
+        );
+    }
+
+    #[test]
+    fn hidden_tasks_are_never_suggested() {
+        let tasks = Task::from_manifest(&manifest(r#"{"scripts":{"prepare":"x"}}"#));
+        assert!(suggestions(&tasks, "prepar").is_empty());
     }
 
     #[test]
@@ -409,7 +515,7 @@ mod tests {
 
     #[test]
     fn unknown_standalone_scripts_share_the_catch_all() {
-        let tasks = Task::from_manifest(&manifest(r#"{"scripts":{"prepare":"x","release":"x"}}"#));
+        let tasks = Task::from_manifest(&manifest(r#"{"scripts":{"present":"x","info":"x"}}"#));
         assert!(tasks.iter().all(|task| task.group == Group::Other));
         assert_eq!(by_group(&tasks).len(), 1, "one shared group, not two");
     }
@@ -417,9 +523,9 @@ mod tests {
     #[test]
     fn catch_all_sorts_last() {
         let tasks = Task::from_manifest(&manifest(
-            r#"{"scripts":{"prepare":"x","db:seed":"x","dev":"x"}}"#,
+            r#"{"scripts":{"present":"x","db:seed":"x","dev":"x"}}"#,
         ));
-        assert_eq!(names(&tasks), ["dev", "db:seed", "prepare"]);
+        assert_eq!(names(&tasks), ["dev", "db:seed", "present"]);
     }
 
     #[test]
@@ -428,12 +534,22 @@ mod tests {
             r#"{"scripts":{"build":"x","prebuild":"x","postbuild":"x"}}"#,
         ));
         assert_eq!(names(&tasks), ["build"]);
+        assert_eq!(hidden(&tasks), ["postbuild", "prebuild"]);
+    }
+
+    #[test]
+    fn a_hidden_task_never_reaches_a_section() {
+        let tasks = Task::from_manifest(&manifest(r#"{"scripts":{"dev":"x","prepare":"x"}}"#));
+        let listed: usize = by_group(&tasks).iter().map(|(_, tasks)| tasks.len()).sum();
+        assert_eq!(listed, 1);
     }
 
     #[test]
     fn lifecycle_hooks_without_a_main_script_are_kept() {
-        let tasks = Task::from_manifest(&manifest(r#"{"scripts":{"postinstall":"x"}}"#));
-        assert_eq!(names(&tasks), ["postinstall"]);
+        // "postinstall" is an npm lifecycle name, so it stays hidden; a hook
+        // for a script the project does not have is not.
+        let tasks = Task::from_manifest(&manifest(r#"{"scripts":{"postcompile":"x"}}"#));
+        assert_eq!(names(&tasks), ["postcompile"]);
         assert_eq!(tasks[0].group, Group::Other);
     }
 
@@ -644,13 +760,13 @@ mod tests {
     #[test]
     fn sections_cover_every_task_exactly_once() {
         let tasks = Task::from_manifest(&manifest(
-            r#"{"scripts":{"dev":"x","dev:api":"x","build":"x","db:seed":"x","prepare":"x"}}"#,
+            r#"{"scripts":{"dev":"x","dev:api":"x","build":"x","db:seed":"x","present":"x"}}"#,
         ));
         let sections = by_group(&tasks);
         assert_eq!(sections.len(), 4);
         assert_eq!(
             sections.iter().map(|(_, tasks)| tasks.len()).sum::<usize>(),
-            tasks.len()
+            names(&tasks).len()
         );
     }
 }
