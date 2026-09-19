@@ -5,7 +5,7 @@
 Go into any repository, type `opi`, and get a usable interface for that
 project — without configuring anything first.
 
-> **Status: `0.1.0` does one thing — makes a project's `package.json` scripts
+> **Status: `0.1.1` does one thing — makes a project's `package.json` scripts
 > immediately runnable.** Health, dependency updates, clean and security are
 > designed but not built.
 

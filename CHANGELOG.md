@@ -6,14 +6,26 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-09-19
+
+Both changes come from running `0.1.0` against a real project, where a list of
+41 entries with lines up to 101 columns wide was unreadable.
+
+### Fixed
+
+- Entries are fitted to the terminal width instead of wrapping to column zero,
+  which destroyed the two-column layout (runemark 0.4.2). Long descriptions are
+  shortened with an ellipsis; where the name column leaves no useful room, the
+  description is dropped rather than cut to a stub.
+
 ### Changed
 
 - A workspace member's script is no longer listed when the root defines one by
   the same name. The root wins that name on the command line anyway, so listing
   both offered a choice the interface could not honour. On one real project
   this removed 12 of 18 member entries, none of which carried a description.
-- Entries are fitted to the terminal width instead of wrapping to column zero
-  (runemark 0.4.2).
+  What remains is what the root cannot reach; a member left with nothing shows
+  no group at all.
 
 ## [0.1.0] - 2026-09-19
 
@@ -51,6 +63,7 @@ Placeholder release. Reserves the crate name on crates.io and establishes the
 repository skeleton. The binary prints its version and a development notice; no
 functionality is implemented.
 
-[Unreleased]: https://github.com/casoon/opi/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/casoon/opi/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/casoon/opi/releases/tag/v0.1.1
 [0.1.0]: https://github.com/casoon/opi/releases/tag/v0.1.0
 [0.0.1]: https://github.com/casoon/opi/releases/tag/v0.0.1
