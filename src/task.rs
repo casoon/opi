@@ -18,6 +18,12 @@ use crate::workspace::Member;
 /// ordering is exactly the arrangement that makes a script list unusable.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Group {
+    /// Scripts the project marked as favourites.
+    ///
+    /// First, and a group of its own: a favourite leaves the group its name
+    /// would have put it in. Sorting it first *within* that group would barely
+    /// show — measured on a real project, five of ten groups held two entries.
+    Favorites,
     Development,
     Build,
     Preview,
@@ -44,6 +50,7 @@ impl Group {
     /// sit visually below `Development` as lowercase text.
     pub fn label(&self) -> String {
         match self {
+            Self::Favorites => "Favorites".to_owned(),
             Self::Development => "Development".to_owned(),
             Self::Build => "Build".to_owned(),
             Self::Preview => "Preview".to_owned(),
@@ -54,6 +61,26 @@ impl Group {
             Self::Other => "Other".to_owned(),
             // A package name is an identifier, not prose; shown unchanged.
             Self::Workspace(name) => name.clone(),
+        }
+    }
+
+    /// The group a project asked for by name.
+    ///
+    /// A name matching one `opi` already knows takes that group's fixed place
+    /// in the order, so configuration refines the meaning-first arrangement
+    /// rather than dropping out of it. Anything else joins the unrecognised
+    /// prefixes.
+    fn named(label: &str) -> Self {
+        match label.trim().to_lowercase().as_str() {
+            "favorites" | "favourites" => Self::Favorites,
+            "development" | "dev" => Self::Development,
+            "build" => Self::Build,
+            "preview" => Self::Preview,
+            "quality" => Self::Quality,
+            "deploy" | "deployment" => Self::Deploy,
+            "maintenance" => Self::Maintenance,
+            "other" => Self::Other,
+            _ => Self::Custom(label.trim().to_owned()),
         }
     }
 
@@ -114,6 +141,8 @@ pub struct Task {
     /// The underlying command, for execution — not for display.
     pub command: String,
     pub group: Group,
+    /// Whether to ask before running it.
+    pub confirm: bool,
     /// The workspace member this belongs to, if any. Running it needs the
     /// package manager to be pointed at that member.
     pub workspace: Option<String>,
@@ -135,13 +164,26 @@ impl Task {
         let mut tasks: Vec<Self> = manifest
             .scripts
             .iter()
-            .map(|(name, command)| Self {
-                name: name.clone(),
-                description: manifest.description(name).map(str::to_owned),
-                command: command.clone(),
-                group: Group::of(name, manifest.scripts.keys().map(String::as_str)),
-                workspace: None,
-                hidden: is_implicit_lifecycle(name, manifest),
+            .map(|(name, command)| {
+                let meta = manifest.script_meta(name);
+                Self {
+                    name: name.clone(),
+                    description: manifest.description(name),
+                    command: command.clone(),
+                    // A favourite leaves its group; an explicit group replaces
+                    // the one the name implies; otherwise the name decides.
+                    group: if meta.favorite {
+                        Group::Favorites
+                    } else {
+                        meta.group.as_deref().map_or_else(
+                            || Group::of(name, manifest.scripts.keys().map(String::as_str)),
+                            Group::named,
+                        )
+                    },
+                    confirm: meta.confirm,
+                    workspace: None,
+                    hidden: is_implicit_lifecycle(name, manifest),
+                }
             })
             .collect();
 
@@ -176,13 +218,20 @@ impl Task {
                 .scripts
                 .iter()
                 .filter(|(name, _)| !manifest.scripts.contains_key(name.as_str()))
-                .map(|(name, command)| Self {
-                    name: name.clone(),
-                    description: member.manifest.description(name).map(str::to_owned),
-                    command: command.clone(),
-                    group: Group::Workspace(member.name.clone()),
-                    workspace: Some(member.name.clone()),
-                    hidden: is_implicit_lifecycle(name, &member.manifest),
+                .map(|(name, command)| {
+                    let meta = member.manifest.script_meta(name);
+                    Self {
+                        name: name.clone(),
+                        description: member.manifest.description(name),
+                        command: command.clone(),
+                        // A member's own group stays the member: lifting one of
+                        // its scripts into the root's Build would lose which
+                        // package it belongs to.
+                        group: Group::Workspace(member.name.clone()),
+                        confirm: meta.confirm,
+                        workspace: Some(member.name.clone()),
+                        hidden: is_implicit_lifecycle(name, &member.manifest),
+                    }
                 })
                 .collect();
             tasks.extend(member_tasks);
@@ -448,6 +497,95 @@ mod tests {
             .find(|task| task.name == "present")
             .expect("present");
         assert_eq!(present.group, Group::Other);
+    }
+
+    #[test]
+    fn a_favourite_leaves_the_group_its_name_would_have_given_it() {
+        let tasks = Task::from_manifest(&manifest(
+            r#"{"scripts":{"dev":"x","build":"x"},
+                "opi":{"scripts":{"build":{"favorite":true}}}}"#,
+        ));
+        let build = tasks
+            .iter()
+            .find(|task| task.name == "build")
+            .expect("build");
+        assert_eq!(build.group, Group::Favorites);
+        // And it sorts ahead of everything, including Development.
+        assert_eq!(names(&tasks), ["build", "dev"]);
+    }
+
+    #[test]
+    fn an_explicit_group_replaces_the_one_the_name_implies() {
+        let tasks = Task::from_manifest(&manifest(
+            r#"{"scripts":{"smoke":"x"},"opi":{"scripts":{"smoke":{"group":"Quality"}}}}"#,
+        ));
+        assert_eq!(tasks[0].group, Group::Quality, "not the catch-all");
+    }
+
+    #[test]
+    fn a_named_group_opi_knows_keeps_that_groups_place() {
+        // Configuration refines the meaning-first order rather than dropping
+        // out of it: "Deployment" is Deploy, which sorts after Quality.
+        let tasks = Task::from_manifest(&manifest(
+            r#"{"scripts":{"ship":"x","check":"x"},
+                "opi":{"scripts":{"ship":{"group":"Deployment"}}}}"#,
+        ));
+        assert_eq!(names(&tasks), ["check", "ship"]);
+        let ship = tasks.iter().find(|task| task.name == "ship").expect("ship");
+        assert_eq!(ship.group, Group::Deploy);
+    }
+
+    #[test]
+    fn an_unknown_group_name_joins_the_unrecognised_prefixes() {
+        let tasks = Task::from_manifest(&manifest(
+            r#"{"scripts":{"x":"y"},"opi":{"scripts":{"x":{"group":"Rituals"}}}}"#,
+        ));
+        assert_eq!(tasks[0].group, Group::Custom("Rituals".to_owned()));
+        assert_eq!(tasks[0].group.label(), "Rituals");
+    }
+
+    #[test]
+    fn confirm_is_carried_on_the_task() {
+        let tasks = Task::from_manifest(&manifest(
+            r#"{"scripts":{"deploy":"x","dev":"x"},
+                "opi":{"scripts":{"deploy":{"confirm":true}}}}"#,
+        ));
+        let deploy = tasks
+            .iter()
+            .find(|task| task.name == "deploy")
+            .expect("deploy");
+        let dev = tasks.iter().find(|task| task.name == "dev").expect("dev");
+        assert!(deploy.confirm);
+        assert!(!dev.confirm, "absent means no question");
+    }
+
+    #[test]
+    fn an_opi_description_wins_over_scripts_info() {
+        let tasks = Task::from_manifest(&manifest(
+            r#"{"scripts":{"dev":"x"},"scripts-info":{"dev":"older"},
+                "opi":{"scripts":{"dev":{"description":"newer"}}}}"#,
+        ));
+        assert_eq!(tasks[0].description.as_deref(), Some("newer"));
+    }
+
+    #[test]
+    fn a_favourite_workspace_script_stays_with_its_member() {
+        // Lifting a member's script into a root group would lose which package
+        // it belongs to, and its id would no longer say.
+        let root = manifest(r#"{"scripts":{"build":"x"}}"#);
+        let member = Member {
+            name: "app".to_owned(),
+            path: std::path::PathBuf::new(),
+            manifest: manifest(
+                r#"{"scripts":{"deploy":"x"},"opi":{"scripts":{"deploy":{"favorite":true}}}}"#,
+            ),
+        };
+        let tasks = Task::from_workspace(&root, &[member]);
+        let deploy = tasks
+            .iter()
+            .find(|task| task.name == "deploy")
+            .expect("deploy");
+        assert_eq!(deploy.group, Group::Workspace("app".to_owned()));
     }
 
     #[test]

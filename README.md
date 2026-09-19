@@ -5,7 +5,7 @@
 Go into any repository, type `opi`, and get a usable interface for that
 project — without configuring anything first.
 
-> **Status: `0.3.0`.** Scripts are the main thing; health, security, updates,
+> **Status: `0.4.0`.** Scripts are the main thing; health, security, updates,
 > clean and the commit/release workflows are built on top of them.
 
 ## What it does
@@ -60,6 +60,34 @@ holding `package.json`.
 The script replaces the `opi` process, so `Ctrl-C` reaches your dev server
 rather than killing a wrapper, and the script's exit code is what your shell
 sees — `opi build && …` works.
+
+## Saying more about a script
+
+Optional, and only ever refinement — a project with neither `opi` nor
+`scripts-info` still gets a usable list, which is the whole point.
+
+```json
+{
+  "scripts": { "dev": "astro dev", "deploy": "wrangler deploy" },
+  "scripts-info": { "dev": "Start development server" },
+  "opi": {
+    "scripts": {
+      "dev":    { "favorite": true },
+      "deploy": { "group": "Deployment", "confirm": true }
+    }
+  }
+}
+```
+
+| | |
+| --- | --- |
+| `description` | Wins over `scripts-info`, which stays valid for `nr` |
+| `group` | Replaces the group the script's name implies |
+| `favorite` | Lifts it out of its group, to the top |
+| `confirm` | Asks before running it; `opi --yes <script>` answers in advance |
+
+A `confirm` script refuses to run without a terminal rather than assuming yes —
+otherwise the protection would vanish in exactly the case it exists for.
 
 ## The other areas
 

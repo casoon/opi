@@ -6,6 +6,36 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-09-19
+
+### Added
+
+- Per-script metadata in the `opi` key of `package.json`: `description`,
+  `group`, `favorite` and `confirm`. None of it is required — a project with
+  neither `opi` nor `scripts-info` still gets a usable list, which is the point.
+- `description` there wins over `scripts-info` without invalidating it. Both may
+  name the same script; that is how a project says something to `opi` without
+  changing what `nr` and `npm-scripts-info` read.
+- `group` replaces the group a script's name implies. A name `opi` already
+  knows takes that group's fixed place in the order, so configuration refines
+  the meaning-first arrangement rather than dropping out of it.
+- `favorite` lifts a script out of its group into a Favorites group at the top.
+  Sorting it first *within* its group would barely show — measured on a real
+  project, five of ten groups held two entries.
+- `confirm` asks before running. Without a terminal it refuses rather than
+  assuming yes, since skipping the question where it cannot be asked would
+  remove the protection in exactly the case it exists for. `--yes` says it out
+  loud instead.
+
+### Notes
+
+The `opi` block is held as unparsed JSON and read field by field: a `favorite`
+that is a string rather than a boolean costs that one field, not the entry, and
+certainly not a `package.json` whose `scripts` are perfectly fine.
+
+A favourite in a workspace member stays with its member. Lifting it into the
+root's Favorites would lose which package it belongs to.
+
 ## [0.3.0] - 2026-09-19
 
 Five areas beside the script list, each a hotkey in the list and a flag on the
@@ -117,7 +147,8 @@ Placeholder release. Reserves the crate name on crates.io and establishes the
 repository skeleton. The binary prints its version and a development notice; no
 functionality is implemented.
 
-[Unreleased]: https://github.com/casoon/opi/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/casoon/opi/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/casoon/opi/releases/tag/v0.4.0
 [0.3.0]: https://github.com/casoon/opi/releases/tag/v0.3.0
 [0.2.0]: https://github.com/casoon/opi/releases/tag/v0.2.0
 [0.1.1]: https://github.com/casoon/opi/releases/tag/v0.1.1

@@ -101,6 +101,44 @@ impl Manifest {
         serde_json::from_str(&contents).map_err(|error| ManifestError::Malformed { path, error })
     }
 
+    /// What the project says about one script, beyond its command.
+    ///
+    /// Every field is read defensively and independently: a `favorite` that is
+    /// a string rather than a boolean costs that one field, not the entry and
+    /// certainly not the manifest.
+    pub fn script_meta(&self, script: &str) -> ScriptMeta {
+        let Some(entry) = self
+            .opi
+            .get("scripts")
+            .and_then(|scripts| scripts.get(script))
+        else {
+            return ScriptMeta::default();
+        };
+
+        ScriptMeta {
+            description: entry
+                .get("description")
+                .and_then(serde_json::Value::as_str)
+                .map(str::trim)
+                .filter(|text| !text.is_empty())
+                .map(str::to_owned),
+            group: entry
+                .get("group")
+                .and_then(serde_json::Value::as_str)
+                .map(str::trim)
+                .filter(|text| !text.is_empty())
+                .map(str::to_owned),
+            favorite: entry
+                .get("favorite")
+                .and_then(serde_json::Value::as_bool)
+                .unwrap_or(false),
+            confirm: entry
+                .get("confirm")
+                .and_then(serde_json::Value::as_bool)
+                .unwrap_or(false),
+        }
+    }
+
     /// The strings under `opi.<key>`, ignoring anything of another shape.
     pub fn opi_list(&self, key: &str) -> Vec<String> {
         self.opi
@@ -125,14 +163,34 @@ impl Manifest {
 
     /// The description for `script`, if the project provides one.
     ///
+    /// `opi.scripts.<name>.description` wins over `scripts-info`, and both may
+    /// name the same script: that is the intended way to say something to
+    /// `opi` without changing what `nr` and `npm-scripts-info` read.
+    ///
     /// A blank entry counts as absent — an empty description column is better
     /// than a column of whitespace.
-    pub fn description(&self, script: &str) -> Option<&str> {
-        self.scripts_info
-            .get(script)
-            .map(|text| text.trim())
-            .filter(|text| !text.is_empty())
+    pub fn description(&self, script: &str) -> Option<String> {
+        self.script_meta(script).description.or_else(|| {
+            self.scripts_info
+                .get(script)
+                .map(|text| text.trim())
+                .filter(|text| !text.is_empty())
+                .map(str::to_owned)
+        })
     }
+}
+
+/// What a project says about one of its scripts.
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub struct ScriptMeta {
+    /// Wins over `scripts-info`, which stays valid for `nr` and its kin.
+    pub description: Option<String>,
+    /// Overrides the group derived from the script's name.
+    pub group: Option<String>,
+    /// Lifted out of its group, to the top of the list.
+    pub favorite: bool,
+    /// Asked about before it runs.
+    pub confirm: bool,
 }
 
 /// Why `package.json` could not be turned into a [`Manifest`].
@@ -198,7 +256,7 @@ mod tests {
             manifest.scripts.get("dev").map(String::as_str),
             Some("astro dev")
         );
-        assert_eq!(manifest.description("dev"), Some("Start"));
+        assert_eq!(manifest.description("dev").as_deref(), Some("Start"));
     }
 
     #[test]
@@ -269,6 +327,63 @@ mod tests {
 
         let (manifest, _) = Manifest::discover(&inner).expect("discover");
         assert_eq!(manifest.name.as_deref(), Some("blog"));
+    }
+
+    #[test]
+    fn opi_beats_scripts_info_without_invalidating_it() {
+        // Both may name the same script: that is how a project says something
+        // to opi without changing what nr reads.
+        let manifest = load(
+            r#"{"scripts":{"dev":"x"},"scripts-info":{"dev":"Start development server"},
+                "opi":{"scripts":{"dev":{"description":"Start OPI development environment"}}}}"#,
+        )
+        .expect("parse");
+        assert_eq!(
+            manifest.description("dev").as_deref(),
+            Some("Start OPI development environment")
+        );
+        assert_eq!(
+            manifest.scripts_info.get("dev").map(String::as_str),
+            Some("Start development server"),
+            "the older line is untouched"
+        );
+    }
+
+    #[test]
+    fn script_metadata_is_read_field_by_field() {
+        let manifest = load(
+            r#"{"scripts":{"deploy":"x"},
+                "opi":{"scripts":{"deploy":{"group":"Deployment","confirm":true}}}}"#,
+        )
+        .expect("parse");
+        let meta = manifest.script_meta("deploy");
+        assert_eq!(meta.group.as_deref(), Some("Deployment"));
+        assert!(meta.confirm);
+        assert!(!meta.favorite, "absent means false, not unknown");
+    }
+
+    #[test]
+    fn a_field_of_the_wrong_type_costs_only_that_field() {
+        let manifest = load(
+            r#"{"scripts":{"dev":"x"},
+                "opi":{"scripts":{"dev":{"favorite":"yes please","group":"Development"}}}}"#,
+        )
+        .expect("parse");
+        let meta = manifest.script_meta("dev");
+        assert!(!meta.favorite, "a string is not a boolean");
+        assert_eq!(
+            meta.group.as_deref(),
+            Some("Development"),
+            "and the rest survives"
+        );
+    }
+
+    #[test]
+    fn metadata_for_an_unknown_script_is_simply_empty() {
+        let manifest =
+            load(r#"{"scripts":{"dev":"x"},"opi":{"scripts":{"gone":{"favorite":true}}}}"#)
+                .expect("parse");
+        assert_eq!(manifest.script_meta("dev"), ScriptMeta::default());
     }
 
     #[test]

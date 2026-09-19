@@ -16,6 +16,8 @@ pub enum Invocation {
     Run {
         name: String,
         args: Vec<String>,
+        /// A confirmation was given in advance, with `--yes`.
+        confirmed: bool,
     },
     Help,
     Version,
@@ -46,11 +48,19 @@ where
     S: Into<String>,
 {
     let mut args = args.into_iter().map(Into::into);
+    let mut confirmed = false;
 
-    // Only the first argument can address opi itself; there are no opi flags
-    // that leave the rest of the line still addressed to opi.
-    let Some(first) = args.next() else {
-        return Invocation::List;
+    // `--yes` is the one flag that leaves the rest of the line still addressed
+    // to opi; everything else either is the script or terminates the parse.
+    let first = loop {
+        let Some(arg) = args.next() else {
+            return Invocation::List;
+        };
+        if arg == "--yes" || arg == "-y" {
+            confirmed = true;
+            continue;
+        }
+        break arg;
     };
 
     match first.as_str() {
@@ -78,6 +88,7 @@ where
             Invocation::Run {
                 name: first,
                 args: rest,
+                confirmed,
             }
         }
     }
@@ -96,6 +107,7 @@ In the list, ↑↓ move, Enter runs, / filters, H checks, C cleans,
 S scans for secrets and vulnerable dependencies, U shows updates.
 
 Options:
+  -y, --yes               Answer a script's confirmation in advance
       --health            Run the project's checks
       --clean             Show and remove build artefacts
       --security          Scan for secrets and vulnerable dependencies
@@ -117,6 +129,15 @@ mod tests {
         Invocation::Run {
             name: name.to_owned(),
             args: args.iter().map(|arg| (*arg).to_owned()).collect(),
+            confirmed: false,
+        }
+    }
+
+    fn confirmed(name: &str) -> Invocation {
+        Invocation::Run {
+            name: name.to_owned(),
+            args: Vec::new(),
+            confirmed: true,
         }
     }
 
@@ -167,6 +188,23 @@ mod tests {
         assert_eq!(parse(["-h"]), Invocation::Help);
         assert_eq!(parse(["--version"]), Invocation::Version);
         assert_eq!(parse(["-V"]), Invocation::Version);
+    }
+
+    #[test]
+    fn yes_answers_in_advance_and_leaves_the_script_alone() {
+        assert_eq!(parse(["--yes", "deploy"]), confirmed("deploy"));
+        assert_eq!(parse(["-y", "deploy"]), confirmed("deploy"));
+        assert_eq!(parse(["deploy"]), run("deploy", &[]));
+    }
+
+    #[test]
+    fn yes_after_the_script_belongs_to_the_script() {
+        assert_eq!(parse(["deploy", "--yes"]), run("deploy", &["--yes"]));
+    }
+
+    #[test]
+    fn yes_alone_still_lists() {
+        assert_eq!(parse(["--yes"]), Invocation::List);
     }
 
     #[test]

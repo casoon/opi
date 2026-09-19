@@ -90,7 +90,11 @@ fn main() -> ExitCode {
         Invocation::Security => security(&manifest, &members, &project, &root),
         Invocation::Updates => updates(&project, &root),
         Invocation::Workflow(name) => run_workflow(&name, &manifest, &members, &project, &root),
-        Invocation::Run { name, args } => start(&project, &tasks, &name, &args),
+        Invocation::Run {
+            name,
+            args,
+            confirmed,
+        } => start(&project, &tasks, &name, &args, confirmed),
         // An unknown flag is only reported once a project is present, so the
         // missing-package.json message wins where both are true — that is the
         // problem the user has to fix first.
@@ -176,7 +180,7 @@ fn list(
     };
 
     match outcome {
-        Outcome::Selected(id) => start(project, tasks, &id, &[]),
+        Outcome::Selected(id) => start(project, tasks, &id, &[], false),
         // Nothing was chosen; that is not a failure.
         Outcome::Cancelled => ExitCode::SUCCESS,
         Outcome::Hotkey('H') => health(manifest, members, project, directory),
@@ -223,7 +227,13 @@ fn build_menu(project: &Project, tasks: &[Task], directory: &Path) -> Menu {
 /// Runs `name`, or explains why it cannot.
 ///
 /// Returns only on failure: a started script replaces this process.
-fn start(project: &Project, tasks: &[Task], name: &str, args: &[String]) -> ExitCode {
+fn start(
+    project: &Project,
+    tasks: &[Task],
+    name: &str,
+    args: &[String],
+    confirmed: bool,
+) -> ExitCode {
     let Some(task) = find(tasks, name) else {
         let console = Console::stderr(ColorMode::Auto);
         let mut block = ErrorBlock::new(format!("No script named {name}"));
@@ -241,6 +251,10 @@ fn start(project: &Project, tasks: &[Task], name: &str, args: &[String]) -> Exit
         write_block(&block, console);
         return ExitCode::FAILURE;
     };
+
+    if task.confirm && !confirmed && !confirm(task) {
+        return ExitCode::FAILURE;
+    }
 
     let manager = project.package_manager;
     let error = run::execute(manager.manager, &task.name, task.workspace.as_deref(), args);
@@ -261,6 +275,41 @@ fn start(project: &Project, tasks: &[Task], name: &str, args: &[String]) -> Exit
         });
     write_block(&block, console);
     ExitCode::FAILURE
+}
+
+/// Asks before running a task the project marked as needing it.
+///
+/// Without a terminal this refuses rather than assuming yes. Skipping the
+/// question where it cannot be asked would remove the protection in exactly
+/// the case it exists for — a script, a hook, CI — so `--yes` has to be said
+/// out loud there.
+fn confirm(task: &Task) -> bool {
+    let console = Console::stderr(ColorMode::Auto);
+    let interactive = io::stdout().is_terminal() && io::stderr().is_terminal();
+
+    if !interactive {
+        let block = ErrorBlock::new(format!("{} needs confirming", task.name))
+            .with_explanation("This project marked it as needing a confirmation, and there is no terminal to ask in.")
+            .with_remedy("Run it again with --yes if that is what you mean.")
+            .add_command(format!("opi --yes {}", task.name));
+        write_block(&block, console);
+        return false;
+    }
+
+    let menu = Menu::new()
+        .with_heading(format!("Run {}?", task.name))
+        .with_note(&task.command)
+        .add_group(
+            Group::new("Confirm")
+                .add_item(Item::new("no", "Cancel"))
+                .add_item(Item::new("yes", format!("Run {}", task.name))),
+        );
+
+    // Cancel first, so the cursor starts on the harmless answer.
+    matches!(
+        menu.run(console, SelectMode::Auto, true),
+        Ok(Outcome::Selected(choice)) if choice == "yes"
+    )
 }
 
 /// Writes an error block to stderr, ignoring a broken pipe.

@@ -27,8 +27,12 @@ a flag: health, security, updates, clean, and the `commit` and `release`
 workflows. None of the underlying tools are reimplemented; `opi` detects which
 one a project uses, runs it and reports what came back.
 
-**Not built:** per-script metadata in the `opi` key, and ecosystems other than
-npm.
+A project can say more about a script through the `opi` key in `package.json` —
+a description that wins over `scripts-info`, an explicit group, a favourite, a
+confirmation before running. All of it optional: a project with none of it
+still gets a usable list.
+
+**Not built:** ecosystems other than npm.
 
 `0.0.1` was a placeholder that held the crate name; everything since has been
 functional.

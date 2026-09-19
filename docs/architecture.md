@@ -43,8 +43,14 @@ flowchart TD
 project detection, the task model and the checks. Nothing re-reads the file.
 
 The `opi` block inside it is deliberately held as unparsed JSON and read
-leniently. Typed into a struct, one field of the wrong type would fail the whole
-parse and make `opi` useless in a project whose `scripts` are perfectly fine.
+leniently, field by field. Typed into a struct, one field of the wrong type
+would fail the whole parse and make `opi` useless in a project whose `scripts`
+are perfectly fine; read this way, a `favorite` that is a string costs that one
+field.
+
+It carries per-script metadata — `description`, `group`, `favorite`, `confirm` —
+and the `clean` path list. All of it is refinement: nothing here may be required
+for a screen to work, or the zero-configuration rule is broken.
 
 ## Finding the project
 
@@ -108,6 +114,16 @@ declared — `Development`, `Build`, `Preview`, `Quality`, then unrecognised
 prefixes alphabetically, then the catch-all. There is no separate sort
 function to keep in step.
 
+A project may override the derived group, or lift a script out of it entirely.
+A `group` naming one `opi` already knows takes that group's fixed place, so
+configuration refines the meaning-first order rather than escaping it; a
+`favorite` becomes its own group at the top, because sorting first *within* a
+group of two barely shows.
+
+A favourite in a workspace member stays with its member: lifting it into the
+root's Favorites would lose which package it belongs to, and its id would no
+longer say.
+
 Two rules are less obvious than they look:
 
 - A script with no prefix that heads a family joins that family. `deploy`
@@ -142,6 +158,11 @@ projects, and the bare word stays theirs.
 | Updates | `U` | `--updates` | Outdated dependencies, split by semver jump |
 | Clean | `C` | `--clean` | Removable artefacts, with sizes |
 | Workflows | — | `--check commit`/`release` | A named subset, plus git gates |
+
+A script the project marked `confirm` is asked about before it runs. Without a
+terminal that refuses rather than assuming yes — skipping the question where it
+cannot be asked would remove the protection in exactly the case it exists for —
+and `--yes` is how to say it out loud in a script.
 
 ### Checks
 
