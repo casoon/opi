@@ -38,8 +38,13 @@ Three levels, each optional:
 1. `scripts` — sufficient on its own
 2. `scripts-info` — descriptions, deliberately the field `nr` already uses, so
    existing projects benefit without change
-3. `opi` — project-specific refinement (health step list, clean paths), never a
-   precondition
+3. `opi` — refinement `opi` defines itself: `opi.clean` for extra removable
+   paths, and `opi.scripts.<name>` for a description, a group, a favourite or a
+   confirmation. Never a precondition for a screen to work.
+
+A Rust project declares none of this. Its commands are the same everywhere, so
+`Cargo.toml` is read for two facts — the package name and whether a binary
+exists — and nothing else.
 
 ## No task system of its own
 
@@ -52,9 +57,14 @@ task type.
 
 ## Orchestration, not reimplementation
 
-No check is implemented inside `opi`. TypeScript errors come from `tsc`, unused
-exports from Knip, vulnerabilities from `pnpm audit`. `opi` detects which tool a
-project uses, invokes it, parses the result and presents it.
+No check is implemented inside `opi`. TypeScript errors come from `tsc` or
+`astro check`, lint findings from Biome or ESLint, dead code from fallow or
+Knip, vulnerabilities from the package manager's own audit. `opi` detects which
+tool a project uses, invokes it, and relays the result.
+
+Output is parsed only where the format is documented — `audit --json`,
+`outdated --json`. Everything else is relayed whole and capped, because a
+parser that guesses at a tool's output breaks on that tool's next release.
 
 Consequence: adapters must be swappable. The "Lint" check exists independently
 of whether ESLint or Biome satisfies it. Where several tools are detected for the
@@ -62,9 +72,9 @@ same check, `opi` shows which one actually ran.
 
 ## runemark is the only presentation dependency
 
-All terminal output goes through [runemark](https://github.com/casoon/runemark) —
-including the interactive selection layer, which runemark is being extended to
-provide (see [decisions.md](decisions.md)). No second TUI or prompt library.
+All terminal output goes through [runemark](https://github.com/casoon/runemark),
+including the interactive list, its filter and the confirmation dialogue. No
+second TUI or prompt library.
 
 Consequence: every user-facing string is produced by a runemark `Console`,
 `Report` or block type before it is written out. No raw ANSI escapes, no
@@ -75,12 +85,13 @@ compliance and piped output in ways that are hard to notice and hard to undo.
 
 - `NO_COLOR` is honoured, colour is TTY-aware by default (inherited from
   runemark's existing policy).
-- A signal that kills the process outright while the interactive list is open
-  leaves the terminal in raw mode; no destructor runs. `Ctrl-C` is unaffected —
-  in raw mode it arrives as a key and closes the list normally.
 - Without a TTY, nothing may block waiting for input. `opi | cat` and `opi` in
   CI must terminate.
-- Raw mode must be restored on abort, error, panic and signal.
+- Raw mode is restored on every path out of the list: selection, cancellation,
+  error and an unwinding panic. **Not** on a signal that kills the process
+  outright — `SIGTERM` and `SIGHUP` run no destructor, and runemark installs no
+  signal handlers. `Ctrl-C` is unaffected: in raw mode it arrives as a key and
+  closes the list normally.
 - Exit codes of executed scripts are passed through, so `opi build && …` works
   in shell chains.
 
@@ -91,8 +102,19 @@ inside the project directory, does not follow symlinks, and rejects paths from
 the `opi` key that escape the project (`..`, absolute paths). `node_modules/` is
 never preselected.
 
-Operations that modify files — dependency updates, auto-fixes — show a diff
-preview and require confirmation before writing.
+**Nothing else writes.** `opi --updates` reports what is outdated and stops
+there; applying an update rewrites `package.json` and a lockfile, and with pnpm
+catalogs the versions may not live in `package.json` at all. The package
+manager already does that correctly. No check is run in a fixing mode.
+
+A script the project marked `confirm` is asked about before it runs, and
+refuses without a terminal rather than assuming yes — `--yes` says it out loud
+instead.
 
 ## Assumptions, not yet settled
 
+- **Nested workspaces** — a member that declares workspaces of its own. None of
+  the 81 workspace repositories measured had one, so the behaviour is untested
+  rather than decided.
+- **Terminal behaviour beyond macOS and Linux.** CI covers both; other Unixes
+  are assumed to behave the same and have not been tried.

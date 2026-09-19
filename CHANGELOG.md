@@ -6,6 +6,22 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-09-19
+
+### Fixed
+
+- `opi --help` said entries come from `package.json`, which stopped being the
+  whole truth when `Cargo.toml` was added in `0.5.0`. It now names both, and
+  mentions the `<member>/<script>` form, which was undocumented.
+
+### Notes
+
+A full pass over the README and `docs/` against the code turned up eleven
+statements the implementation no longer supported — among them a `taze`
+adapter that was never built, a diff preview before writing that does not
+exist, an `opi.health` key that is not read, and a claim that raw mode is
+restored on a signal, three lines below the sentence explaining that it is not.
+
 ## [0.5.0] - 2026-09-19
 
 ### Added
@@ -171,7 +187,8 @@ Placeholder release. Reserves the crate name on crates.io and establishes the
 repository skeleton. The binary prints its version and a development notice; no
 functionality is implemented.
 
-[Unreleased]: https://github.com/casoon/opi/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/casoon/opi/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/casoon/opi/releases/tag/v0.5.1
 [0.5.0]: https://github.com/casoon/opi/releases/tag/v0.5.0
 [0.4.0]: https://github.com/casoon/opi/releases/tag/v0.4.0
 [0.3.0]: https://github.com/casoon/opi/releases/tag/v0.3.0

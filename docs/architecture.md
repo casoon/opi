@@ -27,21 +27,29 @@ src/
 
 ```mermaid
 flowchart TD
-  Args["std::env::args"] --> Cli["cli::parse"]
-  Cli -->|"Invocation"| Main["main"]
-  Manifest["manifest::Manifest::load\npackage.json"] --> Project["project::Project::detect"]
-  Manifest --> Task["task::Task::from_manifest"]
-  Main --> Manifest
-  Project -->|"PackageManager"| Run["run::execute"]
-  Task -->|"Vec&lt;Task&gt;"| Menu["runemark::Menu"]
-  Task -->|"exact name match"| Run
-  Menu -->|"Outcome::Selected"| Run
-  Menu -->|"Outcome::Unavailable"| Render["Menu::render → stdout"]
-  Run -->|"exec, replaces this process"| Script["pnpm run dev"]
+  Args["std::env::args"] --> Cli["cli::parse → Invocation"]
+  Npm["manifest::discover\npackage.json"] --> Task["task::Task"]
+  Rust["cargo::discover\nCargo.toml"] --> Task
+  Npm --> Project["project::Project\nname, package manager"]
+  Rust --> Project
+  Cli --> Npm
+  Cli --> Rust
+  Task -->|"Exec::Script"| Run["run::execute"]
+  Task -->|"Exec::Direct"| Run
+  Task --> Menu["runemark::Menu"]
+  Menu -->|"Selected"| Run
+  Menu -->|"Unavailable"| Render["Menu::render → stdout"]
+  Menu -->|"Hotkey"| Areas["health · security\nupdates · clean"]
+  Cli --> Areas
+  Run -->|"exec, replaces this process"| Child["pnpm run dev · cargo test"]
 ```
 
-`package.json` is parsed once, by `manifest.rs`, and the result is shared by
-project detection, the task model and the checks. Nothing re-reads the file.
+Each manifest is parsed once and the result is shared by project detection, the
+task model and the checks. Nothing re-reads a file.
+
+Both discoveries run, and either may come back empty; only both being empty is
+an error. A Rust-only project stands on an empty `Manifest`, which answers every
+question about scripts with "none" and needs no special case downstream.
 
 The `opi` block inside it is deliberately held as unparsed JSON and read
 leniently, field by field. Typed into a struct, one field of the wrong type

@@ -39,10 +39,11 @@ Three speeds, all backed by the same task model:
 
 ```bash
 opi                   # navigate: ↓ ↓ Enter
-opi                   # or filter: /dep ↵
+opi                   # filter:   /dep ↵
 opi dev               # direct, no interface
-opi build --verbose   # arguments are forwarded to the script
 ```
+
+Arguments after the name go to the script: `opi build --verbose`.
 
 In a monorepo each workspace member's scripts appear under the member's name —
 only those the root does not already define, since the root's script usually
@@ -135,10 +136,15 @@ astro-v7-workspace  health
 ```
 
 `opi` reimplements none of this. It detects which tool a project depends on —
-Biome, ESLint, Prettier, `tsc`, `astro check`, Vitest, Jest, Knip, fallow, a
-secret scanner — runs it, and relays what came back. In a workspace the checks
-run per member, in the member, because that is where the tools and their config
-live.
+Biome, ESLint, Prettier, `tsc`, `astro check`, Vitest, Jest, fallow, Knip, a
+secret scanner, `cargo` — runs it, and relays what came back. In a workspace the
+checks run per member, in the member, because that is where the tools and their
+config live.
+
+Output is parsed only where the format is documented (`audit --json`,
+`outdated --json`). Everything else is relayed whole and capped at twenty lines,
+with the command to see the rest: a parser that guesses at a tool's output
+breaks on that tool's next release.
 
 There is no health score. A composite number stops meaning anything within
 weeks; what a failing tool actually said does not.
@@ -147,8 +153,9 @@ weeks; what a failing tool actually said does not.
 
 - **Zero configuration.** `opi` must be useful in an unmodified repository. A
   tool you have to configure first never gets started in someone else's project.
-- **`package.json` is the only interface.** No `opi.toml`, no second source of
-  truth. `scripts`, optionally `scripts-info`, optionally an `opi` key for
+- **The project's own files are the only interface.** `package.json` and
+  `Cargo.toml` — no `opi.toml`, no second source of truth of `opi`'s own
+  making. `scripts`, optionally `scripts-info`, optionally an `opi` key for
   refinement.
 - **No task system of its own.** `opi` does not define tasks with their own
   commands — that would put it in competition with npm scripts, `just`, `make`
@@ -172,7 +179,9 @@ binary.
 ## Documentation
 
 - [docs/project-state.md](docs/project-state.md) — what this is and where it stands
+- [docs/architecture.md](docs/architecture.md) — the modules and how they fit
 - [docs/constraints.md](docs/constraints.md) — the boundaries the implementation respects
+- [docs/conventions.md](docs/conventions.md) — the rules future changes follow
 - [docs/decisions.md](docs/decisions.md) — the decisions in force, and why
 
 Terminal presentation comes from [runemark](https://github.com/casoon/runemark),

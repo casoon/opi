@@ -6,63 +6,62 @@
 question in any repository: *what can and what should I do with this project
 right now?*
 
-Its primary function is to make a project's `package.json` scripts immediately
-usable: grouped, labelled, keyboard-driven, with the package manager detected
-rather than typed. Maintenance areas — health, dependency updates, clean,
-security — sit behind hotkeys, deliberately secondary to that.
+Its primary function is to make a project's scripts immediately usable —
+grouped, labelled, keyboard-driven, with the package manager detected rather
+than typed. Everything else sits behind a hotkey, deliberately secondary.
 
-`opi` does not reimplement any of the tools it surfaces. It orchestrates
-established ones (`tsc`, ESLint, Biome, Vitest, Knip, No Secrets, `pnpm audit`,
-Taze), parses their output and presents it consistently. It is a UX layer over
-proven tooling.
+`opi` reimplements none of the tools it surfaces. It detects which one a
+project depends on, runs it, and relays the result.
 
-## Current status
+## What it does
 
-`opi` finds the nearest `package.json`, groups its scripts, adds any workspace
-members' scripts, and runs the one you pick — from an interactive list, by name,
-or by filtering with `/`.
+`opi` finds the nearest `package.json` by searching upwards, groups its
+scripts, adds any workspace members' scripts, and runs the one you pick — from
+an interactive list, by name, or by filtering with `/`.
 
-Beside that it offers five areas, each reachable by a hotkey in the list and by
-a flag: health, security, updates, clean, and the `commit` and `release`
-workflows. None of the underlying tools are reimplemented; `opi` detects which
-one a project uses, runs it and reports what came back.
+`Cargo.toml` is read the same way, and a repository may be both at once: the
+list, health and clean cover npm and Rust together rather than choosing one.
 
-A project can say more about a script through the `opi` key in `package.json` —
+Five areas sit beside the list:
+
+| Area | Key | Flag |
+| --- | --- | --- |
+| Health | `H` | `--health` |
+| Security | `S` | `--security` |
+| Updates | `U` | `--updates` |
+| Clean | `C` | `--clean` |
+| Workflows | — | `--check commit`, `--check release` |
+
+A project can say more about a script through the `opi` key in `package.json`:
 a description that wins over `scripts-info`, an explicit group, a favourite, a
-confirmation before running. All of it optional: a project with none of it
-still gets a usable list.
+confirmation before running. All optional — a project with none of it still
+gets a usable list, which is the point of the whole arrangement.
 
-`opi` also recognises Rust projects, and a repository can be both at once: the
-list, health and clean cover `package.json` and `Cargo.toml` together rather
-than choosing one.
+## What it does not do
 
-**Not built:** .NET, which appeared in none of the measured directories on its
-own.
+- **Apply updates.** `--updates` reports and stops. See
+  [constraints.md](constraints.md).
+- **Run checks in a fixing mode.** Nothing writes but clean.
+- **.NET.** No standalone marker appeared in the 231 directories measured.
+- **Windows.** See [decisions.md](decisions.md).
 
-`0.0.1` was a placeholder that held the crate name; everything since has been
-functional.
-
-See [architecture.md](architecture.md) for how the pieces fit.
-
-The build plan lives in the gitignored `plan/` directory. The first functional
-release (`0.1.0`) is scoped to project detection, the grouped script list,
-interactive selection and direct execution — nothing else.
-
-## Target stack
+## Stack
 
 | | |
 | --- | --- |
-| Language | Rust, edition 2024 |
+| Language | Rust, edition 2024, MSRV `1.85` |
 | Distribution | crates.io as `opi`, installed via `cargo install opi` |
-| Terminal presentation | [runemark](https://github.com/casoon/runemark) `0.4` with its `select` feature — the only presentation dependency |
-| Project input | `package.json` and `Cargo.toml` — no separate config file |
+| Terminal presentation | [runemark](https://github.com/casoon/runemark) `0.5` with its `select` feature — the only presentation dependency |
+| Project input | `package.json` and `Cargo.toml` — no config file of `opi`'s own |
 | Platforms | Unix only; building on Windows fails with an explicit message |
+| Dependencies | four: `runemark`, `serde`, `serde_json`, `glob` |
 
 ## Documentation in this directory
 
-- [constraints.md](constraints.md) — the hard boundaries the implementation must
-  respect
-- [decisions.md](decisions.md) — the decisions currently in force, and why
-
 - [architecture.md](architecture.md) — the modules that exist and how they fit
+- [constraints.md](constraints.md) — the boundaries the implementation respects
 - [conventions.md](conventions.md) — the rules future changes follow
+- [decisions.md](decisions.md) — the decisions in force, and why
+
+The working backlog lives in the gitignored `plan/` directory, which is not
+part of this documentation and not published with the crate.

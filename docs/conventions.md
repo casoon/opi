@@ -27,10 +27,25 @@ rather than in repository secrets.
 
 ## Modules
 
-One module per layer, named for what it produces: `manifest`, `workspace`,
-`project`, `task`, `run`, `cli`. Each carries a module-level doc comment
-saying what it owns and, where it is not obvious, what it deliberately does
-not.
+One module per layer, named for what it produces:
+
+| | |
+| --- | --- |
+| `cli` | arguments → an `Invocation` |
+| `manifest` | `package.json` → a `Manifest` |
+| `cargo` | `Cargo.toml` → a Rust project and its commands |
+| `workspace` | workspace patterns → member manifests |
+| `project` | manifest and directory → name and package manager |
+| `task` | manifests → the one list everything operates on |
+| `run` | a task → the running process |
+| `check` | a project's tools → concurrent results |
+| `audit` | a package manager's audit → parsed advisories |
+| `outdated` | a package manager's `outdated` → updates by semver jump |
+| `clean` | removable paths, measured |
+| `workflow` | named sequences of checks, plus repository gates |
+
+Each carries a module-level doc comment saying what it owns and, where it is
+not obvious, what it deliberately does not.
 
 `main.rs` holds the wiring and **all** user-facing output. No other module
 prints.
@@ -76,13 +91,16 @@ through to the script is not.
 ## Dependencies
 
 Four, each with a stated reason: `runemark` for all presentation, `serde` and
-`serde_json` for `package.json`, `glob` for workspace patterns. A fifth needs
-an argument that a small adapter over an existing focused crate cannot be
-avoided.
+`serde_json` for `package.json` and the JSON the package managers emit, `glob`
+for workspace patterns. A fifth needs an argument that a small adapter over an
+existing focused crate cannot be avoided.
+
+`Cargo.toml` is read without a TOML parser for that reason: two facts are
+wanted, and a dependency to learn them would cost more than they are worth.
 
 ## Measure before deciding
 
-Several rules here came from counting rather than reasoning, and twice the count
+Several rules here came from counting rather than reasoning, and three times the count
 contradicted the plan:
 
 - The plan named Knip as a dead-code adapter. Knip was present in 1 of 133 real
@@ -95,6 +113,8 @@ contradicted the plan:
 - Dropping the Node version line, because it was most of the startup time.
 - The Deploy and Maintenance groups, because 273 of 1923 entries were landing in
   the catch-all and they were a handful of names repeated everywhere.
+- Building Rust support and not .NET, because `Cargo.toml` appeared in 51 of
+  231 directories and a standalone .NET marker in none.
 
 Where a question is answerable by looking at real projects, look — and where the
 answer contradicts the plan, the plan was a guess and the count is not.

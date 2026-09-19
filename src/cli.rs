@@ -100,8 +100,9 @@ pub fn help(version: &str) -> String {
         "opi {version} — Operations Interface
 
 Usage:
-  opi                     List the project's scripts
+  opi                     List what this project can do
   opi <script> [args…]    Run a script, passing args on to it
+  opi <member>/<script>   Run a workspace member's script
 
 In the list, ↑↓ move, Enter runs, / filters, H checks, C cleans,
 S scans for secrets and vulnerable dependencies, U shows updates.
@@ -116,8 +117,10 @@ Options:
   -h, --help              Show this help
   -V, --version           Show the version
 
-Scripts come from package.json and always take precedence over built-in
-names, so a project with a script called \"help\" keeps working."
+Entries come from package.json and Cargo.toml. A project's own scripts
+always take precedence over built-in names, so a project with a script
+called \"clean\" keeps working — every built-in area is a flag or a
+hotkey instead."
     )
 }
 

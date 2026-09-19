@@ -23,7 +23,8 @@ state — it is not a history.
 > Groups are derived from script name prefixes — the part before the first `:`
 > becomes the group, known base names (`dev`, `check`, `test`) map to meaningful
 > labels. Group order is fixed and meaning-oriented, not alphabetical.
-> Descriptions come from `scripts-info`; where absent, the column stays empty.
+> Descriptions come from `opi.scripts.<name>.description`, then `scripts-info`;
+> where neither exists, the column stays empty.
 >
 > *Reason:* a flat alphabetical list of raw script names is the problem `opi`
 > exists to solve.
@@ -34,18 +35,19 @@ state — it is not a history.
 
 > **runemark is extended rather than paired with a second library**
 >
-> The interactive selection layer lives in runemark `0.4.0`, behind its `select`
-> feature. `opi` takes on no other presentation dependency — no ratatui, no
-> inquire.
+> The interactive list lives in runemark, behind its `select` feature, and so
+> do its viewport, its width fitting and its filter. `opi` takes on no other
+> presentation dependency — no ratatui, no inquire.
 >
 > *Reason:* one presentation layer across the CLI tools in this ecosystem,
 > rather than two competing rendering models inside one binary.
 >
 > *Consequence:* runemark's design boundary now covers grouped selection, and
 > its documentation says so. The API stays generic — it knows nothing about
-> scripts, `package.json` or package managers. If that generic form turns out
-> not to carry `opi`'s interface, that is grounds to revisit this decision, not
-> to widen the boundary further.
+> scripts, `package.json` or package managers. Four rounds of `opi`'s needs
+> shaped it without a single `opi` term entering it. If that generic form ever
+> turns out not to carry the interface, that is grounds to revisit this
+> decision, not to widen the boundary further.
 
 > **Unix only**
 >
@@ -76,14 +78,52 @@ state — it is not a history.
 > differently named internal crates. The name is also not reserved — publishing
 > early is what secures it.
 
+> **A favourite leaves its group**
+>
+> A script marked `favorite` moves into a Favorites group at the top rather
+> than sorting first inside the group its name implies.
+>
+> *Reason:* sorting first within a group barely shows. Measured on a real
+> project, five of its ten groups held two entries each.
+>
+> *Consequence:* a favourite in a workspace member is the exception — it stays
+> with its member, because lifting it out would lose which package it belongs
+> to and its id would no longer say.
+
+> **More than one ecosystem, and none of them wins**
+>
+> `package.json` and `Cargo.toml` are both looked for, and a repository that is
+> both shows both under one set of headings.
+>
+> *Reason:* measured across 231 directories here, 133 carry a `package.json`,
+> 51 a `Cargo.toml` and twelve both. Choosing one would misrepresent those
+> twelve, and refusing a repository that has only the second turned 39 of them
+> away.
+>
+> *Consequence:* `Task` carries how to start it — through the package manager,
+> or by naming its own program. A third ecosystem needs no second list.
+
 > **Built-in actions never shadow a project's scripts**
 >
-> A project with a script named `health`, `clean` or `update` is plausible.
-> Where a name collides, the script wins; built-in actions stay reachable by
-> hotkey and in an unambiguous form.
+> A project with a script named `health`, `clean`, `release` or `commit` is not
+> merely plausible — `clean` appeared in 41 of 133 measured projects. Where a
+> name collides the script wins, and every built-in area is reached by a flag
+> or a hotkey instead of a bare word.
 >
 > *Reason:* `opi` must not break in exactly the kind of project it is meant to
 > improve.
+
+> **Reporting beats acting, where acting is a guess**
+>
+> `opi --updates` shows what is outdated and stops. Clean is the only code that
+> writes, and it removes only what it has measured and been told to.
+>
+> *Reason:* applying an update rewrites `package.json` and a lockfile, and with
+> pnpm catalogs the versions may not live in `package.json` at all. The package
+> manager already does it correctly.
+>
+> *Consequence:* the value of the screen is the separation — "two safe, one
+> major" is a decision, a column of version numbers is homework.
 
 > **No health score**
 >
