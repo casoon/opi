@@ -23,6 +23,8 @@ pub enum Invocation {
     Health,
     /// Show and remove build artefacts.
     Clean,
+    /// Scan for secrets and vulnerable dependencies.
+    Security,
     /// A flag `opi` does not know, before any script name.
     UnknownFlag(String),
 }
@@ -54,6 +56,7 @@ where
         // must keep "opi health" meaning its own.
         "--health" => Invocation::Health,
         "--clean" => Invocation::Clean,
+        "--security" => Invocation::Security,
         _ if first.starts_with('-') => Invocation::UnknownFlag(first),
         _ => {
             let mut rest: Vec<String> = args.collect();
@@ -77,11 +80,13 @@ Usage:
   opi                     List the project's scripts
   opi <script> [args…]    Run a script, passing args on to it
 
-In the list, ↑↓ move, Enter runs, / filters, H checks, C cleans.
+In the list, ↑↓ move, Enter runs, / filters, H checks, C cleans,
+S scans for secrets and vulnerable dependencies.
 
 Options:
       --health            Run the project's checks
       --clean             Show and remove build artefacts
+      --security          Scan for secrets and vulnerable dependencies
   -h, --help              Show this help
   -V, --version           Show the version
 
@@ -154,6 +159,7 @@ mod tests {
     fn built_in_areas_are_flags_so_a_script_can_own_the_word() {
         assert_eq!(parse(["--health"]), Invocation::Health);
         assert_eq!(parse(["--clean"]), Invocation::Clean);
+        assert_eq!(parse(["--security"]), Invocation::Security);
         // "clean" is a script name in 41 of 133 measured projects.
         assert_eq!(parse(["health"]), run("health", &[]));
         assert_eq!(parse(["clean"]), run("clean", &[]));

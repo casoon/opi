@@ -9,6 +9,7 @@ compile_error!(
      and its interactive list drives termios directly."
 );
 
+mod audit;
 mod check;
 mod clean;
 mod cli;
@@ -84,6 +85,7 @@ fn main() -> ExitCode {
         Invocation::List => list(&manifest, &members, &project, &tasks, &root),
         Invocation::Health => health(&manifest, &members, &project, &root),
         Invocation::Clean => clean(&manifest, &members, &project, &root),
+        Invocation::Security => security(&manifest, &members, &project, &root),
         Invocation::Run { name, args } => start(&project, &tasks, &name, &args),
         // An unknown flag is only reported once a project is present, so the
         // missing-package.json message wins where both are true — that is the
@@ -144,7 +146,9 @@ fn list(
     if !checks.is_empty() {
         menu = menu.add_hint(Hint::new('H', "Health"));
     }
-    menu = menu.add_hint(Hint::new('C', "Clean"));
+    menu = menu
+        .add_hint(Hint::new('C', "Clean"))
+        .add_hint(Hint::new('S', "Security"));
 
     // Both streams have to be terminals. stdout decides whether the list is
     // being captured rather than read, and the menu draws its frames on
@@ -172,6 +176,7 @@ fn list(
         Outcome::Cancelled => ExitCode::SUCCESS,
         Outcome::Hotkey('H') => health(manifest, members, project, directory),
         Outcome::Hotkey('C') => clean(manifest, members, project, directory),
+        Outcome::Hotkey('S') => security(manifest, members, project, directory),
         Outcome::Hotkey(_) => ExitCode::SUCCESS,
         Outcome::Unavailable => {
             print!("{}", menu.render(Console::stdout(ColorMode::Auto)));
@@ -525,6 +530,150 @@ fn clean(
     }
 
     if failures.is_empty() {
+        ExitCode::SUCCESS
+    } else {
+        ExitCode::FAILURE
+    }
+}
+
+/// Scans the repository for secrets and its dependencies for vulnerabilities.
+fn security(
+    manifest: &Manifest,
+    members: &[workspace::Member],
+    project: &Project,
+    root: &Path,
+) -> ExitCode {
+    let console = Console::stdout(ColorMode::Auto);
+    println!(
+        "{}  {}",
+        console.paint(Tone::Title, project.display_name(root)),
+        console.paint(Tone::Muted, "security")
+    );
+    println!();
+
+    let mut clean = true;
+
+    // Secrets is a check like any other; this only makes it reachable without
+    // waiting for the tests to finish.
+    let scans: Vec<check::Check> = check::Check::detect_all(manifest, members, root)
+        .into_iter()
+        .filter(|check| check.name == "Secrets")
+        .collect();
+
+    if scans.is_empty() {
+        println!(
+            "{}",
+            console.paint(
+                Tone::Muted,
+                "No secret scanner: this project depends on none that opi knows."
+            )
+        );
+    } else {
+        let reports = check::run_all(scans, |_| {});
+        for report in &reports {
+            if report.passed() {
+                println!(
+                    "{} {}",
+                    console.paint(Tone::Success, "✓"),
+                    console.paint(Tone::Success, format!("Secrets — {}", report.check.tool))
+                );
+            } else {
+                clean = false;
+                println!(
+                    "{} {}",
+                    console.paint(Tone::Error, "✗"),
+                    console.paint(Tone::Error, format!("Secrets — {}", report.check.tool))
+                );
+                // Locations, not values: this output lands in scrollback, CI
+                // logs and screenshots.
+                let lines: Vec<&str> = report.output.lines().collect();
+                for line in lines.iter().take(OUTPUT_LINES) {
+                    println!("  {line}");
+                }
+                if let Some(rest) = lines.len().checked_sub(OUTPUT_LINES).filter(|n| *n > 0) {
+                    println!(
+                        "  {}",
+                        console.paint(
+                            Tone::Muted,
+                            format!(
+                                "… {rest} more lines — run `{}`",
+                                report.check.command_line()
+                            )
+                        )
+                    );
+                }
+            }
+        }
+    }
+
+    println!();
+    match audit::run(project.package_manager.manager, root) {
+        Ok(found) if found.is_empty() => println!(
+            "{} {}",
+            console.paint(Tone::Success, "✓"),
+            console.paint(Tone::Success, "Dependencies — no known vulnerabilities")
+        ),
+        Ok(found) => {
+            let serious = found
+                .advisories
+                .iter()
+                .any(|advisory| advisory.severity.serious());
+            clean = clean && !serious;
+
+            let summary = found
+                .counts()
+                .iter()
+                .map(|(severity, count)| format!("{count} {}", severity.label()))
+                .collect::<Vec<_>>()
+                .join(", ");
+            println!(
+                "{} {}",
+                console.paint(if serious { Tone::Error } else { Tone::Warning }, "!"),
+                console.paint(
+                    if serious { Tone::Error } else { Tone::Warning },
+                    format!("Dependencies — {summary}")
+                )
+            );
+
+            // Summarised by default: a tree of six hundred dependencies
+            // produces far more prose than anyone reads.
+            let width = found
+                .advisories
+                .iter()
+                .map(|advisory| advisory.module.chars().count())
+                .max()
+                .unwrap_or(0);
+            for advisory in found.advisories.iter().take(OUTPUT_LINES) {
+                let fix = advisory
+                    .patched
+                    .as_deref()
+                    .map_or_else(String::new, |patched| format!("  → {patched}"));
+                println!(
+                    "  {}  {}{}",
+                    console.paint(Tone::Info, format!("{:width$}", advisory.module)),
+                    console.paint(Tone::Muted, advisory.severity.label()),
+                    console.paint(Tone::Muted, fix),
+                );
+            }
+            if let Some(rest) = found
+                .advisories
+                .len()
+                .checked_sub(OUTPUT_LINES)
+                .filter(|n| *n > 0)
+            {
+                println!("  {}", console.paint(Tone::Muted, format!("… {rest} more")));
+            }
+        }
+        Err(error) => println!(
+            "{} {}",
+            console.paint(Tone::Muted, "–"),
+            console.paint(Tone::Muted, format!("Dependencies — {error}"))
+        ),
+    }
+
+    println!();
+    if clean {
+        println!("{}", console.paint(Tone::Success, "Nothing to act on."));
         ExitCode::SUCCESS
     } else {
         ExitCode::FAILURE
