@@ -28,6 +28,14 @@ pub struct Manifest {
     /// uses `pnpm-workspace.yaml` instead.
     #[serde(default, deserialize_with = "workspace_patterns")]
     pub workspaces: Vec<String>,
+    /// The `opi` block, kept unparsed on purpose.
+    ///
+    /// Typed straight into a struct, a field of the wrong type would fail the
+    /// whole `package.json` parse and make `opi` useless in a project whose
+    /// `scripts` are perfectly fine. Reading it leniently keeps a typo here
+    /// from costing everything else.
+    #[serde(default)]
+    opi: serde_json::Value,
     #[serde(default)]
     dependencies: BTreeMap<String, String>,
     #[serde(default, rename = "devDependencies")]
@@ -90,6 +98,20 @@ impl Manifest {
         };
 
         serde_json::from_str(&contents).map_err(|error| ManifestError::Malformed { path, error })
+    }
+
+    /// The strings under `opi.<key>`, ignoring anything of another shape.
+    pub fn opi_list(&self, key: &str) -> Vec<String> {
+        self.opi
+            .get(key)
+            .and_then(serde_json::Value::as_array)
+            .map(|values| {
+                values
+                    .iter()
+                    .filter_map(|value| value.as_str().map(str::to_owned))
+                    .collect()
+            })
+            .unwrap_or_default()
     }
 
     /// Whether the project depends on `package`, in either dependency set.
@@ -246,6 +268,30 @@ mod tests {
 
         let (manifest, _) = Manifest::discover(&inner).expect("discover");
         assert_eq!(manifest.name.as_deref(), Some("blog"));
+    }
+
+    #[test]
+    fn the_opi_block_is_read_leniently() {
+        let manifest =
+            load(r#"{"scripts":{"dev":"x"},"opi":{"clean":["dist",".astro"]}}"#).expect("parse");
+        assert_eq!(manifest.opi_list("clean"), ["dist", ".astro"]);
+        assert!(manifest.opi_list("health").is_empty());
+    }
+
+    #[test]
+    fn a_malformed_opi_block_does_not_cost_the_scripts() {
+        // Typed into a struct, a wrong type here would fail the whole parse and
+        // make opi useless in a project whose scripts are fine.
+        for broken in [
+            r#"{"scripts":{"dev":"x"},"opi":"not an object"}"#,
+            r#"{"scripts":{"dev":"x"},"opi":{"clean":"not a list"}}"#,
+            r#"{"scripts":{"dev":"x"},"opi":{"clean":[1,2,{"a":"b"}]}}"#,
+            r#"{"scripts":{"dev":"x"},"opi":42}"#,
+        ] {
+            let manifest = load(broken).unwrap_or_else(|_| panic!("should parse: {broken}"));
+            assert_eq!(manifest.scripts.len(), 1, "for {broken}");
+            assert!(manifest.opi_list("clean").is_empty(), "for {broken}");
+        }
     }
 
     #[test]
