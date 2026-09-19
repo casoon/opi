@@ -51,7 +51,7 @@ gets a usable list, which is the point of the whole arrangement.
 | --- | --- |
 | Language | Rust, edition 2024, MSRV `1.85` |
 | Distribution | crates.io as `opi`, installed via `cargo install opi` |
-| Terminal presentation | [runemark](https://github.com/casoon/runemark) `0.5` with its `select` feature — the only presentation dependency |
+| Terminal presentation | [runemark](https://github.com/casoon/runemark) `0.6` with its `select` feature — the only presentation dependency |
 | Project input | `package.json` and `Cargo.toml` — no config file of `opi`'s own |
 | Platforms | Unix only; building on Windows fails with an explicit message |
 | Dependencies | four: `runemark`, `serde`, `serde_json`, `glob` |

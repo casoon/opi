@@ -758,15 +758,18 @@ fn security(
             )
             .with_detail_level(DetailLevel::Detailed);
 
+            // A verdict rather than a tone: this is read in pipes and in CI,
+            // where a tone is nothing at all.
             for (severity, count) in found.counts() {
-                report =
-                    report.add_metric(Metric::new(severity.label(), count.to_string()).with_tone(
+                report = report.add_metric(
+                    Metric::new(severity.label(), count.to_string()).with_verdict(
                         if severity.serious() {
-                            Tone::Error
+                            Verdict::Failed
                         } else {
-                            Tone::Warning
+                            Verdict::Warning
                         },
-                    ));
+                    ),
+                );
             }
 
             let mut group = FindingGroup::new("Vulnerable dependencies");

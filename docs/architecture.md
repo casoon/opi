@@ -249,10 +249,15 @@ than parsing it. Tried both ways against real output:
   indentation, and reports a count of lines as if it were a count of findings.
 
 Two further reasons hold for health specifically. Its results **stream**: each
-check prints as it finishes so a slow test run does not look like a hang, while
-a report is built and rendered once. And a `Metric` carries a `Tone` but no
-symbol, so with colour off a failing check is indistinguishable from a passing
-one — which matters because `opi` is piped and run in CI.
+check prints as it finishes so a slow test run does not look like a hang — 5.6
+seconds on one real workspace — while a report is built and rendered once. And
+its status marks belong on the streamed lines, where a report has no say.
+
+A third reason used to hold and no longer does: a `Metric` carried a tone but no
+symbol, so with colour off a failing one read exactly like a passing one. That
+gap was closed in runemark `0.6` by `Metric::with_verdict`, which the audit's
+severity counts now use. It does not change health's answer — streaming and raw
+output still decide it — but it is why those counts are legible in a pipe.
 
 - The list is a `runemark::Menu`, built in `main::build_menu`. Item ids are
   script names, so a selection is ready to run.

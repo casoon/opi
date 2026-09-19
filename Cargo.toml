@@ -1,6 +1,6 @@
 [package]
 name = "opi"
-version = "0.5.2"
+version = "0.5.3"
 edition = "2024"
 rust-version = "1.85"
 description = "Operations Interface — a project control center for your terminal"
@@ -14,7 +14,7 @@ exclude = ["plan/**", "konzept.txt", "docs/**"]
 
 [dependencies]
 glob = "0.3.4"
-runemark = { version = "0.5.2", features = ["select"] }
+runemark = { version = "0.6", features = ["select"] }
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"
 

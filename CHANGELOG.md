@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.5.3] - 2026-09-19
+
+### Fixed
+
+- The audit's severity counts are legible without colour. They carried a tone,
+  which is nothing in a pipe or in CI, so `high: 1` read exactly like a clean
+  count; they now render as `[FAIL] high: 1` (runemark 0.6).
+
 ## [0.5.2] - 2026-09-19
 
 ### Changed
@@ -203,7 +211,8 @@ Placeholder release. Reserves the crate name on crates.io and establishes the
 repository skeleton. The binary prints its version and a development notice; no
 functionality is implemented.
 
-[Unreleased]: https://github.com/casoon/opi/compare/v0.5.2...HEAD
+[Unreleased]: https://github.com/casoon/opi/compare/v0.5.3...HEAD
+[0.5.3]: https://github.com/casoon/opi/releases/tag/v0.5.3
 [0.5.2]: https://github.com/casoon/opi/releases/tag/v0.5.2
 [0.5.1]: https://github.com/casoon/opi/releases/tag/v0.5.1
 [0.5.0]: https://github.com/casoon/opi/releases/tag/v0.5.0
