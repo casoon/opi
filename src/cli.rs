@@ -25,6 +25,8 @@ pub enum Invocation {
     Clean,
     /// Scan for secrets and vulnerable dependencies.
     Security,
+    /// Run a named workflow.
+    Workflow(String),
     /// A flag `opi` does not know, before any script name.
     UnknownFlag(String),
 }
@@ -57,6 +59,13 @@ where
         "--health" => Invocation::Health,
         "--clean" => Invocation::Clean,
         "--security" => Invocation::Security,
+        // The name follows the flag rather than standing alone, so a project
+        // script called "commit" or "release" keeps its word.
+        "--check" => args
+            .next()
+            .map_or(Invocation::UnknownFlag("--check".to_owned()), |name| {
+                Invocation::Workflow(name)
+            }),
         _ if first.starts_with('-') => Invocation::UnknownFlag(first),
         _ => {
             let mut rest: Vec<String> = args.collect();
@@ -87,6 +96,7 @@ Options:
       --health            Run the project's checks
       --clean             Show and remove build artefacts
       --security          Scan for secrets and vulnerable dependencies
+      --check <workflow>  Run a workflow: commit or release
   -h, --help              Show this help
   -V, --version           Show the version
 
@@ -153,6 +163,24 @@ mod tests {
         assert_eq!(parse(["-h"]), Invocation::Help);
         assert_eq!(parse(["--version"]), Invocation::Version);
         assert_eq!(parse(["-V"]), Invocation::Version);
+    }
+
+    #[test]
+    fn a_workflow_is_named_after_its_flag() {
+        assert_eq!(
+            parse(["--check", "release"]),
+            Invocation::Workflow("release".to_owned())
+        );
+        // "release" is a script name in real projects; the bare word is theirs.
+        assert_eq!(parse(["release"]), run("release", &[]));
+    }
+
+    #[test]
+    fn a_workflow_flag_without_a_name_is_rejected() {
+        assert_eq!(
+            parse(["--check"]),
+            Invocation::UnknownFlag("--check".to_owned())
+        );
     }
 
     #[test]

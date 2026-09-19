@@ -17,6 +17,7 @@ mod manifest;
 mod project;
 mod run;
 mod task;
+mod workflow;
 mod workspace;
 
 use std::io::{self, IsTerminal, Write};
@@ -86,6 +87,7 @@ fn main() -> ExitCode {
         Invocation::Health => health(&manifest, &members, &project, &root),
         Invocation::Clean => clean(&manifest, &members, &project, &root),
         Invocation::Security => security(&manifest, &members, &project, &root),
+        Invocation::Workflow(name) => run_workflow(&name, &manifest, &members, &project, &root),
         Invocation::Run { name, args } => start(&project, &tasks, &name, &args),
         // An unknown flag is only reported once a project is present, so the
         // missing-package.json message wins where both are true — that is the
@@ -677,5 +679,117 @@ fn security(
         ExitCode::SUCCESS
     } else {
         ExitCode::FAILURE
+    }
+}
+
+/// Runs a named workflow: the repository questions, then the checks.
+fn run_workflow(
+    name: &str,
+    manifest: &Manifest,
+    members: &[workspace::Member],
+    project: &Project,
+    root: &Path,
+) -> ExitCode {
+    let console = Console::stdout(ColorMode::Auto);
+
+    let Some(workflow) = workflow::Workflow::parse(name) else {
+        let block = ErrorBlock::new(format!("No workflow named {name}"))
+            .with_remedy("Known workflows: commit, release.");
+        write_block(&block, Console::stderr(ColorMode::Auto));
+        return ExitCode::FAILURE;
+    };
+
+    println!(
+        "{}  {}",
+        console.paint(Tone::Title, project.display_name(root)),
+        console.paint(Tone::Muted, workflow.label())
+    );
+    println!();
+
+    let mut blocked = false;
+
+    // The repository questions come first: a release from a dirty tree is
+    // settled before spending a minute on its tests.
+    for gate in workflow.gates() {
+        let result = gate.check(root, manifest.version.as_deref());
+        let (tone, mark) = match result.verdict {
+            runemark::Verdict::Passed => (Tone::Success, "✓"),
+            runemark::Verdict::Skipped => (Tone::Muted, "–"),
+            _ => {
+                blocked = true;
+                (Tone::Error, "✗")
+            }
+        };
+        let detail = result
+            .detail
+            .map_or_else(String::new, |detail| format!("  {detail}"));
+        println!(
+            "{} {}{}",
+            console.paint(tone, mark),
+            console.paint(tone, gate.name()),
+            console.paint(Tone::Muted, detail)
+        );
+    }
+
+    let checks: Vec<check::Check> = check::Check::detect_all(manifest, members, root)
+        .into_iter()
+        .filter(|check| workflow.includes(check.name))
+        .collect();
+
+    if checks.is_empty() {
+        println!(
+            "{}",
+            console.paint(Tone::Muted, "No checks apply to this project.")
+        );
+    }
+
+    let width = checks
+        .iter()
+        .map(|check| check.label().chars().count())
+        .max()
+        .unwrap_or(0);
+    let reports = check::run_all(checks, |report| {
+        let (tone, mark) = match report {
+            report if report.passed() => (Tone::Success, "✓"),
+            report if report.unusable() => (Tone::Warning, "!"),
+            _ => (Tone::Error, "✗"),
+        };
+        println!(
+            "{} {}  {}",
+            console.paint(tone, mark),
+            console.paint(tone, format!("{:width$}", report.check.label())),
+            console.paint(Tone::Muted, report.check.tool),
+        );
+    });
+
+    let failed = reports.iter().filter(|report| !report.passed()).count();
+    println!();
+
+    if blocked || failed > 0 {
+        // Which step and why, rather than a count on its own.
+        for report in reports.iter().filter(|report| !report.passed()) {
+            println!(
+                "{}",
+                console.paint(
+                    Tone::Error,
+                    format!("{} — {}", report.check.label(), report.check.tool)
+                )
+            );
+            for line in report.output.lines().take(OUTPUT_LINES) {
+                println!("  {line}");
+            }
+        }
+        println!();
+        println!(
+            "{}",
+            console.paint(Tone::Error, format!("Not ready to {name}."))
+        );
+        ExitCode::FAILURE
+    } else {
+        println!(
+            "{}",
+            console.paint(Tone::Success, format!("Ready to {name}."))
+        );
+        ExitCode::SUCCESS
     }
 }

@@ -17,6 +17,7 @@ use serde::{Deserialize, Deserializer};
 #[serde(rename_all = "camelCase")]
 pub struct Manifest {
     pub name: Option<String>,
+    pub version: Option<String>,
     pub package_manager: Option<String>,
     #[serde(default)]
     pub scripts: BTreeMap<String, String>,
