@@ -14,6 +14,7 @@ mod check;
 mod clean;
 mod cli;
 mod manifest;
+mod outdated;
 mod project;
 mod run;
 mod task;
@@ -87,6 +88,7 @@ fn main() -> ExitCode {
         Invocation::Health => health(&manifest, &members, &project, &root),
         Invocation::Clean => clean(&manifest, &members, &project, &root),
         Invocation::Security => security(&manifest, &members, &project, &root),
+        Invocation::Updates => updates(&project, &root),
         Invocation::Workflow(name) => run_workflow(&name, &manifest, &members, &project, &root),
         Invocation::Run { name, args } => start(&project, &tasks, &name, &args),
         // An unknown flag is only reported once a project is present, so the
@@ -150,7 +152,8 @@ fn list(
     }
     menu = menu
         .add_hint(Hint::new('C', "Clean"))
-        .add_hint(Hint::new('S', "Security"));
+        .add_hint(Hint::new('S', "Security"))
+        .add_hint(Hint::new('U', "Updates"));
 
     // Both streams have to be terminals. stdout decides whether the list is
     // being captured rather than read, and the menu draws its frames on
@@ -179,6 +182,7 @@ fn list(
         Outcome::Hotkey('H') => health(manifest, members, project, directory),
         Outcome::Hotkey('C') => clean(manifest, members, project, directory),
         Outcome::Hotkey('S') => security(manifest, members, project, directory),
+        Outcome::Hotkey('U') => updates(project, directory),
         Outcome::Hotkey(_) => ExitCode::SUCCESS,
         Outcome::Unavailable => {
             print!("{}", menu.render(Console::stdout(ColorMode::Auto)));
@@ -792,4 +796,89 @@ fn run_workflow(
         );
         ExitCode::SUCCESS
     }
+}
+
+/// Shows which dependencies have moved on, separated by how far.
+fn updates(project: &Project, root: &Path) -> ExitCode {
+    let console = Console::stdout(ColorMode::Auto);
+    let manager = project.package_manager.manager;
+
+    println!(
+        "{}  {}",
+        console.paint(Tone::Title, project.display_name(root)),
+        console.paint(Tone::Muted, "updates")
+    );
+    println!();
+
+    let found = match outdated::run(manager, root) {
+        Ok(found) => found,
+        Err(error) => {
+            let block = ErrorBlock::new("Cannot list outdated dependencies")
+                .with_explanation(format!("{error}"));
+            write_block(&block, Console::stderr(ColorMode::Auto));
+            return ExitCode::FAILURE;
+        }
+    };
+
+    if found.is_empty() {
+        println!("{}", console.paint(Tone::Success, "Everything is current."));
+        return ExitCode::SUCCESS;
+    }
+
+    let width = found
+        .iter()
+        .map(|update| update.name.chars().count())
+        .max()
+        .unwrap_or(0);
+    let versions = found
+        .iter()
+        .map(|update| update.current.chars().count())
+        .max()
+        .unwrap_or(0);
+
+    for update in &found {
+        println!(
+            "  {}  {} → {}  {}",
+            console.paint(Tone::Info, format!("{:width$}", update.name)),
+            console.paint(Tone::Muted, format!("{:>versions$}", update.current)),
+            console.paint(Tone::Muted, &update.latest),
+            console.paint(
+                if update.jump.breaking() {
+                    Tone::Warning
+                } else {
+                    Tone::Muted
+                },
+                update.jump.label()
+            ),
+        );
+    }
+
+    let safe = found
+        .iter()
+        .filter(|update| !update.jump.breaking())
+        .count();
+    let breaking = found.len() - safe;
+    println!();
+
+    // The separation is the point: "four safe, one major" is a decision, a
+    // column of version numbers is homework.
+    let summary = match (safe, breaking) {
+        (0, n) => format!("{n} major update(s) — each one a decision of its own"),
+        (n, 0) => format!("{n} safe update(s)"),
+        (n, m) => format!("{n} safe update(s) · {m} major"),
+    };
+    println!("{}", console.paint(Tone::Info, summary));
+
+    if safe > 0 {
+        // opi stops here on purpose. Applying updates rewrites package.json
+        // and the lockfile, and with pnpm catalogs the versions may not even
+        // live in package.json — a wrong guess there is expensive, and the
+        // package manager already does it correctly.
+        println!(
+            "{}",
+            console.paint(Tone::Muted, format!("Apply them with: {manager} update"))
+        );
+    }
+
+    ExitCode::SUCCESS
 }
