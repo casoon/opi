@@ -26,6 +26,12 @@ Past 15 entries or 5 groups the list shows its groups as a row of tabs and
 lists only the active one, with the first group preselected so `opi ↵` runs
 what it always ran. A line under the heading counts what was found.
 
+Every area now answers for both ecosystems where both are present, in a section
+each: `cargo audit` and `cargo outdated` beside the package manager's own.
+Three of the four package managers are audited — bun has its own shape, yarn's
+is read by nothing here. `--updates` can also apply what it found by calling
+the package manager, and runs the commit checks on the result.
+
 Five areas sit beside the list:
 
 | Area | Key | Flag |

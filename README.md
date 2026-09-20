@@ -5,8 +5,10 @@
 Go into any repository, type `opi`, and get a usable interface for that
 project — without configuring anything first.
 
-> **Status: `0.7.0`.** Scripts are the main thing; health, security, updates,
-> clean and the commit/release workflows are built on top of them.
+> **Status: `0.8.0`.** Scripts are the main thing; health, security, updates,
+> clean and the commit/release workflows are built on top of them. npm, pnpm,
+> bun and Cargo projects are covered; yarn is listed but its output is not
+> read.
 
 ## What it does
 
@@ -109,9 +111,16 @@ Build
   cargo check   Type-check without building
 ```
 
-Health, security and clean follow: `cargo fmt --check`, `cargo clippy` and
-`cargo test` run alongside the npm checks, `cargo audit` answers for the crates
-where it is installed, and `target/` is listed with the build artefacts.
+Every area follows: `cargo fmt --check`, `cargo clippy` and `cargo test` run
+alongside the npm checks, `cargo audit` and `cargo outdated` answer for the
+crates where they are installed, and `target/` is listed with the build
+artefacts. A repository carrying both manifests gets a section each rather than
+one merged list — `Dependencies` and `Dependencies (rust)` — because "safe to
+take" orders within an ecosystem and not across two.
+
+Both are external cargo subcommands rather than part of the toolchain, so
+where one is missing `opi` says so along with the `cargo install` that adds
+it, instead of leaving a section that reads like "nothing found".
 
 In a Cargo workspace `opi` works on the workspace even when started inside one
 of its crates — that is where `target/` lives and where the checks reach every
@@ -155,8 +164,8 @@ word stays theirs.
 | | | |
 | --- | --- | --- |
 | `H` | `opi --health` | Runs every check the project's tools can answer, concurrently |
-| `S` | `opi --security` | Secret scan and a parsed dependency audit |
-| `U` | `opi --updates` | What is outdated, split into safe and major |
+| `S` | `opi --security` | Secret scan and a parsed dependency audit, per ecosystem |
+| `U` | `opi --updates` | What is outdated, split into safe and major — and the offer to take it |
 | `C` | `opi --clean` | Removable artefacts, with what each one costs |
 | | `opi --check commit` | The fast checks, before you commit |
 | | `opi --check release` | Everything, plus a clean tree and an untagged version |
@@ -184,6 +193,26 @@ breaks on that tool's next release.
 There is no health score. A composite number stops meaning anything within
 weeks; what a failing tool actually said does not.
 
+### Taking the updates
+
+`--updates` can apply what it found, and then runs the commit checks on what
+comes back — update, install, check, what is red now. That chain is the reason
+the action exists; saving you from typing `pnpm update` would not have been.
+
+The choice offered is **not** safe against major. That is how the list is
+ordered, and it is the wrong question for an action: in a project whose ranges
+are exact or `~`, `pnpm update` moves none of what the list calls safe. The
+real choice is staying inside the declared ranges against raising them, and
+each line carries its own count and disappears when that count is zero.
+
+`opi` writes nothing itself. It calls the package manager with a list of names
+— no `package.json`, no lockfile, no `pnpm-workspace.yaml`. Majors are never in
+that list. Raising ranges is offered for pnpm only, because npm has no command
+that keeps the operator: `npm install x@1.1.1` turns an exact `2.1.2` into
+`^2.1.3`, and an exact pin is a statement. Where two lockfiles disagree and no
+`packageManager` field settles it, the offer is withheld and the finding named
+instead.
+
 ## Design rules
 
 - **Zero configuration.** `opi` must be useful in an unmodified repository. A
@@ -197,6 +226,10 @@ weeks; what a failing tool actually said does not.
   and Taskfile for no gain.
 - **Orchestration, not reimplementation.** `opi` is a UX layer over proven
   tooling.
+- **`opi` writes nothing.** Clean removes what you pick, and updates are
+  applied by the package manager. No file is ever rewritten by `opi` itself,
+  and where a tool cannot do something cleanly it is not offered rather than
+  offered badly.
 
 ## Install
 
