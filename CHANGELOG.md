@@ -23,6 +23,21 @@ All notable changes to this project are documented here. The format follows
   looked like it would need changing — cargo treating `0.12 → 0.13` as breaking
   — was already there, and already applied to npm too.
 
+- `opi --security` reads bun's audit instead of saying it cannot. Bun has had
+  an `audit` of its own for a while, and it emits clean JSON on stdout with its
+  banner on stderr — measured against 1.3.3.
+
+  Its shape is a map from package name to a **list** of advisories, which npm's
+  object carrying one each cannot express, so it is a second shape behind the
+  same call, chosen once by which manager was asked. yarn still says it cannot
+  be read.
+
+  Bun names `vulnerable_versions` and never the patched range, so its findings
+  carry no remedy — deriving "update to 4.17.21" from `<4.17.21` would be
+  inventing the one number that has to be right. Several advisories for one
+  package condense to one line per severity, so the counts are of vulnerable
+  dependencies rather than of advisories; `bun audit` itself has the full list.
+
 ### Fixed
 
 - `--updates` in a project without a `package.json` no longer says `opi checks

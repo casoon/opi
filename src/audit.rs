@@ -147,11 +147,30 @@ struct RawVulnerability {
     range: Option<String>,
 }
 
+/// The shape bun's own `audit` produces.
+///
+/// A map from package name to a **list** of advisories, rather than npm's
+/// object carrying one each — so one package can arrive with five, which npm's
+/// shape has no way to express.
+///
+/// Measured against bun 1.3.3: the banner goes to stderr, stdout is pure JSON,
+/// and the severity names are the five [`Severity::parse`] already knows.
+///
+/// Only `severity` is read. Bun names `vulnerable_versions`, never the patched
+/// range, so [`Advisory::patched`] stays empty here and no remedy is shown —
+/// guessing "update to 4.17.21" out of `<4.17.21` would be inventing the one
+/// number that has to be right.
+#[derive(Debug, Deserialize)]
+struct BunAdvisory {
+    #[serde(default)]
+    severity: String,
+}
+
 /// Runs the package manager's audit and reads what it found.
 pub fn run(manager: PackageManager, root: &Path) -> Result<Audit, AuditError> {
-    // yarn and bun each report in their own shape; claiming to audit them and
-    // then showing nothing would be worse than saying so.
-    if !matches!(manager, PackageManager::Npm | PackageManager::Pnpm) {
+    // yarn reports in a shape of its own, and claiming to audit it and then
+    // showing nothing would be worse than saying so.
+    if matches!(manager, PackageManager::Yarn) {
         return Err(AuditError::Unsupported(manager));
     }
 
@@ -164,11 +183,42 @@ pub fn run(manager: PackageManager, root: &Path) -> Result<Audit, AuditError> {
     // A non-zero exit means findings, not a broken run, so the output is read
     // either way.
     let text = String::from_utf8_lossy(&output.stdout);
-    let report: AdvisoryReport = serde_json::from_str(&text).map_err(|error| {
+
+    // The two shapes are told apart once, here, by which manager was asked —
+    // not by trying one parser and falling back to the other, which would turn
+    // a malformed report into a confusing error about the wrong format.
+    let mut advisories = if matches!(manager, PackageManager::Bun) {
+        read_bun(&text)
+    } else {
+        read_npm(&text)
+    }
+    .map_err(|error| {
         AuditError::Failed(format!("could not read {manager}'s audit output: {error}"))
     })?;
 
-    let mut advisories: Vec<Advisory> = report
+    condense(&mut advisories);
+    Ok(Audit { advisories })
+}
+
+/// Worst first, and one line per package and severity.
+///
+/// bun reports every advisory separately — five for lodash in the fixture —
+/// and the severity is what decides what to do about them, so the rest is
+/// repetition. Shared with the tests rather than restated there, since a test
+/// that condenses differently from `run` proves nothing.
+fn condense(advisories: &mut Vec<Advisory>) {
+    advisories.sort_by(|a, b| {
+        a.severity
+            .cmp(&b.severity)
+            .then_with(|| a.module.cmp(&b.module))
+    });
+    advisories.dedup_by(|a, b| a.module == b.module && a.severity == b.severity);
+}
+
+/// Reads the shape npm and pnpm share.
+fn read_npm(text: &str) -> Result<Vec<Advisory>, serde_json::Error> {
+    let report: AdvisoryReport = serde_json::from_str(text)?;
+    Ok(report
         .advisories
         .into_values()
         .filter_map(|raw| {
@@ -185,16 +235,26 @@ pub fn run(manager: PackageManager, root: &Path) -> Result<Audit, AuditError> {
                 patched: raw.range,
             })
         }))
-        .collect();
+        .collect())
+}
 
-    advisories.sort_by(|a, b| {
-        a.severity
-            .cmp(&b.severity)
-            .then_with(|| a.module.cmp(&b.module))
-    });
-    advisories.dedup_by(|a, b| a.module == b.module && a.severity == b.severity);
-
-    Ok(Audit { advisories })
+/// Reads bun's shape.
+fn read_bun(text: &str) -> Result<Vec<Advisory>, serde_json::Error> {
+    // An audit with nothing to report prints `{}`, which parses to an empty
+    // map on its own.
+    let report: BTreeMap<String, Vec<BunAdvisory>> = serde_json::from_str(text)?;
+    Ok(report
+        .into_iter()
+        .flat_map(|(module, found)| {
+            found.into_iter().filter_map(move |raw| {
+                Some(Advisory {
+                    module: module.clone(),
+                    severity: Severity::parse(&raw.severity)?,
+                    patched: None,
+                })
+            })
+        })
+        .collect())
 }
 
 /// One advisory `cargo audit` reported.
@@ -428,18 +488,14 @@ mod tests {
     }
 
     fn parse(json: &str) -> Vec<Advisory> {
-        let report: AdvisoryReport = serde_json::from_str(json).expect("parse");
-        report
-            .advisories
-            .into_values()
-            .filter_map(|raw| {
-                Some(Advisory {
-                    module: raw.module_name,
-                    severity: Severity::parse(&raw.severity)?,
-                    patched: raw.patched_versions,
-                })
-            })
-            .collect()
+        read_npm(json).expect("parse")
+    }
+
+    /// bun's shape, condensed the way `run` condenses it.
+    fn parse_bun(json: &str) -> Vec<Advisory> {
+        let mut found = read_bun(json).expect("parse");
+        condense(&mut found);
+        found
     }
 
     #[test]
@@ -454,6 +510,67 @@ mod tests {
         assert_eq!(found[0].module, "trim-newlines");
         assert_eq!(found[0].severity, Severity::High);
         assert_eq!(found[0].patched.as_deref(), Some(">=3.0.1"));
+    }
+
+    /// Trimmed from a real `bun audit --json` run (bun 1.3.3) against
+    /// lodash@4.17.20 and minimist@1.2.0. A map to **lists**, which is what
+    /// npm's shape cannot express, and no patched range anywhere.
+    const BUN: &str = r#"{"lodash":[
+        {"id":1106913,"title":"Command Injection in lodash","severity":"high",
+         "vulnerable_versions":"<4.17.21","cwe":["CWE-77"]},
+        {"id":1108258,"title":"ReDoS in lodash","severity":"moderate",
+         "vulnerable_versions":">=4.0.0 <4.17.21","cwe":["CWE-400"]},
+        {"id":1120370,"title":"Prototype Pollution","severity":"moderate",
+         "vulnerable_versions":">=4.0.0 <=4.17.22","cwe":["CWE-1321"]},
+        {"id":1115806,"title":"Code Injection via _.template","severity":"high",
+         "vulnerable_versions":">=4.0.0 <=4.17.23","cwe":["CWE-94"]},
+        {"id":1115810,"title":"Prototype Pollution via array path","severity":"moderate",
+         "vulnerable_versions":"<=4.17.23","cwe":["CWE-1321"]}],
+      "minimist":[
+        {"id":1097678,"title":"Prototype Pollution in minimist","severity":"critical",
+         "vulnerable_versions":"<0.2.1","cwe":["CWE-1321"]},
+        {"id":1096466,"title":"Prototype Pollution in minimist","severity":"moderate",
+         "vulnerable_versions":"<1.2.6","cwe":["CWE-1321"]}]}"#;
+
+    #[test]
+    fn the_bun_shape_is_read() {
+        let found = parse_bun(BUN);
+        assert!(found.iter().any(|a| a.module == "lodash"));
+        assert!(found.iter().any(|a| a.module == "minimist"));
+    }
+
+    #[test]
+    fn several_advisories_for_one_package_condense_to_one_per_severity() {
+        // Seven advisories in, four lines out: lodash is high and moderate,
+        // minimist critical and moderate. The severity is what decides what to
+        // do; the rest is repetition.
+        let found = parse_bun(BUN);
+        let lines: Vec<(&str, Severity)> = found
+            .iter()
+            .map(|a| (a.module.as_str(), a.severity))
+            .collect();
+        assert_eq!(
+            lines,
+            [
+                ("minimist", Severity::Critical),
+                ("lodash", Severity::High),
+                ("lodash", Severity::Moderate),
+                ("minimist", Severity::Moderate),
+            ]
+        );
+    }
+
+    #[test]
+    fn bun_names_no_patched_range_so_none_is_shown() {
+        // It reports `vulnerable_versions` and nothing else. Deriving
+        // "update to 4.17.21" from "<4.17.21" would be inventing the one
+        // number that has to be right.
+        assert!(parse_bun(BUN).iter().all(|a| a.patched.is_none()));
+    }
+
+    #[test]
+    fn a_clean_bun_audit_reports_nothing() {
+        assert!(parse_bun("{}").is_empty());
     }
 
     #[test]
