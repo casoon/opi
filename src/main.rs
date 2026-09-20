@@ -1008,6 +1008,17 @@ fn updates(project: &Project, root: &Path) -> ExitCode {
 
     let found = match outdated::run(manager, root) {
         Ok(found) => found,
+        // A package manager whose output `opi` cannot read is not a failed
+        // run: it is said in a line, the way the dependency section of
+        // `--security` says it, and the exit code stays clean.
+        Err(error @ outdated::OutdatedError::Unsupported(_)) => {
+            println!(
+                "{}  {}",
+                console.paint(Tone::Title, project.display_name(root)),
+                console.paint(Tone::Muted, format!("{error}"))
+            );
+            return ExitCode::SUCCESS;
+        }
         Err(error) => {
             let block = ErrorBlock::new("Cannot list outdated dependencies")
                 .with_explanation(format!("{error}"));

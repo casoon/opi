@@ -1,8 +1,11 @@
 //! Dependencies with newer versions.
 //!
 //! The plan for this called for a `taze` adapter. Measured across 133 real
-//! projects, `taze` appeared in none of them, while every package manager
-//! ships `outdated` and emits JSON — so that is what this reads.
+//! projects, `taze` appeared in none of them, while npm and pnpm both ship
+//! `outdated` and emit the same JSON map — so that is what this reads.
+//!
+//! The other two do not: bun ignores `--json` and prints a table, and yarn
+//! emits its own line-delimited shape where it still has the command at all.
 //!
 //! The value here is not the list, which the package manager already prints.
 //! It is the separation: "four safe, one major" is a decision, a column of
@@ -95,12 +98,17 @@ struct RawEntry {
 /// Why the list could not be produced.
 #[derive(Debug)]
 pub enum OutdatedError {
+    /// The package manager has no `outdated` output `opi` knows how to read.
+    Unsupported(PackageManager),
     Failed(String),
 }
 
 impl std::fmt::Display for OutdatedError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Self::Unsupported(manager) => {
+                write!(f, "opi cannot read {manager}'s outdated output")
+            }
             Self::Failed(reason) => f.write_str(reason),
         }
     }
@@ -108,6 +116,14 @@ impl std::fmt::Display for OutdatedError {
 
 /// Asks the package manager what is out of date.
 pub fn run(manager: PackageManager, root: &Path) -> Result<Vec<Update>, OutdatedError> {
+    // bun prints a table whether or not `--json` is passed, and yarn reports
+    // line by line in a shape of its own — yarn 2 and newer dropped the
+    // command altogether. Reading either as npm's map fails, and a parse
+    // error reads like a broken project rather than a missing feature.
+    if !matches!(manager, PackageManager::Npm | PackageManager::Pnpm) {
+        return Err(OutdatedError::Unsupported(manager));
+    }
+
     let output = Command::new(manager.program())
         .args(["outdated", "--json"])
         .current_dir(root)
@@ -179,6 +195,19 @@ mod tests {
         assert!(Jump::Major.breaking());
         assert!(!Jump::Minor.breaking());
         assert!(!Jump::Patch.breaking());
+    }
+
+    #[test]
+    fn a_manager_opi_cannot_read_is_refused_rather_than_run() {
+        // The guard has to sit in front of the process: a table parsed as JSON
+        // would be reported as a broken project instead of a missing feature.
+        for manager in [PackageManager::Bun, PackageManager::Yarn] {
+            let error = run(manager, Path::new(".")).expect_err("unsupported");
+            assert!(
+                matches!(error, OutdatedError::Unsupported(_)),
+                "for {manager}"
+            );
+        }
     }
 
     #[test]

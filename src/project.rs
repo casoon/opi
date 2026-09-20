@@ -26,10 +26,14 @@ pub enum PackageManager {
 impl PackageManager {
     /// Lockfiles that identify a package manager, most specific first.
     ///
+    /// Bun is listed twice: `bun.lock` is what it writes since 1.2, the binary
+    /// `bun.lockb` what every project installed before that still carries.
+    ///
     /// `package-lock.json` is last because other package managers are
     /// occasionally committed alongside it, while the reverse is rare.
-    const LOCKFILES: [(&'static str, Self); 4] = [
+    const LOCKFILES: [(&'static str, Self); 5] = [
         ("pnpm-lock.yaml", Self::Pnpm),
+        ("bun.lock", Self::Bun),
         ("bun.lockb", Self::Bun),
         ("yarn.lock", Self::Yarn),
         ("package-lock.json", Self::Npm),

@@ -113,7 +113,8 @@ contradicted the plan:
 - The plan named Knip as a dead-code adapter. Knip was present in 1 of 133 real
   projects; `fallow`, absent from the plan, in 11%.
 - The plan called for a `taze` adapter for dependency updates. `taze` was
-  present in **none** of the 133, while every package manager ships `outdated`.
+  present in **none** of the 133, while npm and pnpm both ship `outdated` and
+  emit the same JSON. bun and yarn do not, and are told so rather than parsed.
 - The `member/script` syntax, because every workspace repository measured had
   root and member scripts sharing names, and none of 382 script names contained
   a slash.

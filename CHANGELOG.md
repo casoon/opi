@@ -38,6 +38,22 @@ All notable changes to this project are documented here. The format follows
   standing in, since that is where cargo starts it: a binary crate inside a
   workspace keeps its entry, a virtual workspace root has nothing to run.
 
+- A Bun project is recognised by `bun.lock`, not only by the binary `bun.lockb`
+  it stopped writing in 1.2.
+
+  Only the old name was in the lockfile table, so a Bun project without a
+  `packageManager` field fell through to the npm fallback — and `opi build` ran
+  `npm run build` in a repository that has no npm in it.
+
+- `opi --updates` says that it cannot read bun's or yarn's output, instead of
+  failing on it.
+
+  Both were asked for `outdated --json` and their answer parsed as npm's shape.
+  bun ignores `--json` and prints a table, yarn 1 answers line by line and
+  yarn 2 has no such command at all — so the screen ended in a parse error that
+  read like a broken project rather than a missing feature. `--security` had
+  this guard from the start; `--updates` now has the same one.
+
 ## [0.7.0] - 2026-09-20
 
 ### Changed
