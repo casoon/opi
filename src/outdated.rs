@@ -206,9 +206,10 @@ pub fn run(
         return Ok(Vec::new());
     }
 
-    let raw: BTreeMap<String, RawEntry> = serde_json::from_str(&text).map_err(|error| {
-        OutdatedError::Failed(format!("could not read {manager}'s output: {error}"))
-    })?;
+    let raw: BTreeMap<String, RawEntry> =
+        serde_json::from_str(json_from(&text)).map_err(|error| {
+            OutdatedError::Failed(format!("could not read {manager}'s output: {error}"))
+        })?;
 
     let mut updates: Vec<Update> = raw
         .into_iter()
@@ -301,6 +302,23 @@ pub fn cargo(root: &Path) -> Result<Vec<Update>, OutdatedError> {
     }
 
     Ok(read_cargo(&text))
+}
+
+/// The document inside output that may carry warnings ahead of it.
+///
+/// pnpm writes its own warnings to **stdout**, not stderr — a slow registry
+/// produces `‼ WARN‼ Request took 11084ms: …` in front of the JSON, and
+/// parsing the whole text then fails with "expected value at line 1 column 1".
+/// Seen on a real repository, and only when the network was slow enough, which
+/// is what made it survive the first round of testing.
+///
+/// The first line that starts a document wins; everything before it is the
+/// noise. A warning that itself began with `{` would still break this, and
+/// would be reported the way it is today.
+fn json_from(text: &str) -> &str {
+    text.char_indices()
+        .find(|(_, character)| *character == '{')
+        .map_or(text, |(at, _)| &text[at..])
 }
 
 /// How an update is applied.
@@ -454,6 +472,23 @@ mod tests {
         r#"{"crate_name":"b","dependencies":[{"name":"glob","project":"0.3.0","compat":"---","latest":"0.3.4","kind":"Normal","platform":null},{"name":"serde_json","project":"1.0.100","compat":"---","latest":"1.0.151","kind":"Normal","platform":null}]}"#,
         "\n",
     );
+
+    #[test]
+    fn a_warning_printed_ahead_of_the_json_does_not_break_the_read() {
+        // The bug this pins: pnpm writes its warnings to stdout, so a slow
+        // registry put `‼ WARN‼ Request took 11084ms: …` in front of the
+        // document and --updates answered "could not read pnpm's output".
+        let noisy = "\u{203c} WARN\u{203c} Request took 11084ms: https://registry.npmjs.org/x\n{\"ms\":{\"current\":\"2.1.2\",\"wanted\":\"2.1.3\",\"latest\":\"2.1.3\"}}";
+        let raw: BTreeMap<String, RawEntry> =
+            serde_json::from_str(json_from(noisy)).expect("parse past the warning");
+        assert_eq!(raw["ms"].latest, "2.1.3");
+    }
+
+    #[test]
+    fn clean_output_is_untouched() {
+        let json = r#"{"ms":{"current":"2.1.2","wanted":"2.1.3","latest":"2.1.3"}}"#;
+        assert_eq!(json_from(json), json);
+    }
 
     #[test]
     fn in_range_is_wanted_against_current_not_the_semver_jump() {

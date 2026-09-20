@@ -80,6 +80,12 @@ All notable changes to this project are documented here. The format follows
   package at two versions in two members shows one of them. `pnpm outdated -r`
   prints both rows itself.
 
+- `--updates` survives a warning printed ahead of the JSON. pnpm writes its
+  own warnings to **stdout**, so a slow registry put `‼ WARN‼ Request took
+  11084ms: …` in front of the document and the area answered "could not read
+  pnpm's output". It only showed up when the network was slow enough, which is
+  why the first round of testing missed it.
+
 - `--updates` in a project without a `package.json` no longer says `opi checks
   updates only for npm`, which stopped being true.
 
