@@ -21,9 +21,16 @@ across Linux and macOS.
 ## Releasing
 
 `cargo publish` is run locally. The release workflow verifies the tag against
-the crate version, confirms the version is on crates.io, and creates the GitHub
-release — it never publishes. The registry token stays on a maintainer machine
-rather than in repository secrets.
+the crate version, confirms the version is on crates.io, builds the binaries
+and creates the GitHub release — it never publishes. The registry token stays
+on a maintainer machine rather than in repository secrets.
+
+The binaries are `aarch64`/`x86_64` macOS and `aarch64`/`x86_64` Linux, the
+Linux pair built against musl so one binary is not tied to the glibc of the
+runner that produced it. Each is a `.tar.gz` with a `.sha256` beside it, named
+`opi-<version>-<target>`, which is exactly what `install.sh` reconstructs and
+verifies — the archive names are part of that contract, not a detail of the
+workflow.
 
 ## Modules
 

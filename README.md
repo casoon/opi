@@ -112,6 +112,11 @@ Build
 Health and clean follow: `cargo fmt --check`, `cargo clippy` and `cargo test`
 run alongside the npm checks, and `target/` is listed with the build artefacts.
 
+In a Cargo workspace `opi` works on the workspace even when started inside one
+of its crates — that is where `target/` lives and where the checks reach every
+member. `cargo run` still follows you: it is offered in a binary crate, because
+that is where cargo would start it.
+
 ## Saying more about a script
 
 Optional, and only ever refinement — a project with neither `opi` nor
@@ -193,6 +198,18 @@ weeks; what a failing tool actually said does not.
   tooling.
 
 ## Install
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/casoon/opi/main/install.sh | sh
+```
+
+That downloads the release binary for your platform, checks it against the
+published SHA-256 and puts it in `~/.local/bin` — `OPI_INSTALL_DIR` picks
+another directory, `OPI_VERSION` another version. Binaries exist for macOS on
+Apple silicon and Intel, and for Linux on x86-64 and arm64; the Linux ones are
+static musl builds, so the distribution does not matter.
+
+From the registry instead, which builds it here:
 
 ```bash
 cargo install opi

@@ -6,6 +6,38 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- `install.sh`, and release binaries for it to install:
+
+  ```bash
+  curl -fsSL https://raw.githubusercontent.com/casoon/opi/main/install.sh | sh
+  ```
+
+  `cargo install opi` builds the binary on the user's machine and needs a Rust
+  toolchain for a tool whose point is that you can use it in any repository.
+  The release workflow now builds macOS and Linux binaries for `aarch64` and
+  `x86_64` and attaches them with their checksums; the installer picks the one
+  for the platform, verifies it, and writes it to `~/.local/bin`. The Linux
+  builds are static musl, so the distribution does not enter into it.
+
+  Publishing stays local. The binaries come out of CI, the crate does not.
+
+### Fixed
+
+- In a Cargo workspace, `opi` started inside a crate now works on the workspace
+  rather than on that crate.
+
+  The nearest `Cargo.toml` was taken as the project, so `opi --clean` looked for
+  `target/` inside the crate, where it is not — missing the largest directory in
+  the repository, 509 MB in the one this was found on, which is the only reason
+  anyone starts Clean. The checks covered one crate instead of all of them, and
+  the header named the crate rather than the repository.
+
+  Whether `cargo run` is offered is still asked of the directory you are
+  standing in, since that is where cargo starts it: a binary crate inside a
+  workspace keeps its entry, a virtual workspace root has nothing to run.
+
 ## [0.7.0] - 2026-09-20
 
 ### Changed
