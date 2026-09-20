@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-09-20
+
+### Fixed
+
+- `0.6.0` did not compile on Rust `1.85`, the version this crate declares. The
+  cause was in runemark `0.7.0`, which used a `let` chain — stable only from
+  `1.88` — for the tab digits. Requires runemark `0.7.1`.
+
 ## [0.6.0] - 2026-09-20
 
 ### Added

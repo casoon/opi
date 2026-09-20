@@ -5,7 +5,7 @@
 Go into any repository, type `opi`, and get a usable interface for that
 project — without configuring anything first.
 
-> **Status: `0.6.0`.** Scripts are the main thing; health, security, updates,
+> **Status: `0.6.1`.** Scripts are the main thing; health, security, updates,
 > clean and the commit/release workflows are built on top of them.
 
 ## What it does
