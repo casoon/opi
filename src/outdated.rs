@@ -7,6 +7,10 @@
 //! The other two do not: bun ignores `--json` and prints a table, and yarn
 //! emits its own line-delimited shape where it still has the command at all.
 //!
+//! Rust arrives through `cargo outdated`, which answers the same question and
+//! fills the same [`Update`] — a second source, not a second model. [`Jump`]
+//! never learns where a version came from.
+//!
 //! The value here is not the list, which the package manager already prints.
 //! It is the separation: "four safe, one major" is a decision, a column of
 //! version numbers is homework.
@@ -105,17 +109,25 @@ pub enum OutdatedError {
     NoManifest,
     /// The package manager has no `outdated` output `opi` knows how to read.
     Unsupported(PackageManager),
+    /// `cargo outdated` is not installed.
+    ///
+    /// An external subcommand like `cargo audit`, so its absence is the
+    /// ordinary case rather than a broken setup.
+    NotInstalled,
     Failed(String),
 }
 
 impl std::fmt::Display for OutdatedError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::NoManifest => {
-                f.write_str("no package.json here, and opi checks updates only for npm")
-            }
+            // Only about this section. Rust is answered by the one below it,
+            // so claiming opi checks npm alone stopped being true.
+            Self::NoManifest => f.write_str("no package.json here"),
             Self::Unsupported(manager) => {
                 write!(f, "opi cannot read {manager}'s outdated output")
+            }
+            Self::NotInstalled => {
+                f.write_str("cargo outdated is not installed; cargo install cargo-outdated adds it")
             }
             Self::Failed(reason) => f.write_str(reason),
         }
@@ -165,6 +177,119 @@ pub fn run(manager: PackageManager, root: &Path) -> Result<Vec<Update>, Outdated
     Ok(updates)
 }
 
+/// One line of `cargo outdated --format json`.
+///
+/// A workspace emits **one object per member**, newline separated, so the
+/// output is not a single JSON document and is read line by line. Measured on
+/// cargo-outdated 0.19.0 against a two-member workspace.
+#[derive(Debug, Deserialize)]
+struct CargoReport {
+    #[serde(default)]
+    dependencies: Vec<CargoEntry>,
+}
+
+#[derive(Debug, Deserialize)]
+struct CargoEntry {
+    #[serde(default)]
+    name: String,
+    /// What the lockfile resolved to. Named `project`, not `current`.
+    #[serde(default)]
+    project: String,
+    #[serde(default)]
+    latest: String,
+}
+
+/// Asks `cargo outdated` what has moved on.
+///
+/// `--root-deps-only` is what makes this the same question npm answers. Without
+/// it every entry is a transitive crate — measured on one real project, all 17
+/// were, named `parent->child` and none of them in any manifest. A list nobody
+/// can act on is worse than no list.
+///
+/// `--workspace` covers the members, because `opi` treats the workspace root as
+/// the project. A plain package is unaffected by it.
+///
+/// `compat`, the latest semver-compatible version, is deliberately ignored.
+/// It reports what the *requirement* allows — a pinned `=1.0.100` shows `---`
+/// though 1.0.151 is compatible — while [`Jump`] answers the question actually
+/// being asked, and answers it the same way for both ecosystems.
+pub fn cargo(root: &Path) -> Result<Vec<Update>, OutdatedError> {
+    if !crate::cargo::has_subcommand("outdated") {
+        return Err(OutdatedError::NotInstalled);
+    }
+
+    let output = Command::new("cargo")
+        .args([
+            "outdated",
+            "--workspace",
+            "--root-deps-only",
+            "--format",
+            "json",
+        ])
+        .current_dir(root)
+        .output()
+        .map_err(|error| OutdatedError::Failed(format!("could not run cargo outdated: {error}")))?;
+
+    let text = String::from_utf8_lossy(&output.stdout);
+    if text.trim().is_empty() {
+        // It copies the project to a temporary directory and resolves there,
+        // so a path dependency pointing outside the workspace stops it — seen
+        // on a real repository here. That goes to stderr with nothing on
+        // stdout, and relaying it beats a parse error about nothing.
+        let reason = String::from_utf8_lossy(&output.stderr);
+        let reason = reason
+            .lines()
+            .find(|line| line.trim_start().starts_with("error"))
+            .or_else(|| reason.lines().next())
+            .unwrap_or("no output")
+            .trim()
+            .to_owned();
+        if reason.is_empty() || reason == "no output" {
+            return Ok(Vec::new());
+        }
+        return Err(OutdatedError::Failed(format!("cargo outdated: {reason}")));
+    }
+
+    Ok(read_cargo(&text))
+}
+
+/// Reads the newline-separated reports into updates.
+fn read_cargo(text: &str) -> Vec<Update> {
+    let mut updates: Vec<Update> = text
+        .lines()
+        .filter(|line| !line.trim().is_empty())
+        .filter_map(|line| serde_json::from_str::<CargoReport>(line).ok())
+        .flat_map(|report| report.dependencies)
+        .filter(|entry| {
+            !entry.name.is_empty()
+                && !entry.project.is_empty()
+                && !entry.latest.is_empty()
+                && entry.project != entry.latest
+        })
+        .map(|entry| Update {
+            jump: Jump::between(&entry.project, &entry.latest),
+            name: entry.name,
+            current: entry.project,
+            latest: entry.latest,
+        })
+        .collect();
+
+    // A crate several members depend on is reported once per member. Sorting
+    // by name first puts the copies together so they can be dropped; the
+    // display order is restored below.
+    updates.sort_by(|a, b| {
+        a.name
+            .cmp(&b.name)
+            .then_with(|| a.current.cmp(&b.current))
+            .then_with(|| a.latest.cmp(&b.latest))
+    });
+    updates.dedup_by(|a, b| a.name == b.name && a.current == b.current && a.latest == b.latest);
+
+    // Riskiest last, as on the npm side.
+    updates.sort_by(|a, b| a.jump.cmp(&b.jump).then_with(|| a.name.cmp(&b.name)));
+    updates
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -196,6 +321,75 @@ mod tests {
         assert_eq!(Jump::between("^1.2.3", "~1.2.9"), Jump::Patch);
         assert_eq!(Jump::between("1.2.3", "1.2.4-beta.1"), Jump::Patch);
         assert_eq!(parts("v2.1"), Some((2, 1, 0)));
+    }
+
+    /// Trimmed from a real `cargo outdated --workspace --root-deps-only
+    /// --format json` run (cargo-outdated 0.19.0) on a two-member workspace.
+    /// One object per member, newline separated — not one document.
+    const CARGO_WORKSPACE: &str = concat!(
+        r#"{"crate_name":"a","dependencies":[{"name":"serde_json","project":"1.0.100","compat":"---","latest":"1.0.151","kind":"Normal","platform":null}]}"#,
+        "\n",
+        r#"{"crate_name":"b","dependencies":[{"name":"glob","project":"0.3.0","compat":"---","latest":"0.3.4","kind":"Normal","platform":null},{"name":"serde_json","project":"1.0.100","compat":"---","latest":"1.0.151","kind":"Normal","platform":null}]}"#,
+        "\n",
+    );
+
+    #[test]
+    fn a_workspace_report_is_read_line_by_line() {
+        // The bug this pins: cargo outdated emits one object per member rather
+        // than one document, so reading the whole text as JSON fails on every
+        // workspace.
+        let updates = read_cargo(CARGO_WORKSPACE);
+        assert_eq!(updates.len(), 2);
+        assert!(updates.iter().any(|u| u.name == "glob"));
+        assert!(updates.iter().any(|u| u.name == "serde_json"));
+    }
+
+    #[test]
+    fn a_crate_two_members_share_is_listed_once() {
+        let updates = read_cargo(CARGO_WORKSPACE);
+        let named: Vec<&str> = updates
+            .iter()
+            .filter(|u| u.name == "serde_json")
+            .map(|u| u.name.as_str())
+            .collect();
+        assert_eq!(named.len(), 1, "once, not once per member");
+    }
+
+    #[test]
+    fn a_cargo_entry_fills_the_same_update_as_npm() {
+        // The point of the second source: no second model, and Jump never
+        // learns where the versions came from.
+        let updates = read_cargo(CARGO_WORKSPACE);
+        let glob = updates.iter().find(|u| u.name == "glob").unwrap();
+        assert_eq!(glob.current, "0.3.0");
+        assert_eq!(glob.latest, "0.3.4");
+        assert_eq!(glob.jump, Jump::Patch);
+
+        // 51 patch releases is still a patch jump. The number's size is not
+        // the question; which position moved is.
+        let json = updates.iter().find(|u| u.name == "serde_json").unwrap();
+        assert_eq!(json.jump, Jump::Patch);
+    }
+
+    #[test]
+    fn a_cargo_report_with_nothing_outdated_yields_nothing() {
+        assert!(read_cargo(r#"{"crate_name":"opi","dependencies":[]}"#).is_empty());
+    }
+
+    #[test]
+    fn an_unreadable_cargo_line_is_skipped_rather_than_fatal() {
+        // One member failing to serialise must not cost the others.
+        let text = format!("not json\n{CARGO_WORKSPACE}");
+        assert_eq!(read_cargo(&text).len(), 2);
+    }
+
+    #[test]
+    fn a_cargo_zero_x_minor_is_breaking_here_too() {
+        // The risk the plan raised: cargo treats 0.12 → 0.13 as breaking. The
+        // rule was already in Jump and already applies to both ecosystems, so
+        // nothing needed changing — this pins that it stays that way.
+        let text = r#"{"crate_name":"llmux","dependencies":[{"name":"reqwest","project":"0.12.28","compat":"---","latest":"0.13.5","kind":"Normal","platform":null}]}"#;
+        assert_eq!(read_cargo(text)[0].jump, Jump::Major);
     }
 
     #[test]

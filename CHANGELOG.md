@@ -8,6 +8,29 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- `opi --updates` answers for Rust as well, through `cargo outdated`. Another
+  external subcommand, found on `PATH` the way `cargo audit` is, and named
+  along with its `cargo install` where it is missing.
+
+  Two sections rather than one merged list, as `--security` already does. Safe
+  against breaking is this area's ordering principle and it holds inside an
+  ecosystem; across two it would file `tokio` beside `vite` under "Safe to
+  take" with only the name saying which is which. Rust's section carries no
+  next step, because `cargo update` writes the lockfile — the line `--updates`
+  does not cross.
+
+  `Jump` is unchanged and never learns where a version came from. The rule that
+  looked like it would need changing — cargo treating `0.12 → 0.13` as breaking
+  — was already there, and already applied to npm too.
+
+### Fixed
+
+- `--updates` in a project without a `package.json` no longer says `opi checks
+  updates only for npm`, which stopped being true.
+
+
+### Added
+
 - `install.sh`, and release binaries for it to install:
 
   ```bash

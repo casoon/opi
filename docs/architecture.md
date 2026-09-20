@@ -18,7 +18,7 @@ src/
 ├── run.rs       Task → the running script
 ├── check.rs     detect a project's tools, run them concurrently
 ├── audit.rs     package manager audit → parsed advisories
-├── outdated.rs  package manager outdated → updates by semver jump
+├── outdated.rs  package manager and cargo outdated → updates by semver jump
 ├── clean.rs     removable artefacts, measured before they are offered
 └── workflow.rs  named sequences of checks, plus repository gates
 ```
@@ -223,6 +223,34 @@ Where nothing answers, the area says so instead of printing an empty section,
 because a blank dependency list reads like "no findings". `OutdatedError` carries
 a `NoManifest` for that; `AuditError` no longer needs one, since Rust now has an
 audit of its own.
+
+**Updates does the same**, through `cargo outdated` — another external
+subcommand, found the same way. Two sections rather than one merged list: the
+split into safe and breaking is this area's ordering principle and it holds
+inside an ecosystem, but across two it would file `tokio` beside `vite` under
+"Safe to take" with only the name saying which is which, and "Take the safe
+ones" could name only one of the two commands that would do it. Rust's section
+carries no next step at all, because `cargo update` writes the lockfile.
+
+`Jump` is untouched by any of this and never learns where a version came from —
+the second source fills the same `Update`. The one rule that looked like it
+would need changing, cargo's `0.x` minor being breaking, was already there and
+already applied to both: npm treats `0.x` the same way.
+
+Two things about `cargo outdated`'s output had to be measured rather than
+assumed, and both would have produced a wrong list:
+
+- **Without `--root-deps-only` every entry is transitive.** On one real project
+  all 17 were, named `parent->child` and none of them in any manifest. That
+  flag is what makes this the same question `npm outdated` answers.
+- **A workspace emits one JSON object per member, newline separated**, not one
+  document, so the output is read line by line and a crate several members
+  share is listed once.
+
+`compat`, the latest semver-compatible version, is ignored. It reports what the
+*requirement* allows — a pinned `=1.0.100` shows `---` though `1.0.151` is
+compatible — while `Jump` answers the question being asked, identically for
+both ecosystems.
 
 **Security shows one section per ecosystem present**, named the way health names
 its checks: npm's keeps the plain `Dependencies`, Rust's is `Dependencies

@@ -142,7 +142,7 @@ fn main() -> ExitCode {
         Invocation::Security => {
             security(&manifest, &members, rust_root.as_deref(), &project, &root)
         }
-        Invocation::Updates => updates(&project, &root),
+        Invocation::Updates => updates(&project, rust_root.as_deref(), &root),
         Invocation::Workflow(name) => run_workflow(
             &name,
             &manifest,
@@ -254,7 +254,7 @@ fn list(
         Outcome::Hotkey('H') => health(manifest, members, rust_root, project, directory),
         Outcome::Hotkey('C') => clean(manifest, members, rust_root, project, directory),
         Outcome::Hotkey('S') => security(manifest, members, rust_root, project, directory),
-        Outcome::Hotkey('U') => updates(project, directory),
+        Outcome::Hotkey('U') => updates(project, rust_root, directory),
         Outcome::Hotkey(_) => ExitCode::SUCCESS,
         Outcome::Unavailable => {
             print!("{}", menu.render(Console::stdout(ColorMode::Auto)));
@@ -1077,9 +1077,16 @@ fn run_workflow(
 /// Rendered as a runemark `Report` rather than a hand-set table: the split
 /// between safe and breaking is the whole value of this screen, and a report's
 /// groups make it structural instead of a sentence underneath a list.
-fn updates(project: &Project, root: &Path) -> ExitCode {
+fn updates(project: &Project, rust_root: Option<&Path>, root: &Path) -> ExitCode {
     let console = Console::stdout(ColorMode::Auto);
     let manager = project.package_manager.manager;
+
+    println!(
+        "{}  {}",
+        console.paint(Tone::Title, project.display_name(root)),
+        console.paint(Tone::Muted, "updates")
+    );
+    println!();
 
     // As in `security`: without a package.json the package manager here is a
     // fallback, not a detection, and asking it would be a guess dressed up as
@@ -1089,44 +1096,77 @@ fn updates(project: &Project, root: &Path) -> ExitCode {
     } else {
         Err(outdated::OutdatedError::NoManifest)
     };
+    let mut failed = section(
+        console,
+        "Dependencies",
+        listed,
+        Some(format!("{manager} update")),
+    );
 
+    // Two sections rather than one merged list, the way `--security` already
+    // splits them. Safe against breaking is this area's ordering principle and
+    // it holds inside an ecosystem; across two it would file `tokio` beside
+    // `vite` under "Safe to take" with only the name saying which is which,
+    // and "Take the safe ones" could name only one of the two commands that
+    // would do it.
+    if let Some(rust_root) = rust_root {
+        println!();
+        failed |= section(
+            console,
+            "Dependencies (rust)",
+            outdated::cargo(rust_root),
+            // Deliberately no next step. `cargo update` writes the lockfile,
+            // which is the line `--updates` does not cross — see
+            // `docs/constraints.md`.
+            None,
+        );
+    }
+
+    if failed {
+        ExitCode::FAILURE
+    } else {
+        ExitCode::SUCCESS
+    }
+}
+
+/// Renders one ecosystem's updates, returning whether the run itself failed.
+///
+/// Nothing outdated and output `opi` cannot read are both said in a line and
+/// leave the exit code clean: neither is a failure, and an empty section would
+/// read as "nothing to report", which is the one thing it must not say where
+/// nothing was asked.
+fn section(
+    console: Console,
+    title: &str,
+    listed: Result<Vec<outdated::Update>, outdated::OutdatedError>,
+    take_them: Option<String>,
+) -> bool {
     let found = match listed {
-        Ok(found) => found,
-        // Neither nothing to be out of date nor output `opi` cannot read is a
-        // failed run: both are said in a line, the way the dependency section
-        // of `--security` says it, and the exit code stays clean.
-        Err(
-            error @ (outdated::OutdatedError::Unsupported(_) | outdated::OutdatedError::NoManifest),
-        ) => {
+        Ok(found) if found.is_empty() => {
             println!(
-                "{}  {}",
-                console.paint(Tone::Title, project.display_name(root)),
-                console.paint(Tone::Muted, format!("{error}"))
+                "{} {}",
+                console.paint(Tone::Success, "✓"),
+                console.paint(Tone::Success, format!("{title} — everything is current"))
             );
-            return ExitCode::SUCCESS;
+            return false;
         }
+        Ok(found) => found,
         Err(error) => {
-            let block = ErrorBlock::new("Cannot list outdated dependencies")
-                .with_explanation(format!("{error}"));
-            write_block(&block, Console::stderr(ColorMode::Auto));
-            return ExitCode::FAILURE;
+            let fatal = matches!(error, outdated::OutdatedError::Failed(_));
+            println!(
+                "{} {}",
+                console.paint(Tone::Muted, "–"),
+                console.paint(Tone::Muted, format!("{title} — {error}"))
+            );
+            return fatal;
         }
     };
-
-    if found.is_empty() {
-        println!(
-            "{}  {}",
-            console.paint(Tone::Title, project.display_name(root)),
-            console.paint(Tone::Success, "everything is current")
-        );
-        return ExitCode::SUCCESS;
-    }
 
     let (breaking, safe): (Vec<_>, Vec<_>) =
         found.iter().partition(|update| update.jump.breaking());
 
     let mut report = Report::new(
-        project.display_name(root),
+        title,
         if breaking.is_empty() {
             Verdict::Info
         } else {
@@ -1143,14 +1183,14 @@ fn updates(project: &Project, root: &Path) -> ExitCode {
             .add_metric(Metric::new("major", breaking.len().to_string()).with_tone(Tone::Warning));
     }
 
-    for (title, tone, group) in [
+    for (group_title, tone, group) in [
         ("Safe to take", Tone::Muted, &safe),
         ("A decision each", Tone::Warning, &breaking),
     ] {
         if group.is_empty() {
             continue;
         }
-        let mut findings = FindingGroup::new(title);
+        let mut findings = FindingGroup::new(group_title);
         for update in group.iter() {
             findings = findings.add_finding(
                 Finding::new(
@@ -1163,16 +1203,14 @@ fn updates(project: &Project, root: &Path) -> ExitCode {
         report = report.add_group(findings);
     }
 
-    if !safe.is_empty() {
-        report = report.add_next_step(
-            NextStep::new("Take the safe ones").with_command(format!("{manager} update")),
-        );
+    if let Some(command) = take_them.filter(|_| !safe.is_empty()) {
+        report = report.add_next_step(NextStep::new("Take the safe ones").with_command(command));
     }
 
     // No width hint: two metrics read better side by side than stacked, and
     // the findings wrap on their own.
     print!("{}", report.render(console));
-    ExitCode::SUCCESS
+    false
 }
 
 #[cfg(test)]
