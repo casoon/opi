@@ -102,10 +102,35 @@ inside the project directory, does not follow symlinks, and rejects paths from
 the `opi` key that escape the project (`..`, absolute paths). `node_modules/` is
 never preselected.
 
-**Nothing else writes.** `opi --updates` reports what is outdated and stops
-there; applying an update rewrites `package.json` and a lockfile, and with pnpm
-catalogs the versions may not live in `package.json` at all. The package
-manager already does that correctly. No check is run in a fixing mode.
+***opi* itself writes nothing else.** `--updates` can now apply what it found,
+but only by calling the package manager with a list of names. No
+`package.json`, no lockfile, no `pnpm-workspace.yaml` is written by `opi`.
+Catalogs, overrides and `workspace:` protocols stay the problem of the tool
+that understands them.
+
+The earlier rule was "updates are never applied", and its reason was that pnpm
+catalogs put the versions outside `package.json`. Measured, pnpm rewrites the
+catalog correctly — and 45 of 79 workspaces here use one, so treating catalogs
+as the exception was the wrong way round. What survives is the narrower rule
+above.
+
+Two things are still refused rather than done badly:
+
+- **Majors never ride along.** The safe packages are passed by name, because
+  `pnpm update --latest` with no names ignores the range and the risk alike.
+- **Raising ranges is not offered for npm.** It has no command that keeps the
+  operator: `npm install x@1.1.1` turns an exact `2.1.2` into `^2.1.3`. An
+  exact pin is a statement, and rewriting it in passing is the silent edit this
+  section exists to prevent. Only the range-faithful `npm update` appears
+  there.
+
+Where two lockfiles disagree and no `packageManager` field settles it, the
+offer is withheld and the finding named instead. Writing is where a wrong
+detection stops being an annoyance: `pnpm update` in a repository that actually
+runs npm leaves a `pnpm-lock.yaml`, and the next `npm ci` resolves against
+something nobody saw.
+
+No check is run in a fixing mode.
 
 A script the project marked `confirm` is asked about before it runs, and
 refuses without a terminal rather than assuming yes — `--yes` says it out loud

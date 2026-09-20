@@ -206,7 +206,7 @@ projects, and the bare word stays theirs.
 | --- | --- | --- | --- |
 | Health | `H` | `--health` | Runs every detected check concurrently |
 | Security | `S` | `--security` | Secret scan plus a parsed dependency audit |
-| Updates | `U` | `--updates` | Outdated dependencies, split by semver jump |
+| Updates | `U` | `--updates` | Outdated dependencies, split by semver jump, and the offer to take them |
 | Clean | `C` | `--clean` | Removable artefacts, with sizes |
 | Workflows | — | `--check commit`/`release` | A named subset, plus git gates |
 
@@ -291,6 +291,27 @@ Naming the member the JSON happens to carry would claim the other is fine.
 *requirement* allows — a pinned `=1.0.100` shows `---` though `1.0.151` is
 compatible — while `Jump` answers the question being asked, identically for
 both ecosystems.
+
+**Updates can apply what it found, by delegating.** `opi` calls the package
+manager with a list of names and writes nothing itself — see
+[constraints.md](constraints.md) for what that rules out and why.
+
+The choice offered is not safe against breaking. That is the *list's* ordering,
+and it is the wrong question for the action: measured on one project, three
+dependencies, two of them "safe", and `pnpm update` moved none of them, because
+an exact pin and a `~` range each already had what they asked for. The real
+choice is **staying inside the declared ranges** against **raising them**, so
+that is what the menu says, each line carrying its own count and omitted where
+that count is zero — across 13 pnpm projects measured, 4 had nothing in range.
+
+Raising is pnpm-only, and a package that hangs in a member needs `-r` there too:
+without it pnpm changes nothing and still says "Already up to date".
+
+After a successful update the commit workflow runs. That chain — update,
+install, check, what is red now — is the reason the action is worth having at
+all; a key that only saves typing `pnpm update` would not have been worth
+reopening the decision for. Measured at 1.4s here and 10.6s on the largest
+workspace, so it is not a wait worth asking about first.
 
 **Security shows one section per ecosystem present**, named the way health names
 its checks: npm's keeps the plain `Dependencies`, Rust's is `Dependencies

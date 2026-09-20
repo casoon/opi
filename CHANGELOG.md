@@ -8,6 +8,32 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- `opi --updates` offers to take what it found, and runs the commit checks on
+  what comes back.
+
+  The offer is **not** safe against breaking — that is the list's ordering and
+  it is the wrong question here. Measured: three dependencies, two of them
+  "safe", and `pnpm update` moved none, because an exact pin and a `~` range
+  each already had what they asked for. As a line to retype nobody notices; as
+  a key it would be an action that does nothing and reports success. The choice
+  is staying inside the declared ranges against raising them, each line
+  carrying its count and omitted where that count is zero.
+
+  `opi` writes nothing itself — it calls the package manager with a list of
+  names. Majors are never in that list. Raising ranges is offered for pnpm
+  only, because npm has no command that keeps the operator: `npm install
+  x@1.1.1` turns an exact `2.1.2` into `^2.1.3`.
+
+  Where two lockfiles disagree and no `packageManager` field settles it, the
+  offer is withheld and the finding named. Writing with the wrong manager
+  leaves a lockfile the team did not ask for. Without a terminal nothing is
+  applied at all, as with `--clean`.
+
+  This reverses "updates are never applied", whose reason was that pnpm
+  catalogs put versions outside `package.json`. Measured, pnpm rewrites the
+  catalog correctly, and 45 of 79 workspaces here use one — the exception was
+  the rule.
+
 - `opi --updates` answers for Rust as well, through `cargo outdated`. Another
   external subcommand, found on `PATH` the way `cargo audit` is, and named
   along with its `cargo install` where it is missing.

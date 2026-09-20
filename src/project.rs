@@ -116,10 +116,27 @@ impl PackageManager {
     }
 
     fn from_lockfiles(dir: &Path) -> Option<Self> {
-        Self::LOCKFILES
-            .iter()
-            .find(|(file, _)| dir.join(file).exists())
-            .map(|(_, manager)| *manager)
+        Self::lockfiles_in(dir).first().map(|(_, manager)| *manager)
+    }
+
+    /// Every lockfile present, in priority order.
+    ///
+    /// Detection only needs the first, but an action that *writes* needs to
+    /// know there was a second: running `pnpm update` in a repository that
+    /// actually uses npm leaves a `pnpm-lock.yaml` behind, and the next
+    /// `npm ci` in CI then resolves against something the developer never saw.
+    ///
+    /// Bun is listed under two names and counts once — `bun.lockb` is what it
+    /// wrote before 1.2 — or a Bun project mid-migration would look like a
+    /// conflict with itself.
+    pub fn lockfiles_in(dir: &Path) -> Vec<(&'static str, Self)> {
+        let mut found: Vec<(&'static str, Self)> = Vec::new();
+        for (file, manager) in Self::LOCKFILES {
+            if dir.join(file).exists() && !found.iter().any(|(_, seen)| *seen == manager) {
+                found.push((file, manager));
+            }
+        }
+        found
     }
 
     /// Reads the `packageManager` field of the `package.json` in `dir`.
@@ -159,6 +176,36 @@ impl Detected {
     pub fn is_certain(self) -> bool {
         self.source != Source::Fallback
     }
+}
+
+/// Two lockfiles and nothing saying which one the project means.
+///
+/// A third state beside certain and defaulted: detected, but contradicted.
+/// Measured here, 4 of 133 projects carry two lockfiles; the `packageManager`
+/// field settles two of them and 89 of 133 projects have it. For the rest
+/// there is no signal — both files are committed, both on the same day — and
+/// reaching for a timestamp would be a heuristic that is wrong half the time
+/// while looking confident.
+///
+/// Only actions that write ask this. The listing keeps taking the first match
+/// silently: a list from the wrong manager is annoying and obvious, a lockfile
+/// nobody asked for is neither.
+#[derive(Debug, Clone)]
+pub struct Ambiguous {
+    pub lockfiles: Vec<&'static str>,
+}
+
+/// Which lockfiles contradict each other, or `None` where nothing does.
+pub fn conflict(directory: &Path, detected: Detected) -> Option<Ambiguous> {
+    // The field is a statement by the project; a lockfile is a side effect.
+    // Where the project said it, there is nothing to resolve.
+    if detected.source == Source::Manifest {
+        return None;
+    }
+    let found = PackageManager::lockfiles_in(directory);
+    (found.len() > 1).then(|| Ambiguous {
+        lockfiles: found.into_iter().map(|(file, _)| file).collect(),
+    })
 }
 
 /// What `opi` is looking at.
@@ -266,6 +313,56 @@ mod tests {
 
     fn manifest(json: &str) -> Manifest {
         serde_json::from_str(json).expect("parse fixture")
+    }
+
+    fn with_files(files: &[&str]) -> tempfile::TempDir {
+        let dir = tempfile::tempdir().expect("temp dir");
+        for file in files {
+            std::fs::write(dir.path().join(file), "").expect("write");
+        }
+        dir
+    }
+
+    fn lockfile_detected(manager: PackageManager) -> Detected {
+        Detected {
+            manager,
+            source: Source::Lockfile,
+        }
+    }
+
+    #[test]
+    fn two_lockfiles_and_no_field_is_a_conflict() {
+        // Measured here: 4 of 133 projects carry two. Writing with the wrong
+        // one leaves a lockfile the team did not ask for.
+        let dir = with_files(&["pnpm-lock.yaml", "package-lock.json"]);
+        let found =
+            conflict(dir.path(), lockfile_detected(PackageManager::Pnpm)).expect("a conflict");
+        assert_eq!(found.lockfiles, ["pnpm-lock.yaml", "package-lock.json"]);
+    }
+
+    #[test]
+    fn the_package_manager_field_settles_it() {
+        // The field is a statement by the project; a lockfile is a side
+        // effect. Two of the four measured conflicts are answered this way.
+        let dir = with_files(&["pnpm-lock.yaml", "package-lock.json"]);
+        let detected = Detected {
+            manager: PackageManager::Pnpm,
+            source: Source::Manifest,
+        };
+        assert!(conflict(dir.path(), detected).is_none());
+    }
+
+    #[test]
+    fn one_lockfile_is_no_conflict() {
+        let dir = with_files(&["pnpm-lock.yaml"]);
+        assert!(conflict(dir.path(), lockfile_detected(PackageManager::Pnpm)).is_none());
+    }
+
+    #[test]
+    fn a_bun_project_mid_migration_does_not_conflict_with_itself() {
+        // Both names are bun's: bun.lock since 1.2, bun.lockb before it.
+        let dir = with_files(&["bun.lock", "bun.lockb"]);
+        assert!(conflict(dir.path(), lockfile_detected(PackageManager::Bun)).is_none());
     }
 
     #[test]

@@ -89,6 +89,19 @@ pub struct Update {
     pub current: String,
     pub latest: String,
     pub jump: Jump,
+    /// Whether the declared range already allows something newer — npm's
+    /// `wanted` against its `current`.
+    ///
+    /// This is the choice the user actually makes, and it is not the same as
+    /// safe against breaking. Measured on one project: three dependencies,
+    /// two of them "safe", and `pnpm update` moved none of them, because an
+    /// exact pin and a `~` range each already had what they asked for. As a
+    /// line to retype nobody notices; as a key it would be an action that does
+    /// nothing and reports success.
+    ///
+    /// Always false for Rust: `cargo update` writes the lockfile, so nothing
+    /// is offered there and the question is never asked.
+    pub in_range: bool,
 }
 
 /// One entry of `npm`/`pnpm outdated --json`.
@@ -109,6 +122,9 @@ struct RawEntry {
     current: String,
     #[serde(default)]
     latest: String,
+    /// The newest version the declared range allows.
+    #[serde(default)]
+    wanted: String,
 }
 
 /// Why the list could not be produced.
@@ -199,6 +215,7 @@ pub fn run(
         .filter(|(_, entry)| !entry.current.is_empty() && entry.current != entry.latest)
         .map(|(name, entry)| Update {
             jump: Jump::between(&entry.current, &entry.latest),
+            in_range: !entry.wanted.is_empty() && entry.wanted != entry.current,
             name,
             current: entry.current,
             latest: entry.latest,
@@ -286,6 +303,76 @@ pub fn cargo(root: &Path) -> Result<Vec<Update>, OutdatedError> {
     Ok(read_cargo(&text))
 }
 
+/// How an update is applied.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Apply {
+    /// Take what the declared ranges already allow. Writes no `package.json`.
+    InRange,
+    /// Raise the ranges for the named packages.
+    ///
+    /// Named, never blanket: `pnpm update --latest` with no names ignores the
+    /// range *and* the risk, and pulled a 5 → 6 major in the measurement. The
+    /// safe ones are passed by name so the majors stay out, as
+    /// [`Jump::breaking`] requires.
+    Latest,
+}
+
+/// Whether this manager can raise ranges without rewriting what it was not
+/// asked to.
+///
+/// pnpm's `update --latest <names>` keeps the operator — exact stays exact,
+/// `~` stays `~`. npm has no such command: `npm install <name>@<version>`
+/// turns `2.1.2` into `^2.1.3` and `~1.0.0` into `^1.1.1`. An exact pin is a
+/// statement, and rewriting it in passing is the silent edit this whole area
+/// refuses to make, so the option is not offered there rather than offered
+/// badly.
+pub fn can_raise(manager: PackageManager) -> bool {
+    matches!(manager, PackageManager::Pnpm)
+}
+
+/// Runs the package manager's update and lets it speak for itself.
+///
+/// `opi` writes nothing — not `package.json`, not a lockfile, not
+/// `pnpm-workspace.yaml`. Catalogs, overrides and `workspace:` protocols stay
+/// the problem of the tool that understands them, which is the whole reason
+/// this is allowed to exist at all.
+///
+/// The child inherits the terminal, so a peer-dependency conflict arrives as
+/// the manager's own message rather than as a shrug. A non-zero exit is
+/// returned rather than translated into "done".
+pub fn apply(
+    manager: PackageManager,
+    root: &Path,
+    workspace: bool,
+    mode: Apply,
+    names: &[String],
+) -> Result<(), OutdatedError> {
+    let mut args = vec!["update".to_owned()];
+    // Without it a package that hangs only in a member is not reached, and
+    // pnpm still says "Already up to date" — measured.
+    if workspace && matches!(manager, PackageManager::Pnpm) {
+        args.push("-r".to_owned());
+    }
+    if mode == Apply::Latest {
+        args.push("--latest".to_owned());
+        args.extend_from_slice(names);
+    }
+
+    let status = Command::new(manager.program())
+        .args(&args)
+        .current_dir(root)
+        .status()
+        .map_err(|error| OutdatedError::Failed(format!("could not run {manager}: {error}")))?;
+
+    if status.success() {
+        Ok(())
+    } else {
+        Err(OutdatedError::Failed(format!(
+            "{manager} update exited with {status}"
+        )))
+    }
+}
+
 /// Reads the newline-separated reports into updates.
 fn read_cargo(text: &str) -> Vec<Update> {
     let mut updates: Vec<Update> = text
@@ -301,6 +388,8 @@ fn read_cargo(text: &str) -> Vec<Update> {
         })
         .map(|entry| Update {
             jump: Jump::between(&entry.project, &entry.latest),
+            // Nothing is applied for Rust, so the question never arises.
+            in_range: false,
             name: entry.name,
             current: entry.project,
             latest: entry.latest,
@@ -365,6 +454,55 @@ mod tests {
         r#"{"crate_name":"b","dependencies":[{"name":"glob","project":"0.3.0","compat":"---","latest":"0.3.4","kind":"Normal","platform":null},{"name":"serde_json","project":"1.0.100","compat":"---","latest":"1.0.151","kind":"Normal","platform":null}]}"#,
         "\n",
     );
+
+    #[test]
+    fn in_range_is_wanted_against_current_not_the_semver_jump() {
+        // The distinction the menu rests on. Measured on a real project:
+        // three dependencies, two of them "safe", and `pnpm update` moved
+        // none — an exact pin and a `~` range each already had what they
+        // asked for.
+        let json = r#"{
+            "ms": {"current":"2.1.2","wanted":"2.1.2","latest":"2.1.3"},
+            "picocolors": {"current":"1.0.0","wanted":"1.1.1","latest":"1.1.1"}
+        }"#;
+        let raw: BTreeMap<String, RawEntry> = serde_json::from_str(json).expect("parse");
+        let mut seen: Vec<(String, bool, Jump)> = raw
+            .into_iter()
+            .map(|(name, entry)| {
+                (
+                    name,
+                    !entry.wanted.is_empty() && entry.wanted != entry.current,
+                    Jump::between(&entry.current, &entry.latest),
+                )
+            })
+            .collect();
+        seen.sort();
+
+        assert_eq!(seen[0].0, "ms");
+        assert!(!seen[0].1, "a patch that the exact pin forbids");
+        assert_eq!(seen[0].2, Jump::Patch, "safe, and still not applicable");
+
+        assert_eq!(seen[1].0, "picocolors");
+        assert!(seen[1].1, "inside the declared range");
+    }
+
+    #[test]
+    fn only_pnpm_is_asked_to_raise_ranges() {
+        // npm has no command that keeps the operator: `npm install x@1.1.1`
+        // turns an exact 2.1.2 into ^2.1.3. An exact pin is a statement.
+        assert!(can_raise(PackageManager::Pnpm));
+        assert!(!can_raise(PackageManager::Npm));
+        assert!(!can_raise(PackageManager::Yarn));
+        assert!(!can_raise(PackageManager::Bun));
+    }
+
+    #[test]
+    fn a_cargo_update_is_never_offered() {
+        // `cargo update` writes the lockfile, which is the line this area does
+        // not cross, so the in-range question is never asked for Rust.
+        let text = r#"{"crate_name":"a","dependencies":[{"name":"glob","project":"0.3.0","compat":"---","latest":"0.3.4","kind":"Normal","platform":null}]}"#;
+        assert!(!read_cargo(text)[0].in_range);
+    }
 
     #[test]
     fn a_workspace_report_is_read_line_by_line() {

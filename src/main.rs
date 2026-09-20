@@ -142,7 +142,7 @@ fn main() -> ExitCode {
         Invocation::Security => {
             security(&manifest, &members, rust_root.as_deref(), &project, &root)
         }
-        Invocation::Updates => updates(&manifest, &project, rust_root.as_deref(), &root),
+        Invocation::Updates => updates(&manifest, &members, &project, rust_root.as_deref(), &root),
         Invocation::Workflow(name) => run_workflow(
             &name,
             &manifest,
@@ -254,7 +254,7 @@ fn list(
         Outcome::Hotkey('H') => health(manifest, members, rust_root, project, directory),
         Outcome::Hotkey('C') => clean(manifest, members, rust_root, project, directory),
         Outcome::Hotkey('S') => security(manifest, members, rust_root, project, directory),
-        Outcome::Hotkey('U') => updates(manifest, project, rust_root, directory),
+        Outcome::Hotkey('U') => updates(manifest, members, project, rust_root, directory),
         Outcome::Hotkey(_) => ExitCode::SUCCESS,
         Outcome::Unavailable => {
             print!("{}", menu.render(Console::stdout(ColorMode::Auto)));
@@ -1079,6 +1079,7 @@ fn run_workflow(
 /// groups make it structural instead of a sentence underneath a list.
 fn updates(
     manifest: &Manifest,
+    members: &[workspace::Member],
     project: &Project,
     rust_root: Option<&Path>,
     root: &Path,
@@ -1096,17 +1097,18 @@ fn updates(
     // As in `security`: without a package.json the package manager here is a
     // fallback, not a detection, and asking it would be a guess dressed up as
     // a result.
+    let workspace = workspace::declared(root, manifest);
     let listed = if project.npm {
-        outdated::run(manager, root, workspace::declared(root, manifest))
+        outdated::run(manager, root, workspace)
     } else {
         Err(outdated::OutdatedError::NoManifest)
     };
-    let mut failed = section(
-        console,
-        "Dependencies",
-        listed,
-        Some(format!("{manager} update")),
-    );
+    // Kept for the menu below, which needs the names rather than the rendering.
+    let npm_updates = match &listed {
+        Ok(found) => found.clone(),
+        Err(_) => Vec::new(),
+    };
+    let mut failed = section(console, "Dependencies", listed);
 
     // Two sections rather than one merged list, the way `--security` already
     // splits them. Safe against breaking is this area's ordering principle and
@@ -1116,22 +1118,132 @@ fn updates(
     // would do it.
     if let Some(rust_root) = rust_root {
         println!();
-        failed |= section(
-            console,
-            "Dependencies (rust)",
-            outdated::cargo(rust_root),
-            // Deliberately no next step. `cargo update` writes the lockfile,
-            // which is the line `--updates` does not cross — see
-            // `docs/constraints.md`.
-            None,
-        );
+        failed |= section(console, "Dependencies (rust)", outdated::cargo(rust_root));
     }
 
     if failed {
-        ExitCode::FAILURE
-    } else {
-        ExitCode::SUCCESS
+        return ExitCode::FAILURE;
     }
+
+    apply_updates(manifest, members, project, rust_root, root, &npm_updates)
+}
+
+/// Offers to take the updates, and runs the checks on what comes back.
+///
+/// Only npm's side is applied. `cargo update` writes the lockfile, which is
+/// the line this area does not cross.
+fn apply_updates(
+    manifest: &Manifest,
+    members: &[workspace::Member],
+    project: &Project,
+    rust_root: Option<&Path>,
+    root: &Path,
+    found: &[outdated::Update],
+) -> ExitCode {
+    let console = Console::stdout(ColorMode::Auto);
+    let manager = project.package_manager.manager;
+    let workspace = workspace::declared(root, manifest);
+
+    let in_range = found.iter().filter(|update| update.in_range).count();
+    let safe: Vec<String> = found
+        .iter()
+        .filter(|update| !update.jump.breaking())
+        .map(|update| update.name.clone())
+        .collect();
+    let raises = outdated::can_raise(manager) && !safe.is_empty();
+
+    if in_range == 0 && !raises {
+        return ExitCode::SUCCESS;
+    }
+
+    // Writing is where a wrong detection stops being an annoyance. `pnpm
+    // update` in a repository that actually runs npm leaves a pnpm-lock.yaml,
+    // and the next `npm ci` resolves against something nobody saw. The listing
+    // above keeps guessing silently; this does not.
+    if let Some(conflict) = project::conflict(root, project.package_manager) {
+        println!();
+        println!(
+            "{}",
+            console.paint(
+                Tone::Muted,
+                format!(
+                    "Not offering to apply these: {} both present, and no packageManager field says which. Adding one answers it.",
+                    conflict.lockfiles.join(" and ")
+                )
+            )
+        );
+        return ExitCode::SUCCESS;
+    }
+
+    println!();
+    let mut group = Group::new("Update");
+    if in_range > 0 {
+        group = group.add_item(
+            Item::new("in-range", "Within the declared ranges")
+                .with_description(format!("{in_range} packages, no package.json touched")),
+        );
+    }
+    if raises {
+        group = group.add_item(
+            Item::new("latest", "Raise the ranges").with_description(format!(
+                "{} safe, majors left out",
+                plural(safe.len(), "package", "packages")
+            )),
+        );
+    }
+    let menu = Menu::new().add_group(group.add_item(Item::new("cancel", "Cancel")));
+
+    let interactive = io::stdout().is_terminal() && io::stderr().is_terminal();
+    let chosen = match menu.run(
+        Console::stderr(ColorMode::Auto),
+        SelectMode::Auto,
+        interactive,
+    ) {
+        Ok(Outcome::Selected(id)) => id,
+        // Nothing is changed without someone choosing it, so a pipe gets the
+        // list and stops there, as `--clean` does.
+        Ok(Outcome::Unavailable) => {
+            println!(
+                "{}",
+                console.paint(
+                    Tone::Muted,
+                    "Run opi --updates in a terminal to take any of them."
+                )
+            );
+            return ExitCode::SUCCESS;
+        }
+        Ok(_) => return ExitCode::SUCCESS,
+        Err(error) => {
+            let block =
+                ErrorBlock::new("Cannot open the terminal").with_explanation(format!("{error}"));
+            write_block(&block, Console::stderr(ColorMode::Auto));
+            return ExitCode::FAILURE;
+        }
+    };
+
+    let mode = match chosen.as_str() {
+        "in-range" => outdated::Apply::InRange,
+        "latest" => outdated::Apply::Latest,
+        _ => return ExitCode::SUCCESS,
+    };
+
+    println!();
+    if let Err(error) = outdated::apply(manager, root, workspace, mode, &safe) {
+        // The manager has already said why on the terminal it inherited; this
+        // only stops the chain rather than repeating it.
+        let block = ErrorBlock::new("The update did not finish")
+            .with_explanation(format!("{error}"))
+            .with_remedy("The package manager's own output above says why.");
+        write_block(&block, Console::stderr(ColorMode::Auto));
+        return ExitCode::FAILURE;
+    }
+
+    // The point of applying from here rather than retyping one line: what the
+    // update broke is the next question, and nothing else puts the two
+    // together. Measured at 1.4s here and 10.6s on the largest workspace, so
+    // it is not a wait worth asking about first.
+    println!();
+    run_workflow("commit", manifest, members, rust_root, project, root)
 }
 
 /// Renders one ecosystem's updates, returning whether the run itself failed.
@@ -1144,7 +1256,6 @@ fn section(
     console: Console,
     title: &str,
     listed: Result<Vec<outdated::Update>, outdated::OutdatedError>,
-    take_them: Option<String>,
 ) -> bool {
     let found = match listed {
         Ok(found) if found.is_empty() => {
@@ -1208,9 +1319,9 @@ fn section(
         report = report.add_group(findings);
     }
 
-    if let Some(command) = take_them.filter(|_| !safe.is_empty()) {
-        report = report.add_next_step(NextStep::new("Take the safe ones").with_command(command));
-    }
+    // No next step naming an update command. Measured, `pnpm update` moves
+    // none of what this calls safe in a project whose ranges are exact or
+    // `~` — the choice offered below is the one that exists.
 
     // No width hint: two metrics read better side by side than stacked, and
     // the findings wrap on their own.
