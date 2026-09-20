@@ -6,6 +6,35 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-09-20
+
+### Added
+
+- Past 15 entries or 5 groups the start screen shows the groups as a row of
+  tabs and lists only the active one. `web-casoon` has 27 scripts in its root
+  in 7 groups, which is 34 lines with a heading each — taller than a
+  full-screen terminal, so the top scrolled away. `←` `→`, `Tab` and the
+  digits `1`–`9` switch groups.
+
+  The 0.1.0 rule holds: the first group is preselected with the cursor on its
+  first entry, so `opi ↵` still runs `dev`. A submenu demands a choice before
+  anything runnable is on screen; the tabs demand nothing and hide what is not
+  needed. `/` still searches every group — a query matching four of them shows
+  all four together, which is exactly what tabs are worst at.
+
+  A threshold rather than the terminal's own height, which would have fitted
+  more exactly: the height changes while the menu is open, and a list that
+  rearranged itself mid-keystroke would move entries under a cursor already on
+  its way to one. `opi | cat` lists every group either way.
+- A line under the heading says what was found: `43 entries · 10 groups ·
+  3 packages`. Two of those three are no longer on screen at once once the
+  groups are tabs, and packages are named only where there are any.
+
+### Notes
+
+Both need runemark `0.7` (`Layout::Tabs`, `Menu::with_summary`), where the
+interactive path lives.
+
 ## [0.5.3] - 2026-09-19
 
 ### Fixed

@@ -261,9 +261,19 @@ output still decide it — but it is why those counts are legible in a pipe.
 
 - The list is a `runemark::Menu`, built in `main::build_menu`. Item ids are
   script names, so a selection is ready to run.
+- Past 15 entries or 5 groups it is built with `Layout::Tabs`, which puts the
+  groups in a row above the list and shows only the active one's entries. The
+  thresholds are `main`'s, not runemark's: a menu knows how many entries it
+  has, not how much of the screen its caller is willing to spend. Why a count
+  rather than the terminal's height is in [decisions.md](decisions.md).
+- `Menu::with_summary` carries the line under the heading — entries, groups,
+  and packages where a workspace has any. Two of those three stop being
+  countable off the screen once the groups are tabs.
 - A list larger than the terminal is fitted to it by runemark: taller lists
-  scroll, and entries are shortened rather than wrapped.
-- `/` filters the menu. Matching lives in runemark and works on what the menu
+  scroll, and entries are shortened rather than wrapped. Within a tab that
+  still holds; the tabs page between groups, the viewport scrolls inside one.
+- `/` filters the menu across **every** group, tabs or not, and leaves the tab
+  row while it runs. Matching lives in runemark and works on what the menu
   displays; `task::suggestions` is a separate thing, correcting a mistyped name
   on the command line where there is no list to filter.
 - Interactive selection needs runemark's `select` feature and both stdout and

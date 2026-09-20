@@ -5,7 +5,7 @@
 Go into any repository, type `opi`, and get a usable interface for that
 project — without configuring anything first.
 
-> **Status: `0.5.0`.** Scripts are the main thing; health, security, updates,
+> **Status: `0.6.0`.** Scripts are the main thing; health, security, updates,
 > clean and the commit/release workflows are built on top of them.
 
 ## What it does
@@ -16,6 +16,7 @@ package manager detected rather than typed:
 
 ```
 astro-v7-workspace  pnpm
+  12 entries · 4 groups
 
 Development
 › dev              Startet die Starter-App im Dev-Modus
@@ -34,6 +35,30 @@ Quality
 placed in front of it. A list taller than the terminal scrolls, and `/` filters
 it as you type — in a monorepo that is the difference between scrolling past
 thirty entries and typing three letters.
+
+Past **15 entries or 5 groups** the groups move into a row of tabs and only the
+active one's entries are listed, because a heading per group over thirty-odd
+scripts is taller than the terminal:
+
+```
+casoon-web  pnpm
+  43 entries · 10 groups · 3 packages
+
+  1 Development   2 Build   3 Preview   4 Quality   5 Deploy   …
+  ─────────────
+› dev              Startet die Homepage
+  dev:homepage     Startet die Homepage
+  dev:insights     Startet Insights
+  dev:webcheck     Startet Webcheck
+
+←→ group   / search   H Health   C Clean   S Security   U Updates
+```
+
+The first group is preselected and the cursor is on its first entry, so `opi ↵`
+still starts `dev` — the tabs hide what is not needed rather than asking for a
+choice first. `←` `→`, `Tab` and the digits switch groups; `/` searches **all**
+of them, which is the case the tabs are worst at. `opi | cat` lists every group
+as before: nothing on the other end of a pipe can press a key.
 
 Three speeds, all backed by the same task model:
 

@@ -22,6 +22,10 @@ an interactive list, by name, or by filtering with `/`.
 `Cargo.toml` is read the same way, and a repository may be both at once: the
 list, health and clean cover npm and Rust together rather than choosing one.
 
+Past 15 entries or 5 groups the list shows its groups as a row of tabs and
+lists only the active one, with the first group preselected so `opi ↵` runs
+what it always ran. A line under the heading counts what was found.
+
 Five areas sit beside the list:
 
 | Area | Key | Flag |
@@ -51,7 +55,7 @@ gets a usable list, which is the point of the whole arrangement.
 | --- | --- |
 | Language | Rust, edition 2024, MSRV `1.85` |
 | Distribution | crates.io as `opi`, installed via `cargo install opi` |
-| Terminal presentation | [runemark](https://github.com/casoon/runemark) `0.6` with its `select` feature — the only presentation dependency |
+| Terminal presentation | [runemark](https://github.com/casoon/runemark) `0.7` with its `select` feature — the only presentation dependency |
 | Project input | `package.json` and `Cargo.toml` — no config file of `opi`'s own |
 | Platforms | Unix only; building on Windows fails with an explicit message |
 | Dependencies | four: `runemark`, `serde`, `serde_json`, `glob` |

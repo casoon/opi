@@ -18,6 +18,29 @@ state — it is not a history.
 > step between opening `opi` and starting a script needs to justify itself
 > against this.
 
+> **A long list pages by group rather than scrolling past every one**
+>
+> Past 15 entries or 5 groups the groups become a row of tabs and only the
+> active one is listed. The first group is preselected with the cursor on its
+> first entry, so `opi ↵` runs the same script it did before.
+>
+> *Reason:* the flat screen was decided against 24 entries in 8 groups, which
+> still read at a glance. At 27 entries in 7 groups — one real project's root —
+> a heading per group makes 34 lines, so the top scrolls away and the screen
+> stops being a screen. The rejected submenu demanded a choice before anything
+> runnable was visible; a tab row demands nothing and hides what is not needed.
+>
+> *Consequence:* the threshold is a count, not the terminal's height, which
+> would have fitted more exactly. The height changes while the menu is open,
+> and a list that rearranged itself mid-keystroke would move entries under a
+> cursor already on its way to one. `opi` therefore looks the same in every
+> window, and `opi | cat` lists every group as before — a pipe cannot press a
+> key to reach the second tab.
+>
+> *Consequence:* `/` keeps searching every group. Tabs answer "I know roughly
+> where"; the filter answers "I know exactly what", and a query matching four
+> groups is precisely the case tabs are worst at.
+
 > **The script name is not the user interface**
 >
 > Groups are derived from script name prefixes — the part before the first `:`

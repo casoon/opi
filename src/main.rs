@@ -27,8 +27,8 @@ use std::path::Path;
 use std::process::ExitCode;
 
 use runemark::{
-    ColorMode, Console, DetailLevel, ErrorBlock, Finding, FindingGroup, Group, Hint, Item, Menu,
-    Metric, NextStep, Outcome, Report, SelectMode, Tone, Verdict,
+    ColorMode, Console, DetailLevel, ErrorBlock, Finding, FindingGroup, Group, Hint, Item, Layout,
+    Menu, Metric, NextStep, Outcome, Report, SelectMode, Tone, Verdict,
 };
 
 use crate::cli::Invocation;
@@ -40,6 +40,21 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// Lines of a failing tool's output health prints before pointing at the tool.
 const OUTPUT_LINES: usize = 20;
+
+/// Above either of these the list is shown as tabs rather than flat.
+///
+/// The flat list was decided against `astro-v7-template` — 24 entries in 8
+/// groups, still readable. `web-casoon` has 27 in the root alone, and with a
+/// heading per group that is 34 lines: taller than a full-screen terminal, so
+/// the top scrolls away and the whole point of the screen is lost.
+///
+/// A threshold rather than the terminal's own height, which would have fitted
+/// more exactly. The height changes while the menu is open, and a list that
+/// rearranged itself mid-keystroke would move entries under a cursor already
+/// on its way to one. This way `opi` looks the same in every window, and the
+/// same as what a pipe prints.
+const TABS_ABOVE_TASKS: usize = 15;
+const TABS_ABOVE_GROUPS: usize = 5;
 
 fn main() -> ExitCode {
     let invocation = cli::parse(std::env::args().skip(1));
@@ -261,15 +276,57 @@ fn toolchains(tasks: &[Task], project: &Project) -> String {
     names.join(" · ")
 }
 
+/// Whether the list is shown as tabs or flat.
+fn layout(entries: usize, groups: usize) -> Layout {
+    if entries > TABS_ABOVE_TASKS || groups > TABS_ABOVE_GROUPS {
+        Layout::Tabs
+    } else {
+        Layout::Flat
+    }
+}
+
+/// What the list adds up to, for the line under the heading.
+///
+/// The counts are what the list itself only says by being counted, and in the
+/// tab layout two of the three are no longer on screen at once.
+///
+/// Packages are named only where there are some. A single-package project
+/// saying "1 package" would answer a question nobody in it has.
+fn summary(sections: &[(&task::Group, &[Task])], entries: usize) -> String {
+    let mut parts = vec![
+        plural(entries, "entry", "entries"),
+        plural(sections.len(), "group", "groups"),
+    ];
+
+    let packages = sections
+        .iter()
+        .filter(|(group, _)| matches!(group, task::Group::Workspace(_)))
+        .count();
+    if packages > 0 {
+        parts.push(plural(packages, "package", "packages"));
+    }
+
+    parts.join(" · ")
+}
+
+fn plural(count: usize, one: &str, many: &str) -> String {
+    format!("{count} {}", if count == 1 { one } else { many })
+}
+
 /// Turns the task list into a menu.
 ///
 /// The item id is the script name, so a selection is ready to run as-is.
 fn build_menu(project: &Project, tasks: &[Task], directory: &Path) -> Menu {
+    let sections = by_group(tasks);
+    let entries: usize = sections.iter().map(|(_, section)| section.len()).sum();
+
     let mut menu = Menu::new()
         .with_heading(project.display_name(directory))
-        .with_note(toolchains(tasks, project));
+        .with_note(toolchains(tasks, project))
+        .with_summary(summary(&sections, entries))
+        .with_layout(layout(entries, sections.len()));
 
-    for (group, section) in by_group(tasks) {
+    for (group, section) in sections {
         let mut rendered = Group::new(group.label());
         for task in section {
             // The id has to disambiguate: root and member scripts share names
@@ -1000,4 +1057,86 @@ fn updates(project: &Project, root: &Path) -> ExitCode {
     // the findings wrap on their own.
     print!("{}", report.render(console));
     ExitCode::SUCCESS
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::task::Group as TaskGroup;
+
+    fn task(name: &str, group: TaskGroup) -> Task {
+        Task {
+            name: name.to_owned(),
+            description: None,
+            command: name.to_owned(),
+            group,
+            exec: task::Exec::Script,
+            confirm: false,
+            workspace: None,
+            hidden: false,
+        }
+    }
+
+    fn sections(counts: &[(TaskGroup, usize)]) -> Vec<Task> {
+        counts
+            .iter()
+            .flat_map(|(group, count)| {
+                (0..*count).map(move |n| task(&format!("s{n}"), group.clone()))
+            })
+            .collect()
+    }
+
+    #[test]
+    fn a_short_list_stays_flat() {
+        // The 0.1.0 screen: everything visible at once, no row of tabs above
+        // it saying what would fit anyway.
+        assert_eq!(layout(12, 4), Layout::Flat);
+        assert_eq!(layout(15, 5), Layout::Flat, "the thresholds are inclusive");
+    }
+
+    #[test]
+    fn a_long_list_becomes_tabs() {
+        // web-casoon: 27 entries in 7 groups, 34 lines with a heading each.
+        assert_eq!(layout(27, 7), Layout::Tabs);
+    }
+
+    #[test]
+    fn either_count_is_enough_on_its_own() {
+        // Few entries spread very thin still costs a heading per group, and
+        // many entries in two groups still scroll.
+        assert_eq!(layout(8, 8), Layout::Tabs);
+        assert_eq!(layout(30, 2), Layout::Tabs);
+    }
+
+    #[test]
+    fn the_summary_counts_entries_and_groups() {
+        let tasks = sections(&[
+            (TaskGroup::Development, 4),
+            (TaskGroup::Build, 7),
+            (TaskGroup::Quality, 4),
+        ]);
+        let sections = by_group(&tasks);
+        assert_eq!(summary(&sections, 15), "15 entries · 3 groups");
+    }
+
+    #[test]
+    fn a_project_with_no_workspace_says_nothing_about_packages() {
+        // "1 package" would answer a question nobody in a single-package
+        // project has.
+        let tasks = sections(&[(TaskGroup::Development, 1)]);
+        let sections = by_group(&tasks);
+        assert!(!summary(&sections, 1).contains("package"));
+        assert_eq!(summary(&sections, 1), "1 entry · 1 group");
+    }
+
+    #[test]
+    fn the_summary_counts_workspace_packages() {
+        let tasks = sections(&[
+            (TaskGroup::Development, 2),
+            (TaskGroup::Workspace("@casoon/blog".to_owned()), 1),
+            (TaskGroup::Workspace("@casoon/starter".to_owned()), 1),
+        ]);
+        let sections = by_group(&tasks);
+        assert_eq!(summary(&sections, 4), "4 entries · 3 groups · 2 packages");
+    }
 }
