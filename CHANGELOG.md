@@ -25,6 +25,32 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- `opi --security` answers the dependency question for Rust as well, through
+  `cargo audit`.
+
+  It is an external subcommand rather than part of the toolchain, so `opi` looks
+  for a `cargo-audit` executable on `PATH` the way cargo does, and where there
+  is none it says so with the `cargo install` that adds it. A repository with
+  both manifests gets two sections, `Dependencies` and `Dependencies (rust)`,
+  the way health already names its checks.
+
+  No severity is shown, because cargo-audit's JSON does not carry one — the key
+  is absent, and only a CVSS vector string is there. Its console output does
+  print `Severity: 7.5 (high)`, since it scores the vector itself, so that is
+  where the report's next step sends you. Scoring the vector inside `opi` would
+  mean reimplementing CVSS, and reading the number out of console text would
+  mean a parser on an undocumented format.
+
+- `opi --security` and `opi --updates` no longer run npm in a project that has
+  no `package.json`.
+
+  `Project::package_manager` always holds a value, because the absence of every
+  signal still produces the npm fallback — so both areas asked it regardless,
+  and a Rust-only project got `npm audit --json` run in a directory with no
+  manifest, then npm's complaint about that relayed as the result. They now say
+  that there is nothing here they can audit or check, which is the one thing an
+  empty section cannot say.
+
 - In a Cargo workspace, `opi` started inside a crate now works on the workspace
   rather than on that crate.
 

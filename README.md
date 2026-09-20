@@ -109,8 +109,9 @@ Build
   cargo check   Type-check without building
 ```
 
-Health and clean follow: `cargo fmt --check`, `cargo clippy` and `cargo test`
-run alongside the npm checks, and `target/` is listed with the build artefacts.
+Health, security and clean follow: `cargo fmt --check`, `cargo clippy` and
+`cargo test` run alongside the npm checks, `cargo audit` answers for the crates
+where it is installed, and `target/` is listed with the build artefacts.
 
 In a Cargo workspace `opi` works on the workspace even when started inside one
 of its crates — that is where `target/` lives and where the checks reach every

@@ -100,6 +100,11 @@ fn main() -> ExitCode {
         return ExitCode::FAILURE;
     }
 
+    // Kept before the match consumes it. An empty `Manifest` stands in for a
+    // missing one below, and from there nothing can tell the two apart — but
+    // the areas that would start a package manager have to.
+    let has_npm = npm.is_ok();
+
     let (manifest, root) = match npm {
         Ok((manifest, root)) => (manifest, root),
         // A Rust-only project still needs somewhere to stand and something to
@@ -112,7 +117,8 @@ fn main() -> ExitCode {
     };
 
     let project = Project::detect(&manifest, &root)
-        .or_named(rust.as_ref().and_then(|(rust, _)| rust.name.clone()));
+        .or_named(rust.as_ref().and_then(|(rust, _)| rust.name.clone()))
+        .with_npm(has_npm);
     let members = workspace::members(&root, &manifest);
     let mut tasks = Task::from_workspace(&manifest, &members);
     if let Some((rust, _)) = &rust {
@@ -133,7 +139,9 @@ fn main() -> ExitCode {
         ),
         Invocation::Health => health(&manifest, &members, rust_root.as_deref(), &project, &root),
         Invocation::Clean => clean(&manifest, &members, rust_root.as_deref(), &project, &root),
-        Invocation::Security => security(&manifest, &members, &project, &root),
+        Invocation::Security => {
+            security(&manifest, &members, rust_root.as_deref(), &project, &root)
+        }
         Invocation::Updates => updates(&project, &root),
         Invocation::Workflow(name) => run_workflow(
             &name,
@@ -245,7 +253,7 @@ fn list(
         Outcome::Cancelled => ExitCode::SUCCESS,
         Outcome::Hotkey('H') => health(manifest, members, rust_root, project, directory),
         Outcome::Hotkey('C') => clean(manifest, members, rust_root, project, directory),
-        Outcome::Hotkey('S') => security(manifest, members, project, directory),
+        Outcome::Hotkey('S') => security(manifest, members, rust_root, project, directory),
         Outcome::Hotkey('U') => updates(project, directory),
         Outcome::Hotkey(_) => ExitCode::SUCCESS,
         Outcome::Unavailable => {
@@ -739,6 +747,7 @@ fn clean(
 fn security(
     manifest: &Manifest,
     members: &[workspace::Member],
+    rust_root: Option<&Path>,
     project: &Project,
     root: &Path,
 ) -> ExitCode {
@@ -807,72 +816,138 @@ fn security(
         }
     }
 
-    println!();
-    match audit::run(project.package_manager.manager, root) {
-        Ok(found) if found.is_empty() => println!(
-            "{} {}",
-            console.paint(Tone::Success, "✓"),
-            console.paint(Tone::Success, "Dependencies — no known vulnerabilities")
-        ),
-        Ok(found) => {
-            let serious = found
-                .advisories
-                .iter()
-                .any(|advisory| advisory.severity.serious());
-            clean = clean && !serious;
+    // One section per ecosystem present, each named for itself. Health settles
+    // the same question with a scope — `Tests (rust)` — and this follows it:
+    // npm's section keeps the plain name, Rust's is marked.
+    //
+    // `project.package_manager` always holds a value, because the absence of
+    // every signal still produces the npm fallback, so a Rust-only project
+    // would otherwise run `npm audit` where there is no package.json and relay
+    // npm's complaint about it as the result.
+    if project.npm {
+        println!();
+        match audit::run(project.package_manager.manager, root) {
+            Ok(found) if found.is_empty() => println!(
+                "{} {}",
+                console.paint(Tone::Success, "✓"),
+                console.paint(Tone::Success, "Dependencies — no known vulnerabilities")
+            ),
+            Ok(found) => {
+                let serious = found
+                    .advisories
+                    .iter()
+                    .any(|advisory| advisory.severity.serious());
+                clean = clean && !serious;
 
-            // Parsed rather than relayed, so this is where a report earns its
-            // keep: severity counts as metrics, each advisory with the version
-            // range that fixes it as its remedy.
-            let mut report = Report::new(
-                "Dependencies",
-                if serious {
-                    Verdict::Failed
-                } else {
-                    Verdict::Warning
-                },
-            )
-            .with_detail_level(DetailLevel::Detailed);
-
-            // A verdict rather than a tone: this is read in pipes and in CI,
-            // where a tone is nothing at all.
-            for (severity, count) in found.counts() {
-                report = report.add_metric(
-                    Metric::new(severity.label(), count.to_string()).with_verdict(
-                        if severity.serious() {
-                            Verdict::Failed
-                        } else {
-                            Verdict::Warning
-                        },
-                    ),
-                );
-            }
-
-            let mut group = FindingGroup::new("Vulnerable dependencies");
-            for advisory in &found.advisories {
-                let mut finding = Finding::new(
-                    if advisory.severity.serious() {
-                        Tone::Error
+                // Parsed rather than relayed, so this is where a report earns its
+                // keep: severity counts as metrics, each advisory with the version
+                // range that fixes it as its remedy.
+                let mut report = Report::new(
+                    "Dependencies",
+                    if serious {
+                        Verdict::Failed
                     } else {
-                        Tone::Warning
+                        Verdict::Warning
                     },
-                    &advisory.module,
                 )
-                .with_rule_id(advisory.severity.label());
-                if let Some(patched) = &advisory.patched {
-                    finding = finding.with_remedy(format!("update to {patched}"));
-                }
-                group = group.add_finding(finding);
-            }
-            report = report.add_group(group);
+                .with_detail_level(DetailLevel::Detailed);
 
-            print!("{}", report.render(console));
+                // A verdict rather than a tone: this is read in pipes and in CI,
+                // where a tone is nothing at all.
+                for (severity, count) in found.counts() {
+                    report = report.add_metric(
+                        Metric::new(severity.label(), count.to_string()).with_verdict(
+                            if severity.serious() {
+                                Verdict::Failed
+                            } else {
+                                Verdict::Warning
+                            },
+                        ),
+                    );
+                }
+
+                let mut group = FindingGroup::new("Vulnerable dependencies");
+                for advisory in &found.advisories {
+                    let mut finding = Finding::new(
+                        if advisory.severity.serious() {
+                            Tone::Error
+                        } else {
+                            Tone::Warning
+                        },
+                        &advisory.module,
+                    )
+                    .with_rule_id(advisory.severity.label());
+                    if let Some(patched) = &advisory.patched {
+                        finding = finding.with_remedy(format!("update to {patched}"));
+                    }
+                    group = group.add_finding(finding);
+                }
+                report = report.add_group(group);
+
+                print!("{}", report.render(console));
+            }
+            Err(error) => println!(
+                "{} {}",
+                console.paint(Tone::Muted, "–"),
+                console.paint(Tone::Muted, format!("Dependencies — {error}"))
+            ),
         }
-        Err(error) => println!(
-            "{} {}",
-            console.paint(Tone::Muted, "–"),
-            console.paint(Tone::Muted, format!("Dependencies — {error}"))
-        ),
+    }
+
+    if let Some(rust_root) = rust_root {
+        println!();
+        match audit::cargo(rust_root) {
+            Ok(found) if found.is_empty() => println!(
+                "{} {}",
+                console.paint(Tone::Success, "✓"),
+                console.paint(
+                    Tone::Success,
+                    "Dependencies (rust) — no known vulnerabilities"
+                )
+            ),
+            Ok(found) => {
+                // Every advisory counts, because there is no severity here to
+                // sort them by — see `audit::CargoAdvisory` — and because
+                // `cargo audit` fails on any of them itself.
+                clean = false;
+
+                let mut report = Report::new("Dependencies (rust)", Verdict::Failed)
+                    .with_detail_level(DetailLevel::Detailed)
+                    .add_metric(
+                        Metric::new("advisories", found.len().to_string())
+                            .with_verdict(Verdict::Failed),
+                    );
+
+                let mut group = FindingGroup::new("Vulnerable crates");
+                for advisory in &found {
+                    let mut finding = Finding::new(
+                        Tone::Error,
+                        format!("{} {}", advisory.package, advisory.version),
+                    )
+                    .with_rule_id(&advisory.id);
+                    if let Some(patched) = &advisory.patched {
+                        finding = finding.with_remedy(format!("update to {patched}"));
+                    }
+                    group = group.add_finding(finding);
+                }
+                report = report.add_group(group);
+
+                // The severity is missing from the JSON but present in the
+                // tool's own output, so this is where to send someone who
+                // wants it — along with the dependency path that pulled the
+                // crate in.
+                report = report.add_next_step(
+                    NextStep::new("Severities and dependency paths").with_command("cargo audit"),
+                );
+
+                print!("{}", report.render(console));
+            }
+            Err(error) => println!(
+                "{} {}",
+                console.paint(Tone::Muted, "–"),
+                console.paint(Tone::Muted, format!("Dependencies (rust) — {error}"))
+            ),
+        }
     }
 
     println!();
@@ -1006,12 +1081,23 @@ fn updates(project: &Project, root: &Path) -> ExitCode {
     let console = Console::stdout(ColorMode::Auto);
     let manager = project.package_manager.manager;
 
-    let found = match outdated::run(manager, root) {
+    // As in `security`: without a package.json the package manager here is a
+    // fallback, not a detection, and asking it would be a guess dressed up as
+    // a result.
+    let listed = if project.npm {
+        outdated::run(manager, root)
+    } else {
+        Err(outdated::OutdatedError::NoManifest)
+    };
+
+    let found = match listed {
         Ok(found) => found,
-        // A package manager whose output `opi` cannot read is not a failed
-        // run: it is said in a line, the way the dependency section of
-        // `--security` says it, and the exit code stays clean.
-        Err(error @ outdated::OutdatedError::Unsupported(_)) => {
+        // Neither nothing to be out of date nor output `opi` cannot read is a
+        // failed run: both are said in a line, the way the dependency section
+        // of `--security` says it, and the exit code stays clean.
+        Err(
+            error @ (outdated::OutdatedError::Unsupported(_) | outdated::OutdatedError::NoManifest),
+        ) => {
             println!(
                 "{}  {}",
                 console.paint(Tone::Title, project.display_name(root)),

@@ -74,6 +74,26 @@ both — so neither is allowed to win. A repository with only a `Cargo.toml` is 
 project too; 39 of them were previously turned away with "No package.json
 found".
 
+**The nearest `Cargo.toml` is not the answer in a workspace.** It is whichever
+crate the caller happens to stand in, and scoping everything to it costs the two
+things the areas exist for: `target/` lives at the workspace root, so Clean would
+miss the largest directory in the repository — 509 MB in the one this was found
+on — and the checks would cover one crate instead of all of them. So the nearest
+manifest establishes that this is a Rust project at all, and the search keeps
+rising for one that declares a `[workspace]` table. The outermost wins.
+
+Two facts are then read from two places. The name belongs to the workspace root,
+which is why `opi` inside a crate names the repository. Whether `cargo run` is
+offered is asked of the directory the caller stands in, because `run::execute`
+sets no directory and cargo therefore starts where they are: a binary crate
+inside a workspace keeps its entry, while the virtual root — where `cargo run`
+could not pick a binary — does not offer one.
+
+Reading `[workspace] members` was deliberately not needed for any of this, and
+so no TOML parser was taken. It would only be needed to offer something per
+crate, and there is nothing to offer: `cargo clippy` at the root already covers
+every member, unlike npm, where each package carries its own tools.
+
 A .NET marker appeared in none of those directories on its own, so that half of
 the original plan is not built. The same reasoning retired Knip and taze.
 
@@ -189,6 +209,46 @@ projects, and the bare word stays theirs.
 | Updates | `U` | `--updates` | Outdated dependencies, split by semver jump |
 | Clean | `C` | `--clean` | Removable artefacts, with sizes |
 | Workflows | — | `--check commit`/`release` | A named subset, plus git gates |
+
+**Security and updates ask whether there is an npm project at all.**
+`Project::package_manager` always holds a value — the absence of every signal
+still produces the npm fallback — so it cannot answer that, and a Rust-only
+project would otherwise run `npm audit` in a directory with no `package.json`
+and relay npm's complaint about it. `Project::npm` carries what only the
+discovery knew. It is a different question from `Detected::is_certain`: a
+project with neither a lockfile nor a `packageManager` field is uncertain but
+real, and `npm audit` answers for it.
+
+Where nothing answers, the area says so instead of printing an empty section,
+because a blank dependency list reads like "no findings". `OutdatedError` carries
+a `NoManifest` for that; `AuditError` no longer needs one, since Rust now has an
+audit of its own.
+
+**Security shows one section per ecosystem present**, named the way health names
+its checks: npm's keeps the plain `Dependencies`, Rust's is `Dependencies
+(rust)`. `cargo audit` is not part of the toolchain but an external subcommand,
+so `cargo::has_subcommand` looks for a `cargo-audit` executable on `PATH` — the
+way cargo finds one itself. Running `cargo audit` and reading "no such command"
+out of its stderr would be a parser on an undocumented format. An absent
+subcommand is named along with the `cargo install` that adds it, rather than
+leaving the section empty.
+
+**The Rust advisory carries no severity, and none is invented.** Measured
+against cargo-audit 0.22.1, the JSON has no `severity` key at all — only a
+`cvss` vector string — while the tool's own console output prints
+`Severity: 7.5 (high)`, because it scores the vector itself. Three ways to get
+that number were available and all are refused: scoring the vector here would
+reimplement CVSS inside a tool whose rule is to reimplement nothing, reading it
+out of the console text would be the parser this project does not write, and
+relaying the console output raw would bury the findings — 103 lines for three
+advisories, nearly all of it dependency trees, against a 20-line cap. So the
+JSON is parsed for what it does carry (crate, version, RUSTSEC id, patched
+range) and the report's next step is `cargo audit`, where the severity lives.
+
+That is also why every Rust advisory counts and flips the exit code: there is no
+severity to grade them by, and `cargo audit` fails on any of them itself. Only
+`vulnerabilities` are read — `warnings` (`unmaintained`, `unsound`) are
+informational and have no counterpart on the npm side.
 
 Rust checks are scoped as `rust` even in a Rust-only project: in a repository
 carrying both manifests, "Tests" would otherwise mean two different things on

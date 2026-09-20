@@ -98,6 +98,11 @@ struct RawEntry {
 /// Why the list could not be produced.
 #[derive(Debug)]
 pub enum OutdatedError {
+    /// There is no `package.json`, so there is nothing here to be out of date.
+    ///
+    /// Never returned by `run`; see `audit::AuditError::NoManifest` for why it
+    /// lives here anyway.
+    NoManifest,
     /// The package manager has no `outdated` output `opi` knows how to read.
     Unsupported(PackageManager),
     Failed(String),
@@ -106,6 +111,9 @@ pub enum OutdatedError {
 impl std::fmt::Display for OutdatedError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Self::NoManifest => {
+                f.write_str("no package.json here, and opi checks updates only for npm")
+            }
             Self::Unsupported(manager) => {
                 write!(f, "opi cannot read {manager}'s outdated output")
             }

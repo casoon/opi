@@ -167,6 +167,17 @@ pub struct Project {
     /// The `name` field. Absent in manifests that never get published.
     pub name: Option<String>,
     pub package_manager: Detected,
+    /// Whether a `package.json` was found at all.
+    ///
+    /// `package_manager` cannot answer this: it always holds a value, because
+    /// the absence of every signal still produces the npm fallback. A Rust-only
+    /// project therefore looks like an npm project to it, and anything that
+    /// would *run* the package manager has to ask here first.
+    ///
+    /// Not the same question as `Detected::is_certain`. An npm project with
+    /// neither a lockfile nor a `packageManager` field is uncertain but real,
+    /// and `npm audit` answers for it.
+    pub npm: bool,
 }
 
 impl Project {
@@ -179,11 +190,22 @@ impl Project {
         self
     }
 
+    /// Records whether a `package.json` was actually found.
+    ///
+    /// Only the caller that searched for it knows: `detect` is handed a
+    /// manifest either way, and an empty one is indistinguishable from an empty
+    /// real one.
+    pub fn with_npm(mut self, npm: bool) -> Self {
+        self.npm = npm;
+        self
+    }
+
     /// Detects the project in `dir` from its already-parsed manifest.
     pub fn detect(manifest: &Manifest, dir: &Path) -> Self {
         Self {
             name: manifest.name.clone().filter(|name| !name.trim().is_empty()),
             package_manager: detect_package_manager(dir, manifest.package_manager.as_deref()),
+            npm: true,
         }
     }
 
@@ -244,6 +266,26 @@ mod tests {
 
     fn manifest(json: &str) -> Manifest {
         serde_json::from_str(json).expect("parse fixture")
+    }
+
+    #[test]
+    fn a_missing_package_json_is_not_an_uncertain_package_manager() {
+        let dir = tempfile::tempdir().expect("temp dir");
+
+        // No lockfile and no packageManager field: npm by fallback, but a real
+        // npm project, and `npm audit` answers for it.
+        let npm = Project::detect(&manifest("{}"), dir.path());
+        assert!(npm.npm);
+        assert!(!npm.package_manager.is_certain());
+
+        // A project with no package.json at all reaches the same fallback.
+        let rust = Project::detect(&Manifest::default(), dir.path()).with_npm(false);
+        assert!(!rust.npm);
+        assert_eq!(
+            rust.package_manager, npm.package_manager,
+            "the two are indistinguishable from the package manager alone, \
+             which is the whole reason the flag exists"
+        );
     }
 
     fn detect(json: &str, lockfiles: &[&str]) -> (tempfile::TempDir, Project) {

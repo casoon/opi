@@ -115,6 +115,13 @@ instead.
 
 - **Nested workspaces** — a member that declares workspaces of its own. None of
   the 81 workspace repositories measured had one, so the behaviour is untested
-  rather than decided.
+  rather than decided. For Cargo the rule is at least written down — the
+  outermost `[workspace]` wins — but it is a rule without a measurement behind
+  it.
+- **A `Cargo.toml` far above that does not list this crate.** The outermost
+  `[workspace]` is taken as the root without checking that the crate is among
+  its `members`, which would need the TOML parser deliberately not taken. In a
+  normal repository the question does not arise; a crate checked out underneath
+  an unrelated workspace would be misread.
 - **Terminal behaviour beyond macOS and Linux.** CI covers both; other Unixes
   are assumed to behave the same and have not been tried.
