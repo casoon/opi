@@ -40,6 +40,20 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- `opi --updates` sees a pnpm workspace's packages. It asked the root
+  `package.json` alone, which on one real repository found 2 of 11 outdated
+  packages — and where a root declares no dependencies of its own it answers
+  `{}`, so `--updates` reported **"everything is current" over stale
+  packages**. A false acquittal is worse than no answer. 79 of 133 npm projects
+  measured here are pnpm workspaces.
+
+  npm needed no change: it walks the installed tree rather than the manifests
+  and already saw every member, measured both ways on a two-member workspace.
+
+  One limit stays, and it is pnpm's: its JSON keys by package name, so a
+  package at two versions in two members shows one of them. `pnpm outdated -r`
+  prints both rows itself.
+
 - `--updates` in a project without a `package.json` no longer says `opi checks
   updates only for npm`, which stopped being true.
 

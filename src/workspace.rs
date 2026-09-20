@@ -65,6 +65,16 @@ pub fn members(dir: &Path, manifest: &Manifest) -> Vec<Member> {
 }
 
 /// The include and exclude patterns declared by the workspace.
+/// Whether this project declares a workspace at all.
+///
+/// Deliberately not "does [`members`] return anything": that drops members
+/// without scripts, because a package with none has nothing to show in the
+/// list. It still has dependencies, so a caller asking about those has to ask
+/// a different question.
+pub fn declared(dir: &Path, manifest: &Manifest) -> bool {
+    !patterns(dir, manifest).0.is_empty()
+}
+
 fn patterns(dir: &Path, manifest: &Manifest) -> (Vec<String>, Vec<String>) {
     let declared = pnpm_packages(&dir.join("pnpm-workspace.yaml"))
         .unwrap_or_else(|| manifest.workspaces.clone());
@@ -290,6 +300,29 @@ mod tests {
             ("pnpm-workspace.yaml", "packages:\n  - '.'\n"),
         ]);
         assert!(members.is_empty());
+    }
+
+    #[test]
+    fn a_workspace_with_no_scripted_members_is_still_a_workspace() {
+        // The bug this pins: --updates asked whether `members` returned
+        // anything, which drops members without scripts, and then queried pnpm
+        // without -r. In a workspace whose root declares no dependencies that
+        // answers `{}`, so it reported "everything is current" over stale
+        // packages.
+        let (dir, members) = workspace(&[
+            ("package.json", r#"{"name":"root","workspaces":["apps/*"]}"#),
+            ("apps/lib/package.json", r#"{"name":"lib"}"#),
+        ]);
+        assert!(members.is_empty(), "nothing to list");
+        let manifest = Manifest::load(dir.path()).expect("manifest");
+        assert!(declared(dir.path(), &manifest), "still a workspace");
+    }
+
+    #[test]
+    fn a_plain_project_declares_no_workspace() {
+        let (dir, _) = workspace(&[("package.json", r#"{"name":"solo"}"#)]);
+        let manifest = Manifest::load(dir.path()).expect("manifest");
+        assert!(!declared(dir.path(), &manifest));
     }
 
     #[test]

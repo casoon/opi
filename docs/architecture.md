@@ -265,6 +265,28 @@ assumed, and both would have produced a wrong list:
   document, so the output is read line by line and a crate several members
   share is listed once.
 
+**pnpm is asked with `-r` where the project declares a workspace**, or it
+answers for the root `package.json` alone: measured on a real repository, 2 of
+11 outdated packages, and `{}` — reported as "everything is current" — where
+the root declares no dependencies of its own. A false acquittal is worse than
+no answer, which is the same standard by which `--updates` refuses to guess at
+bun's and yarn's output.
+
+The question is `workspace::declared`, not whether `workspace::members` returned
+anything: that drops members without scripts, and a package with no scripts
+still has dependencies.
+
+npm needs no flag. It walks the installed tree rather than the manifests, so it
+already sees every member — measured both ways on a two-member workspace, with
+identical results. Of 23 npm projects here one is a workspace; of 133 npm
+projects 79 are pnpm workspaces, which is where the bug lived.
+
+pnpm's JSON keys by package name and so holds one entry per name. A package at
+two versions in two members loses one of them, though `pnpm outdated -r` prints
+both rows in its own table. Which packages need attention is still right and
+`pnpm update -r` still moves both; only the version shown is one of the two.
+Naming the member the JSON happens to carry would claim the other is fine.
+
 `compat`, the latest semver-compatible version, is ignored. It reports what the
 *requirement* allows — a pinned `=1.0.100` shows `---` though `1.0.151` is
 compatible — while `Jump` answers the question being asked, identically for

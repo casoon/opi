@@ -142,7 +142,7 @@ fn main() -> ExitCode {
         Invocation::Security => {
             security(&manifest, &members, rust_root.as_deref(), &project, &root)
         }
-        Invocation::Updates => updates(&project, rust_root.as_deref(), &root),
+        Invocation::Updates => updates(&manifest, &project, rust_root.as_deref(), &root),
         Invocation::Workflow(name) => run_workflow(
             &name,
             &manifest,
@@ -254,7 +254,7 @@ fn list(
         Outcome::Hotkey('H') => health(manifest, members, rust_root, project, directory),
         Outcome::Hotkey('C') => clean(manifest, members, rust_root, project, directory),
         Outcome::Hotkey('S') => security(manifest, members, rust_root, project, directory),
-        Outcome::Hotkey('U') => updates(project, rust_root, directory),
+        Outcome::Hotkey('U') => updates(manifest, project, rust_root, directory),
         Outcome::Hotkey(_) => ExitCode::SUCCESS,
         Outcome::Unavailable => {
             print!("{}", menu.render(Console::stdout(ColorMode::Auto)));
@@ -1077,7 +1077,12 @@ fn run_workflow(
 /// Rendered as a runemark `Report` rather than a hand-set table: the split
 /// between safe and breaking is the whole value of this screen, and a report's
 /// groups make it structural instead of a sentence underneath a list.
-fn updates(project: &Project, rust_root: Option<&Path>, root: &Path) -> ExitCode {
+fn updates(
+    manifest: &Manifest,
+    project: &Project,
+    rust_root: Option<&Path>,
+    root: &Path,
+) -> ExitCode {
     let console = Console::stdout(ColorMode::Auto);
     let manager = project.package_manager.manager;
 
@@ -1092,7 +1097,7 @@ fn updates(project: &Project, rust_root: Option<&Path>, root: &Path) -> ExitCode
     // fallback, not a detection, and asking it would be a guess dressed up as
     // a result.
     let listed = if project.npm {
-        outdated::run(manager, root)
+        outdated::run(manager, root, workspace::declared(root, manifest))
     } else {
         Err(outdated::OutdatedError::NoManifest)
     };

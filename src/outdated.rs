@@ -91,6 +91,18 @@ pub struct Update {
     pub jump: Jump,
 }
 
+/// One entry of `npm`/`pnpm outdated --json`.
+///
+/// `-r` adds a `dependentPackages` list to each; everything beyond these two
+/// fields is ignored, so the parser is the same either way.
+///
+/// **pnpm's JSON keys by package name, so it can hold one entry per name.**
+/// A crate at two versions in two members — `glob` 9 in one, 10 in the other —
+/// loses one of them here, though `pnpm outdated -r` prints both rows in its
+/// table. Which packages need attention is still right, and `pnpm update -r`
+/// still moves both; only the version shown is one of two. Not worked around,
+/// because naming the one member the JSON happens to carry would claim the
+/// other is fine.
 #[derive(Debug, Deserialize)]
 struct RawEntry {
     #[serde(default)]
@@ -135,7 +147,22 @@ impl std::fmt::Display for OutdatedError {
 }
 
 /// Asks the package manager what is out of date.
-pub fn run(manager: PackageManager, root: &Path) -> Result<Vec<Update>, OutdatedError> {
+///
+/// `workspace` says whether the project declares one, which only pnpm needs
+/// told: without `-r` it answers for the root `package.json` alone. Measured
+/// on a real repository, that was 2 of 11 outdated packages — and where the
+/// root declares no dependencies of its own it answers `{}`, so `--updates`
+/// said "everything is current" over nine stale ones. A false acquittal is
+/// worse than no answer.
+///
+/// npm needs nothing: it walks the installed tree rather than the manifests,
+/// so it already sees every member. Measured both ways on a two-member
+/// workspace, with identical results.
+pub fn run(
+    manager: PackageManager,
+    root: &Path,
+    workspace: bool,
+) -> Result<Vec<Update>, OutdatedError> {
     // bun prints a table whether or not `--json` is passed, and yarn reports
     // line by line in a shape of its own — yarn 2 and newer dropped the
     // command altogether. Reading either as npm's map fails, and a parse
@@ -144,8 +171,14 @@ pub fn run(manager: PackageManager, root: &Path) -> Result<Vec<Update>, Outdated
         return Err(OutdatedError::Unsupported(manager));
     }
 
+    let mut args = vec!["outdated"];
+    if workspace && matches!(manager, PackageManager::Pnpm) {
+        args.push("-r");
+    }
+    args.push("--json");
+
     let output = Command::new(manager.program())
-        .args(["outdated", "--json"])
+        .args(&args)
         .current_dir(root)
         .output()
         .map_err(|error| OutdatedError::Failed(format!("could not run {manager}: {error}")))?;
@@ -404,7 +437,7 @@ mod tests {
         // The guard has to sit in front of the process: a table parsed as JSON
         // would be reported as a broken project instead of a missing feature.
         for manager in [PackageManager::Bun, PackageManager::Yarn] {
-            let error = run(manager, Path::new(".")).expect_err("unsupported");
+            let error = run(manager, Path::new("."), false).expect_err("unsupported");
             assert!(
                 matches!(error, OutdatedError::Unsupported(_)),
                 "for {manager}"
