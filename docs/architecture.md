@@ -266,6 +266,13 @@ output still decide it — but it is why those counts are legible in a pipe.
   thresholds are `main`'s, not runemark's: a menu knows how many entries it
   has, not how much of the screen its caller is willing to spend. Why a count
   rather than the terminal's height is in [decisions.md](decisions.md).
+- **Workspace packages share one tab**, marked off by a divider, via
+  `Group::in_tab`. One each does not scale — the largest workspace measured
+  here has 52 packages against 6 action groups — and it put two questions on
+  one row as peers: the action tabs answer what you are doing, a package tab
+  answers where. Inside the shared tab each package keeps its name as a
+  heading, so `Group::Workspace` still decides what belongs together; only the
+  row is shortened.
 - `Menu::with_summary` carries the line under the heading — entries, groups,
   and packages where a workspace has any. Two of those three stop being
   countable off the screen once the groups are tabs.

@@ -40,6 +40,13 @@ state — it is not a history.
 > *Consequence:* `/` keeps searching every group. Tabs answer "I know roughly
 > where"; the filter answers "I know exactly what", and a query matching four
 > groups is precisely the case tabs are worst at.
+>
+> *Consequence:* every tab names an action, except one that names the
+> workspace's packages and is marked off by a divider. One tab per package was
+> built first and measured wrong: 52 packages against 6 action groups is a row
+> of 58, and the two kinds stood side by side as peers, so "where is the thing
+> that deploys insights?" had two right answers. Grouping is unchanged — each
+> package keeps its heading inside the shared tab.
 
 > **The script name is not the user interface**
 >

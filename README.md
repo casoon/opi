@@ -5,7 +5,7 @@
 Go into any repository, type `opi`, and get a usable interface for that
 project — without configuring anything first.
 
-> **Status: `0.6.1`.** Scripts are the main thing; health, security, updates,
+> **Status: `0.7.0`.** Scripts are the main thing; health, security, updates,
 > clean and the commit/release workflows are built on top of them.
 
 ## What it does
@@ -44,7 +44,7 @@ scripts is taller than the terminal:
 casoon-web  pnpm
   43 entries · 10 groups · 3 packages
 
-  1 Development   2 Build   3 Preview   4 Quality   5 Deploy   …
+  1 Development   2 Build   3 Preview   4 Quality   …   │   8 Packages
   ─────────────
 › dev              Startet die Homepage
   dev:homepage     Startet die Homepage
@@ -53,6 +53,10 @@ casoon-web  pnpm
 
 ←→ group   / search   H Health   C Clean   S Security   U Updates
 ```
+
+A workspace's packages share the last tab rather than taking one each — 52 of
+them against 6 action groups is a tab row nobody can use — and a divider marks
+it, because the other tabs name what you are doing and that one names where.
 
 The first group is preselected and the cursor is on its first entry, so `opi ↵`
 still starts `dev` — the tabs hide what is not needed rather than asking for a

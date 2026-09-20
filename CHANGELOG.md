@@ -6,6 +6,25 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-09-20
+
+### Changed
+
+- Workspace packages share one `Packages` tab instead of taking one each, with
+  a divider in front of it. Inside, each package keeps its name as a heading.
+
+  One tab each was measured and does not scale. The largest workspace here has
+  52 packages against 6 action groups: a tab row of 58 that is almost entirely
+  package names, permanently scrolling, with the digits worthless past the
+  ninth. It is seven tabs now, and `web-casoon` is eight instead of ten.
+
+  It also fixes a mix-up the tabs introduced. The action tabs answer "what am
+  I doing", the package tabs "where am I doing it", and they stood side by side
+  as peers — so "where is the thing that deploys insights?" had two right
+  answers, `Deploy` and `@casoon/insights`. Every tab is an action now, except
+  one that the divider marks as something else.
+
+
 ## [0.6.1] - 2026-09-20
 
 ### Fixed

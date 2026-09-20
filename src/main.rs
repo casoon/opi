@@ -56,6 +56,9 @@ const OUTPUT_LINES: usize = 20;
 const TABS_ABOVE_TASKS: usize = 15;
 const TABS_ABOVE_GROUPS: usize = 5;
 
+/// The one tab every workspace package shares.
+const PACKAGES_TAB: &str = "Packages";
+
 fn main() -> ExitCode {
     let invocation = cli::parse(std::env::args().skip(1));
 
@@ -326,8 +329,24 @@ fn build_menu(project: &Project, tasks: &[Task], directory: &Path) -> Menu {
         .with_summary(summary(&sections, entries))
         .with_layout(layout(entries, sections.len()));
 
+    let mut packaged = false;
     for (group, section) in sections {
         let mut rendered = Group::new(group.label());
+        // Every workspace package shares one tab, and the first of them marks
+        // where the row stops naming actions and starts naming packages.
+        //
+        // One tab each was measured and does not scale: this repository's
+        // largest workspace has 52 packages against 6 action groups, which is
+        // a tab row of 58 that is almost entirely package names, permanently
+        // scrolling, with the digits worthless past the ninth. Inside the tab
+        // each package keeps its heading, so nothing is lost but the length.
+        if matches!(group, task::Group::Workspace(_)) {
+            rendered = rendered.in_tab(PACKAGES_TAB);
+            if !packaged {
+                rendered = rendered.with_divider();
+                packaged = true;
+            }
+        }
         for task in section {
             // The id has to disambiguate: root and member scripts share names
             // in every workspace repository measured.

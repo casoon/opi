@@ -79,7 +79,7 @@ checksum = "9f7c3e4beb33f85d45ae3e3a1792185706c8e16d043238c593331cc7cd313b50"
 
 [[package]]
 name = "opi"
-version = "0.6.1"
+version = "0.7.0"
 dependencies = [
  "glob",
  "runemark",
@@ -114,9 +114,9 @@ checksum = "f8dcc9c7d52a811697d2151c701e0d08956f92b0e24136cf4cf27b57a6a0d9bf"
 
 [[package]]
 name = "runemark"
-version = "0.7.1"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bda96eda3b5228f7135be05e3a8cba0f73c4ee27e5c557c2482b0244908b413e"
+checksum = "560df1e085b90cb103bd356225b224666f5c2d910498c1e1e6e854d69b153740"
 dependencies = [
  "libc",
  "unicode-width",
