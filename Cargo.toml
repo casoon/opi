@@ -10,7 +10,7 @@ documentation = "https://docs.rs/opi"
 repository = "https://github.com/casoon/opi"
 keywords = ["cli", "package-json", "scripts", "task-runner", "terminal"]
 categories = ["command-line-utilities", "development-tools"]
-exclude = ["plan/**", "konzept.txt", "docs/**", "install.sh"]
+exclude = ["plan/**", "konzept.txt", "docs/**", "site/**", "install.sh"]
 
 [dependencies]
 glob = "0.3.4"

@@ -1,0 +1,15 @@
+opi  cargo
+  7 entries · 3 groups
+
+Development
+  cargo run     Build and run the binary
+Build
+  cargo build   Build in release mode
+  cargo check   Type-check without building
+Quality
+  cargo clippy  Lint with warnings denied
+  cargo doc     Build and open the documentation
+  cargo fmt     Format the source
+  cargo test    Run the test suite
+
+H Health   C Clean   S Security   U Updates

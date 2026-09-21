@@ -1,0 +1,7 @@
+[1;96mopi[0m  [2mhealth[0m
+
+[1;92m✓[0m [1;92mLint (rust)  [0m  [2m   0.1s[0m  [2mcargo[0m
+[1;92m✓[0m [1;92mFormat (rust)[0m  [2m   0.1s[0m  [2mcargo[0m
+[1;92m✓[0m [1;92mTests (rust) [0m  [2m   0.2s[0m  [2mcargo[0m
+
+[1;92m3 checks passed.[0m

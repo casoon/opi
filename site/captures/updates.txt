@@ -1,0 +1,11 @@
+opi  updates
+
+– Dependencies — no package.json here
+
+[INFO] Dependencies (rust)
+
+  safe: 1
+
+* Safe to take (1)
+  - runemark 0.8.0 → 0.8.1 [patch]
+

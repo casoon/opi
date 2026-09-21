@@ -1,4 +1,8 @@
-# Project state
+---
+title: Project state
+description: "What opi is, what it does and does not do, and where it stands."
+order: 1
+---
 
 ## What `opi` is
 

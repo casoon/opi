@@ -1,0 +1,106 @@
+---
+import {
+  Badge,
+  Badges,
+  BuildOutput,
+  CodeBlock,
+  Facts,
+  Features,
+  Hero,
+  Install,
+  Quickstart,
+  Terminal,
+} from '@casoon/pages-theme/components';
+import Base from '@casoon/pages-theme/layouts/Base.astro';
+import { capture } from '../showcase';
+
+const usage = `opi                   # navigate: ↓ ↓ Enter
+opi                   # filter:   /dep ↵
+opi dev               # direct, no interface
+opi build --verbose   # arguments go to the script
+opi blog/dev          # a workspace member's script`;
+
+const config = `{
+  "scripts": { "dev": "astro dev", "deploy": "wrangler deploy" },
+  "scripts-info": { "dev": "Start development server" },
+  "opi": {
+    "scripts": {
+      "dev":    { "favorite": true },
+      "deploy": { "group": "Deployment", "confirm": true }
+    }
+  }
+}`;
+---
+
+<Base>
+  <Hero
+    title="A control center for every repository."
+    lead="opi turns a project's scripts into a keyboard-driven list — grouped, labelled, with the package manager detected — and puts health, security, updates and clean one key away. npm, pnpm, bun and Cargo, without configuring anything first."
+  >
+    <Install
+      commands={[
+        {
+          label: 'install.sh',
+          command: 'curl -fsSL https://raw.githubusercontent.com/casoon/opi/main/install.sh | sh',
+        },
+        { label: 'cargo', command: 'cargo install opi' },
+      ]}
+    />
+    <Badges>
+      <Badge>MIT</Badge>
+      <Badge>crates.io 0.8.0</Badge>
+      <Badge>Rust 1.85+</Badge>
+      <Badge>macOS · Linux</Badge>
+    </Badges>
+    <Terminal slot="output" title="opi --health" dots ansi={capture('health.ansi')} />
+  </Hero>
+
+  <Facts
+    items={[
+      { value: '0', label: 'configuration files needed' },
+      { value: '4', label: 'ecosystems read: npm, pnpm, bun, Cargo' },
+      { value: '5', label: 'areas beside the scripts, one key or flag each' },
+      { value: '4', label: 'prebuilt targets for macOS and Linux' },
+    ]}
+  />
+
+  <Features
+    items={[
+      {
+        title: 'Scripts first',
+        body: 'The start screen is the script list. Enter runs the highlighted entry, / filters across every group, and the script replaces the opi process — Ctrl-C reaches your dev server and its exit code reaches your shell.',
+      },
+      {
+        title: 'Orchestration, not reimplementation',
+        body: 'Health runs the tools the project already depends on — Biome, ESLint, tsc, astro check, Vitest, cargo — concurrently, and relays what they said. Output is parsed only where the format is documented.',
+      },
+      {
+        title: 'Your scripts keep their names',
+        body: 'health, clean and release are script names in real projects, so every built-in area is a flag or a hotkey, never a bare word.',
+      },
+      {
+        title: 'opi writes nothing',
+        body: 'Clean removes what you choose; updates are applied by the package manager, followed by the commit checks. No package.json and no lockfile is ever rewritten by opi itself.',
+      },
+    ]}
+  />
+
+  <BuildOutput
+    caption="Captured from opi 0.8.0 on its own repository with site/captures/capture.sh, piped — the showcase has the other areas."
+    file="site/captures/list.txt"
+  >
+    <Terminal ansi={capture('list.txt')} />
+  </BuildOutput>
+
+  <Quickstart
+    lead="Install, change into a project, type opi. The full walkthrough lives in the documentation."
+    steps={[
+      'Install the release binary with the install script, or build it with <code>cargo install opi</code>.',
+      'Change into any directory of a project with a <code>package.json</code> or <code>Cargo.toml</code>.',
+      'Run <code>opi</code> and pick a script — or name it: <code>opi dev</code>.',
+    ]}
+  >
+    <CodeBlock code={usage} lang="sh" label="Usage" />
+    <CodeBlock code={config} lang="json" title="package.json" label="Optional refinement" />
+  </Quickstart>
+</Base>
