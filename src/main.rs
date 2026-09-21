@@ -28,7 +28,7 @@ use std::process::ExitCode;
 
 use runemark::{
     ColorMode, Console, DetailLevel, ErrorBlock, Finding, FindingGroup, Group, Hint, Item, Layout,
-    Menu, Metric, NextStep, Outcome, Report, SelectMode, Tone, Verdict,
+    Menu, Metric, NextStep, Outcome, Picked, Report, SelectMode, Tone, Verdict,
 };
 
 use crate::cli::Invocation;
@@ -1151,8 +1151,9 @@ fn apply_updates(
         .map(|update| update.name.clone())
         .collect();
     let raises = outdated::can_raise(manager) && !safe.is_empty();
+    let decides = outdated::can_raise(manager) && !found.is_empty();
 
-    if in_range == 0 && !raises {
+    if in_range == 0 && !raises && !decides {
         return ExitCode::SUCCESS;
     }
 
@@ -1191,6 +1192,12 @@ fn apply_updates(
             )),
         );
     }
+    if decides {
+        group = group.add_item(
+            Item::new("decide", "Decide per package")
+                .with_description("tick what to raise, majors included"),
+        );
+    }
     let menu = Menu::new().add_group(group.add_item(Item::new("cancel", "Cancel")));
 
     let interactive = io::stdout().is_terminal() && io::stderr().is_terminal();
@@ -1221,14 +1228,21 @@ fn apply_updates(
         }
     };
 
-    let mode = match chosen.as_str() {
-        "in-range" => outdated::Apply::InRange,
-        "latest" => outdated::Apply::Latest,
+    let (mode, names) = match chosen.as_str() {
+        "in-range" => (outdated::Apply::InRange, safe),
+        "latest" => (outdated::Apply::Latest, safe),
+        "decide" => match pick_updates(found, &safe) {
+            Some(picked) => (outdated::Apply::Latest, picked),
+            None => return ExitCode::SUCCESS,
+        },
         _ => return ExitCode::SUCCESS,
     };
+    if names.is_empty() && mode == outdated::Apply::Latest {
+        return ExitCode::SUCCESS;
+    }
 
     println!();
-    if let Err(error) = outdated::apply(manager, root, workspace, mode, &safe) {
+    if let Err(error) = outdated::apply(manager, root, workspace, mode, &names) {
         // The manager has already said why on the terminal it inherited; this
         // only stops the chain rather than repeating it.
         let block = ErrorBlock::new("The update did not finish")
@@ -1244,6 +1258,41 @@ fn apply_updates(
     // it is not a wait worth asking about first.
     println!();
     run_workflow("commit", manifest, members, rust_root, project, root)
+}
+
+/// Lets each update be ticked, returning the names to raise.
+///
+/// The safe ones start ticked and the majors do not, so the default answer is
+/// the one "Raise the ranges" gives and a major is only taken on purpose.
+/// `None` when the list was left without confirming.
+fn pick_updates(found: &[outdated::Update], safe: &[String]) -> Option<Vec<String>> {
+    let mut menu = Menu::new()
+        .with_heading("Raise the ranges")
+        .with_ticked(safe.iter().cloned());
+    for (title, breaking) in [("Safe to take", false), ("A decision each", true)] {
+        let mut group = Group::new(title);
+        for update in found
+            .iter()
+            .filter(|update| update.jump.breaking() == breaking)
+        {
+            group = group.add_item(Item::new(&update.name, &update.name).with_description(
+                format!(
+                    "{} → {}  {}",
+                    update.current,
+                    update.latest,
+                    update.jump.label()
+                ),
+            ));
+        }
+        if !group.items.is_empty() {
+            menu = menu.add_group(group);
+        }
+    }
+
+    match menu.run_multi(Console::stderr(ColorMode::Auto), SelectMode::Auto, true) {
+        Ok(Picked::Chosen(names)) => Some(names),
+        _ => None,
+    }
 }
 
 /// Renders one ecosystem's updates, returning whether the run itself failed.
