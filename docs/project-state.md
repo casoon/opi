@@ -30,7 +30,8 @@ Every area now answers for both ecosystems where both are present, in a section
 each: `cargo audit` and `cargo outdated` beside the package manager's own.
 Three of the four package managers are audited — bun has its own shape, yarn's
 is read by nothing here. `--updates` can also apply what it found by calling
-the package manager, and runs the commit checks on the result.
+the package manager — the safe ones in one step, or each package ticked on its
+own where a major is worth taking — and runs the commit checks on the result.
 
 Five areas sit beside the list:
 
@@ -49,9 +50,10 @@ gets a usable list, which is the point of the whole arrangement.
 
 ## What it does not do
 
-- **Apply updates.** `--updates` reports and stops. See
-  [constraints.md](constraints.md).
-- **Run checks in a fixing mode.** Nothing writes but clean.
+- **Write a project's files.** Clean removes what it is told to and
+  `--updates` calls the package manager with a list of names; `opi` itself
+  writes no manifest, no lockfile and no catalog, and no check runs in a
+  fixing mode. See [constraints.md](constraints.md).
 - **.NET.** No standalone marker appeared in the 231 directories measured.
 - **Windows.** See [decisions.md](decisions.md).
 
@@ -60,8 +62,8 @@ gets a usable list, which is the point of the whole arrangement.
 | | |
 | --- | --- |
 | Language | Rust, edition 2024, MSRV `1.85` |
-| Distribution | crates.io as `opi`, installed via `cargo install opi` |
-| Terminal presentation | [runemark](https://github.com/casoon/runemark) `0.7` with its `select` feature — the only presentation dependency |
+| Distribution | `install.sh` fetches the release binary and checks its SHA-256; crates.io as `opi` via `cargo install opi` for those with a toolchain |
+| Terminal presentation | [runemark](https://github.com/casoon/runemark) `0.9` with its `select` feature — the only presentation dependency |
 | Project input | `package.json` and `Cargo.toml` — no config file of `opi`'s own |
 | Platforms | Unix only; building on Windows fails with an explicit message |
 | Dependencies | four: `runemark`, `serde`, `serde_json`, `glob` |

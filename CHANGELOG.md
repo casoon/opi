@@ -6,6 +6,49 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-09-23
+
+### Added
+
+- `opi --updates` offers **Decide per package**: every finding as a ticked
+  line, majors among them.
+
+  The two existing lines answer the question in bulk — stay inside the declared
+  ranges, or raise them — and both skip the majors on purpose. That leaves the
+  case they were built to avoid without an answer: one major you have read the
+  release notes for, sitting beside twelve minors you have not thought about at
+  all. As a line to retype it is a name you have to copy out of a report; as a
+  list it is one keystroke per package.
+
+  The safe ones start ticked and the majors do not, so confirming without
+  touching anything does what "Raise the ranges" does, and a major is only ever
+  taken deliberately. Leaving the list without confirming applies nothing, and
+  an empty selection is a no-op rather than a call with no names.
+
+  Like the bulk lines, it is offered for pnpm only — `npm install x@1.1.1`
+  turns an exact `2.1.2` into `^2.1.3`, and there is no npm command that keeps
+  the operator. `opi` still writes nothing itself: it calls the package manager
+  with a list of names, and the commit checks run on what comes back.
+
+- A fourth Cargo check, `Docs`: `cargo rustdoc --all-features -- -D warnings`.
+
+  rustdoc renders a doc comment as HTML, so a bare `<iframe>` in a comment
+  becomes a real element and the page can end right there. docs.rs served a
+  truncated page for one of these crates for months before a docs.rs maintainer
+  reported it. `rustdoc::invalid_html_tags` had been warning the whole time; it
+  was simply not wired to anything that could fail.
+
+  `rustdoc` rather than `doc` because the lint level has to reach the crate
+  being documented and nothing else. `cargo doc` would take it through
+  `RUSTDOCFLAGS`, an environment variable `CHECKS` cannot carry — it is
+  `(name, args)` — while `cargo rustdoc` passes it as an argument, the shape
+  every other check here already has. It documents the library target where
+  there is one, the same target a registry publishes, and the binary otherwise.
+
+  `-D warnings` rather than the one HTML lint: broken intra-doc links and bare
+  URLs are the same class of defect, documentation that is wrong where nobody
+  looks.
+
 ## [0.8.0] - 2026-09-20
 
 ### Added
@@ -66,6 +109,21 @@ All notable changes to this project are documented here. The format follows
   package condense to one line per severity, so the counts are of vulnerable
   dependencies rather than of advisories; `bun audit` itself has the full list.
 
+- `install.sh`, and release binaries for it to install:
+
+  ```bash
+  curl -fsSL https://raw.githubusercontent.com/casoon/opi/main/install.sh | sh
+  ```
+
+  `cargo install opi` builds the binary on the user's machine and needs a Rust
+  toolchain for a tool whose point is that you can use it in any repository.
+  The release workflow now builds macOS and Linux binaries for `aarch64` and
+  `x86_64` and attaches them with their checksums; the installer picks the one
+  for the platform, verifies it, and writes it to `~/.local/bin`. The Linux
+  builds are static musl, so the distribution does not enter into it.
+
+  Publishing stays local. The binaries come out of CI, the crate does not.
+
 ### Fixed
 
 - `opi --updates` sees a pnpm workspace's packages. It asked the root
@@ -90,26 +148,6 @@ All notable changes to this project are documented here. The format follows
 
 - `--updates` in a project without a `package.json` no longer says `opi checks
   updates only for npm`, which stopped being true.
-
-
-### Added
-
-- `install.sh`, and release binaries for it to install:
-
-  ```bash
-  curl -fsSL https://raw.githubusercontent.com/casoon/opi/main/install.sh | sh
-  ```
-
-  `cargo install opi` builds the binary on the user's machine and needs a Rust
-  toolchain for a tool whose point is that you can use it in any repository.
-  The release workflow now builds macOS and Linux binaries for `aarch64` and
-  `x86_64` and attaches them with their checksums; the installer picks the one
-  for the platform, verifies it, and writes it to `~/.local/bin`. The Linux
-  builds are static musl, so the distribution does not enter into it.
-
-  Publishing stays local. The binaries come out of CI, the crate does not.
-
-### Fixed
 
 - `opi --security` answers the dependency question for Rust as well, through
   `cargo audit`.
@@ -427,7 +465,12 @@ Placeholder release. Reserves the crate name on crates.io and establishes the
 repository skeleton. The binary prints its version and a development notice; no
 functionality is implemented.
 
-[Unreleased]: https://github.com/casoon/opi/compare/v0.5.3...HEAD
+[Unreleased]: https://github.com/casoon/opi/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/casoon/opi/releases/tag/v0.9.0
+[0.8.0]: https://github.com/casoon/opi/releases/tag/v0.8.0
+[0.7.0]: https://github.com/casoon/opi/releases/tag/v0.7.0
+[0.6.1]: https://github.com/casoon/opi/releases/tag/v0.6.1
+[0.6.0]: https://github.com/casoon/opi/releases/tag/v0.6.0
 [0.5.3]: https://github.com/casoon/opi/releases/tag/v0.5.3
 [0.5.2]: https://github.com/casoon/opi/releases/tag/v0.5.2
 [0.5.1]: https://github.com/casoon/opi/releases/tag/v0.5.1

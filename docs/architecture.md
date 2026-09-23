@@ -146,8 +146,8 @@ exist without a second list.
 
 A Rust project defines no scripts, so its commands are a fixed set rather than
 something read out of the manifest. They are the ones these repositories
-actually run in CI: `fmt --check`, `clippy` with warnings denied, `test
---all-features`. `cargo run` is offered only where something is runnable.
+actually run in CI: `fmt --check`, `clippy` with warnings denied, `rustdoc`
+with warnings denied, and `test --all-features`. `cargo run` is offered only where something is runnable.
 
 `Cargo.toml` is read without a TOML parser. Two facts are wanted — the package
 name and whether a binary exists — and a dependency to learn them would cost
