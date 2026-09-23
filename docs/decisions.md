@@ -1,4 +1,8 @@
-# Decisions
+---
+title: Decisions
+description: "The decisions currently in force, each with its reason and consequence."
+order: 5
+---
 
 Decisions currently in force. When one is superseded, this file describes the new
 state — it is not a history.

@@ -1,0 +1,5 @@
+opi  clean
+
+  target  862.0 MB
+
+Run opi --clean in a terminal to remove any of it.

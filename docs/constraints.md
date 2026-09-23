@@ -1,4 +1,8 @@
-# Constraints
+---
+title: Constraints
+description: "Hard boundaries the implementation respects: toolchain and platforms, zero configuration, what may be deleted."
+order: 3
+---
 
 Hard boundaries the implementation must respect. Where something is an
 assumption rather than a settled requirement, it is marked as such.

@@ -1,0 +1,5 @@
+opi  updates
+
+– Dependencies — no package.json here
+
+✓ Dependencies (rust) — everything is current

@@ -1,4 +1,8 @@
-# Architecture
+---
+title: Architecture
+description: "The modules, how a project is found, the task model and the five areas — what exists today."
+order: 2
+---
 
 What exists today. `opi` lists a project's `package.json` scripts and runs the
 one you pick, and offers five areas beside that: health, security, updates,

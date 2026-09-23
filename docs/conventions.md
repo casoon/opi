@@ -1,4 +1,8 @@
-# Conventions
+---
+title: Conventions
+description: "Rules future changes follow: validation, releasing, modules, output, errors and tests."
+order: 4
+---
 
 Rules future changes follow. Everything here is visible in the code as it
 stands; where a rule is a decision rather than an observation, it is in
