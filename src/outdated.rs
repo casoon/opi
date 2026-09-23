@@ -169,7 +169,8 @@ impl std::fmt::Display for OutdatedError {
 /// on a real repository, that was 2 of 11 outdated packages — and where the
 /// root declares no dependencies of its own it answers `{}`, so `--updates`
 /// said "everything is current" over nine stale ones. A false acquittal is
-/// worse than no answer.
+/// worse than no answer — the same reasoning that makes an empty stdout with
+/// something on stderr an error here, not a quiet "nothing outdated".
 ///
 /// npm needs nothing: it walks the installed tree rather than the manifests,
 /// so it already sees every member. Measured both ways on a two-member
@@ -201,9 +202,20 @@ pub fn run(
 
     let text = String::from_utf8_lossy(&output.stdout);
     // Every manager exits non-zero when something is outdated, so the status
-    // says nothing; an empty body is the real "nothing to report".
+    // says nothing on its own. A clean run prints nothing to stdout either —
+    // measured — so silence there is not itself the problem; but a registry
+    // that could not be reached, or a lockfile out of sync, leaves stdout
+    // empty too and says why on stderr instead. Only silence on both streams
+    // is the real "nothing to report" — the same distinction `cargo outdated`
+    // makes below.
     if text.trim().is_empty() {
-        return Ok(Vec::new());
+        let reason = stderr_reason(&output.stderr);
+        if reason.is_empty() {
+            return Ok(Vec::new());
+        }
+        return Err(OutdatedError::Failed(format!(
+            "{manager} outdated: {reason}"
+        )));
     }
 
     let raw: BTreeMap<String, RawEntry> =
@@ -287,21 +299,27 @@ pub fn cargo(root: &Path) -> Result<Vec<Update>, OutdatedError> {
         // so a path dependency pointing outside the workspace stops it — seen
         // on a real repository here. That goes to stderr with nothing on
         // stdout, and relaying it beats a parse error about nothing.
-        let reason = String::from_utf8_lossy(&output.stderr);
-        let reason = reason
-            .lines()
-            .find(|line| line.trim_start().starts_with("error"))
-            .or_else(|| reason.lines().next())
-            .unwrap_or("no output")
-            .trim()
-            .to_owned();
-        if reason.is_empty() || reason == "no output" {
+        let reason = stderr_reason(&output.stderr);
+        if reason.is_empty() {
             return Ok(Vec::new());
         }
         return Err(OutdatedError::Failed(format!("cargo outdated: {reason}")));
     }
 
     Ok(read_cargo(&text))
+}
+
+/// The most telling line of `stderr`: the first that starts with "error", or
+/// otherwise the first line at all. Empty when stderr is empty, so a caller
+/// can tell a silent failure from one that explained itself.
+fn stderr_reason(stderr: &[u8]) -> String {
+    let text = String::from_utf8_lossy(stderr);
+    text.lines()
+        .find(|line| line.trim_start().starts_with("error"))
+        .or_else(|| text.lines().next())
+        .unwrap_or("")
+        .trim()
+        .to_owned()
 }
 
 /// The document inside output that may carry warnings ahead of it.
@@ -472,6 +490,27 @@ mod tests {
         r#"{"crate_name":"b","dependencies":[{"name":"glob","project":"0.3.0","compat":"---","latest":"0.3.4","kind":"Normal","platform":null},{"name":"serde_json","project":"1.0.100","compat":"---","latest":"1.0.151","kind":"Normal","platform":null}]}"#,
         "\n",
     );
+
+    #[test]
+    fn stderr_reason_prefers_a_line_that_starts_with_error() {
+        let stderr = b"npm warn deprecated foo\nerror ETIMEDOUT registry.npmjs.org\nnpm warn end";
+        assert_eq!(stderr_reason(stderr), "error ETIMEDOUT registry.npmjs.org");
+    }
+
+    #[test]
+    fn stderr_reason_falls_back_to_the_first_line() {
+        assert_eq!(
+            stderr_reason(b"just one line, no error prefix"),
+            "just one line, no error prefix"
+        );
+    }
+
+    #[test]
+    fn stderr_reason_is_empty_when_stderr_is() {
+        // Empty here is the signal a caller uses to tell a silent, genuinely
+        // clean run from one that failed without saying why.
+        assert_eq!(stderr_reason(b""), "");
+    }
 
     #[test]
     fn a_warning_printed_ahead_of_the_json_does_not_break_the_read() {

@@ -578,7 +578,7 @@ mod tests {
         match build.exec {
             Exec::Direct { program, args } => {
                 assert_eq!(program, "cargo");
-                assert_eq!(args, ["build", "--release"]);
+                assert_eq!(args, ["build", "--release", "--workspace"]);
             }
             Exec::Script => panic!("a cargo task is not a package.json script"),
         }

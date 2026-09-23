@@ -184,6 +184,20 @@ pub fn run(manager: PackageManager, root: &Path) -> Result<Audit, AuditError> {
     // either way.
     let text = String::from_utf8_lossy(&output.stdout);
 
+    // A clean run always prints at least an empty report — `{}` for bun, a
+    // full object with zero counts for npm and pnpm (see the tests below).
+    // Stdout empty here means the manager could not produce one at all — a
+    // network error or a broken lockfile, explained on stderr instead — and
+    // reading that silence as "no findings" would be the false acquittal
+    // this project's own principle warns against. The same shape `cargo
+    // audit` handles below.
+    if text.trim().is_empty() {
+        return Err(AuditError::Failed(format!(
+            "{manager} audit: {}",
+            stderr_reason(&output.stderr)
+        )));
+    }
+
     // The two shapes are told apart once, here, by which manager was asked —
     // not by trying one parser and falling back to the other, which would turn
     // a malformed report into a confusing error about the wrong format.
@@ -198,6 +212,18 @@ pub fn run(manager: PackageManager, root: &Path) -> Result<Audit, AuditError> {
 
     condense(&mut advisories);
     Ok(Audit { advisories })
+}
+
+/// The last line of `stderr`, trimmed — what a package manager's own error
+/// explanation usually ends with. `"no output"` when stderr is empty too, so
+/// a message built from this is never blank.
+fn stderr_reason(stderr: &[u8]) -> String {
+    String::from_utf8_lossy(stderr)
+        .lines()
+        .last()
+        .unwrap_or("no output")
+        .trim()
+        .to_owned()
 }
 
 /// Worst first, and one line per package and severity.
@@ -343,14 +369,10 @@ pub fn cargo(root: &Path) -> Result<Vec<CargoAdvisory>, AuditError> {
     if text.trim().is_empty() {
         // An advisory database it could not fetch leaves stdout empty and says
         // why on stderr. Relaying that beats a parse error about nothing.
-        let reason = String::from_utf8_lossy(&output.stderr);
-        let reason = reason
-            .lines()
-            .last()
-            .unwrap_or("no output")
-            .trim()
-            .to_owned();
-        return Err(AuditError::Failed(format!("cargo audit: {reason}")));
+        return Err(AuditError::Failed(format!(
+            "cargo audit: {}",
+            stderr_reason(&output.stderr)
+        )));
     }
 
     let report: CargoReport = serde_json::from_str(&text)
@@ -583,6 +605,22 @@ mod tests {
     fn a_clean_audit_has_no_findings() {
         let json = r#"{"advisories":{},"metadata":{"vulnerabilities":{"high":0}}}"#;
         assert!(parse(json).is_empty());
+    }
+
+    #[test]
+    fn stderr_reason_takes_the_last_line() {
+        // A package manager's own explanation is usually its final line;
+        // warnings ahead of it are noise the way pnpm's outdated warnings are.
+        assert_eq!(
+            stderr_reason(b"npm warn config deprecated\nnpm error network timeout"),
+            "npm error network timeout"
+        );
+    }
+
+    #[test]
+    fn stderr_reason_falls_back_when_stderr_is_empty() {
+        // An error message built from this must never end up blank.
+        assert_eq!(stderr_reason(b""), "no output");
     }
 
     #[test]

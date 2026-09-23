@@ -19,6 +19,7 @@ use std::time::{Duration, Instant};
 use runemark::Verdict;
 
 use crate::manifest::Manifest;
+use crate::project::PackageManager;
 use crate::workspace::Member;
 
 /// One thing that can be checked, and the tool that checks it.
@@ -30,7 +31,8 @@ pub struct Check {
     pub tool: &'static str,
     /// Which package it belongs to, in a workspace. `None` is the root.
     pub scope: Option<String>,
-    /// The executable in `node_modules/.bin`.
+    /// The executable in `node_modules/.bin`, or `yarn` when resolved through
+    /// it instead — see [`resolve`].
     program: PathBuf,
     args: Vec<&'static str>,
     /// Where the tool runs. A member's checks run in the member, which is the
@@ -193,13 +195,15 @@ impl Check {
         members: &[Member],
         rust_root: Option<&Path>,
         root: &Path,
+        manager: PackageManager,
     ) -> Vec<Self> {
-        let mut checks = Self::detect_in(manifest, root, None);
+        let mut checks = Self::detect_in(manifest, root, None, manager);
         for member in members {
             checks.extend(Self::detect_in(
                 &member.manifest,
                 &member.path,
                 Some(member.name.clone()),
+                manager,
             ));
         }
         if let Some(rust_root) = rust_root {
@@ -240,10 +244,17 @@ impl Check {
 
     /// The checks that apply to one package, rooted at `dir`.
     ///
-    /// A tool the package does not depend on, or whose binary is not
-    /// installed, produces no check at all — an absent check is honest, a
-    /// failing one would not be.
-    fn detect_in(manifest: &Manifest, dir: &Path, scope: Option<String>) -> Vec<Self> {
+    /// A tool the package does not depend on produces no check at all — an
+    /// absent check is honest, a failing one would not be. Whether the tool
+    /// is actually installed is, for Yarn, not something a filesystem probe
+    /// can answer (see [`resolve`]); there, a missing tool surfaces through
+    /// `Check::run` as `ActionRequired` instead of being left out here.
+    fn detect_in(
+        manifest: &Manifest,
+        dir: &Path,
+        scope: Option<String>,
+        manager: PackageManager,
+    ) -> Vec<Self> {
         let mut checks: Vec<Self> = Vec::new();
 
         for candidate in CANDIDATES {
@@ -253,7 +264,7 @@ impl Check {
             if !manifest.depends_on(candidate.package) {
                 continue;
             }
-            let Some(program) = binary(dir, candidate.tool) else {
+            let Some((program, prefix)) = resolve(dir, candidate.tool, manager) else {
                 continue;
             };
             checks.push(Self {
@@ -261,7 +272,10 @@ impl Check {
                 tool: candidate.tool,
                 scope: scope.clone(),
                 program,
-                args: candidate.args.to_vec(),
+                args: prefix
+                    .into_iter()
+                    .chain(candidate.args.iter().copied())
+                    .collect(),
                 dir: dir.to_path_buf(),
             });
         }
@@ -317,6 +331,27 @@ fn binary(root: &Path, tool: &str) -> Option<PathBuf> {
         .find(|path| path.exists())
 }
 
+/// How to start `tool`: a binary path, or — for Yarn — `yarn run <tool>`.
+///
+/// Yarn's default linker (Plug'n'Play, Yarn ≥ 2) never creates
+/// `node_modules`, so [`binary`] alone finds nothing installed under an
+/// ordinary Yarn 4 project even though the tool is there. `yarn run <tool>`
+/// resolves a binary exposed by a dependency the same way a declared script
+/// would, PnP or not, and works for Yarn Classic too — so the filesystem
+/// probe is tried first and only Yarn falls back to it. If the tool is
+/// genuinely not installed, that surfaces once the check runs, as the same
+/// `ActionRequired` a missing binary already produces elsewhere.
+fn resolve(
+    dir: &Path,
+    tool: &'static str,
+    manager: PackageManager,
+) -> Option<(PathBuf, Vec<&'static str>)> {
+    if let Some(program) = binary(dir, tool) {
+        return Some((program, Vec::new()));
+    }
+    (manager == PackageManager::Yarn).then(|| (PathBuf::from("yarn"), vec!["run", tool]))
+}
+
 /// Runs `checks` concurrently, handing each report back as it finishes.
 ///
 /// Concurrency is bounded: six Node processes at once can be slower than three
@@ -359,4 +394,89 @@ pub fn run_all(checks: Vec<Check>, mut on_report: impl FnMut(&Report)) -> Vec<Re
     // Slowest last would order by accident; by label it is the same every run.
     reports.sort_by_key(|report| report.check.label());
     reports
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+
+    #[test]
+    fn resolve_prefers_a_filesystem_binary_over_yarn() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let bin = dir.path().join("node_modules").join(".bin");
+        fs::create_dir_all(&bin).expect("mkdir");
+        fs::write(bin.join("eslint"), "").expect("write");
+
+        let (program, prefix) =
+            resolve(dir.path(), "eslint", PackageManager::Yarn).expect("found on disk");
+        assert_eq!(program, bin.join("eslint"));
+        assert!(prefix.is_empty(), "a real binary needs no yarn prefix");
+    }
+
+    #[test]
+    fn resolve_falls_back_to_yarn_run_when_nothing_is_on_disk() {
+        // Yarn's PnP linker never writes node_modules, so this is the normal
+        // case for a Yarn >= 2 project, not an edge case.
+        let dir = tempfile::tempdir().expect("temp dir");
+        let (program, prefix) =
+            resolve(dir.path(), "eslint", PackageManager::Yarn).expect("resolved through yarn");
+        assert_eq!(program, PathBuf::from("yarn"));
+        assert_eq!(prefix, ["run", "eslint"]);
+    }
+
+    #[test]
+    fn resolve_does_not_guess_for_other_managers() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        for manager in [
+            PackageManager::Npm,
+            PackageManager::Pnpm,
+            PackageManager::Bun,
+        ] {
+            assert!(
+                resolve(dir.path(), "eslint", manager).is_none(),
+                "{manager:?} has no node_modules here and no yarn fallback to try"
+            );
+        }
+    }
+
+    #[test]
+    fn a_yarn_pnp_project_still_gets_its_checks() {
+        // The bug this pins: a Yarn 4 project using Plug'n'Play has no
+        // node_modules/.bin, so the old binary-only lookup found nothing and
+        // Health reported zero checks even though `yarn eslint` runs fine.
+        let dir = tempfile::tempdir().expect("temp dir");
+        fs::write(
+            dir.path().join("package.json"),
+            r#"{"name":"pnp","devDependencies":{"eslint":"9.0.0"}}"#,
+        )
+        .expect("write");
+        let manifest = Manifest::load(dir.path()).expect("manifest");
+
+        let checks = Check::detect_in(&manifest, dir.path(), None, PackageManager::Yarn);
+        let lint = checks
+            .iter()
+            .find(|check| check.name == "Lint")
+            .expect("eslint check is offered under Yarn PnP");
+        assert_eq!(lint.command_line(), "yarn run eslint .");
+    }
+
+    #[test]
+    fn the_same_pnp_project_offers_nothing_under_npm() {
+        // Without a real node_modules, npm has no fallback to reach for —
+        // the Yarn path must not leak into the other managers.
+        let dir = tempfile::tempdir().expect("temp dir");
+        fs::write(
+            dir.path().join("package.json"),
+            r#"{"name":"solo","devDependencies":{"eslint":"9.0.0"}}"#,
+        )
+        .expect("write");
+        let manifest = Manifest::load(dir.path()).expect("manifest");
+
+        let checks = Check::detect_in(&manifest, dir.path(), None, PackageManager::Npm);
+        assert!(
+            checks.is_empty(),
+            "no installed eslint, no yarn to fall back to"
+        );
+    }
 }

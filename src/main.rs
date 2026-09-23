@@ -119,8 +119,12 @@ fn main() -> ExitCode {
     let project = Project::detect(&manifest, &root)
         .or_named(rust.as_ref().and_then(|(rust, _)| rust.name.clone()))
         .with_npm(has_npm);
-    let members = workspace::members(&root, &manifest);
-    let mut tasks = Task::from_workspace(&manifest, &members);
+    // Two different questions: the menu only runs what has a script, while
+    // health, clean, security and the workflows look inside every member's
+    // directory regardless of whether it has one.
+    let scripted_members = workspace::members(&root, &manifest);
+    let members = workspace::all(&root, &manifest);
+    let mut tasks = Task::from_workspace(&manifest, &scripted_members);
     if let Some((rust, _)) = &rust {
         tasks.extend(task::from_cargo(rust));
     }
@@ -218,7 +222,13 @@ fn list(
     let mut menu = build_menu(project, tasks, directory);
     // Offered only where it would do something; a key that answers "nothing
     // applies" is worse than no key.
-    let checks = check::Check::detect_all(manifest, members, rust_root, directory);
+    let checks = check::Check::detect_all(
+        manifest,
+        members,
+        rust_root,
+        directory,
+        project.package_manager.manager,
+    );
     if !checks.is_empty() {
         menu = menu.add_hint(Hint::new('H', "Health"));
     }
@@ -500,7 +510,13 @@ fn health(
     root: &Path,
 ) -> ExitCode {
     let console = Console::stdout(ColorMode::Auto);
-    let checks = check::Check::detect_all(manifest, members, rust_root, root);
+    let checks = check::Check::detect_all(
+        manifest,
+        members,
+        rust_root,
+        root,
+        project.package_manager.manager,
+    );
 
     println!(
         "{}  {}",
@@ -765,10 +781,16 @@ fn security(
     // waiting for the tests to finish.
     // Secrets scanning is about the repository, not a toolchain, so the Rust
     // side contributes nothing here.
-    let scans: Vec<check::Check> = check::Check::detect_all(manifest, members, None, root)
-        .into_iter()
-        .filter(|check| check.name == "Secrets")
-        .collect();
+    let scans: Vec<check::Check> = check::Check::detect_all(
+        manifest,
+        members,
+        None,
+        root,
+        project.package_manager.manager,
+    )
+    .into_iter()
+    .filter(|check| check.name == "Secrets")
+    .collect();
 
     if scans.is_empty() {
         println!(
@@ -1009,10 +1031,16 @@ fn run_workflow(
         );
     }
 
-    let checks: Vec<check::Check> = check::Check::detect_all(manifest, members, rust_root, root)
-        .into_iter()
-        .filter(|check| workflow.includes(check.name))
-        .collect();
+    let checks: Vec<check::Check> = check::Check::detect_all(
+        manifest,
+        members,
+        rust_root,
+        root,
+        project.package_manager.manager,
+    )
+    .into_iter()
+    .filter(|check| workflow.includes(check.name))
+    .collect();
 
     if checks.is_empty() {
         println!(

@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 
 use crate::manifest::Manifest;
 
-/// A workspace member with scripts.
+/// A workspace member.
 #[derive(Debug, Clone)]
 pub struct Member {
     /// The package's `name`, used to address it when running a script.
@@ -22,11 +22,28 @@ pub struct Member {
     pub manifest: Manifest,
 }
 
-/// Finds the members of the workspace rooted at `dir`.
+/// Finds the members of the workspace rooted at `dir` that have something to
+/// run.
 ///
 /// Returns an empty list for a project that declares no workspace, so the
 /// caller needs no special case for the ordinary single-package repository.
+/// A member without scripts has nothing to offer a menu, so it is left out
+/// here — [`all`] answers the question for callers that need every member
+/// regardless, such as health, clean and security, which look inside a
+/// member's directory rather than at its scripts.
 pub fn members(dir: &Path, manifest: &Manifest) -> Vec<Member> {
+    all(dir, manifest)
+        .into_iter()
+        .filter(|member| !member.manifest.scripts.is_empty())
+        .collect()
+}
+
+/// Finds every member of the workspace rooted at `dir`, whether or not it
+/// declares scripts.
+///
+/// Returns an empty list for a project that declares no workspace, so the
+/// caller needs no special case for the ordinary single-package repository.
+pub fn all(dir: &Path, manifest: &Manifest) -> Vec<Member> {
     let (includes, excludes) = patterns(dir, manifest);
     if includes.is_empty() {
         return Vec::new();
@@ -43,10 +60,6 @@ pub fn members(dir: &Path, manifest: &Manifest) -> Vec<Member> {
         .filter(|path| !matches_any(dir, path, &excludes))
         .filter_map(|path| {
             let manifest = Manifest::load(&path).ok()?;
-            // A member without scripts has nothing to offer a menu.
-            if manifest.scripts.is_empty() {
-                return None;
-            }
             let name = manifest.name.clone().or_else(|| {
                 path.file_name()
                     .map(|name| name.to_string_lossy().into_owned())
@@ -69,8 +82,8 @@ pub fn members(dir: &Path, manifest: &Manifest) -> Vec<Member> {
 ///
 /// Deliberately not "does [`members`] return anything": that drops members
 /// without scripts, because a package with none has nothing to show in the
-/// list. It still has dependencies, so a caller asking about those has to ask
-/// a different question.
+/// list. [`all`] is the answer for a caller that needs those too; this is for
+/// a caller that only needs to know whether a workspace exists at all.
 pub fn declared(dir: &Path, manifest: &Manifest) -> bool {
     !patterns(dir, manifest).0.is_empty()
 }
@@ -340,6 +353,33 @@ mod tests {
             ["blog"],
             "a member with nothing to run is noise"
         );
+    }
+
+    #[test]
+    fn all_keeps_members_without_scripts_that_members_leaves_out() {
+        // Health and clean look inside a member's directory, not at its
+        // scripts — a library with none still has a `tsconfig.json` to lint
+        // and a `dist/` to clean, so it must not vanish here the way it does
+        // from the menu.
+        let dir = tempfile::tempdir().expect("temp dir");
+        for (path, contents) in [
+            ("package.json", r#"{"name":"root","workspaces":["apps/*"]}"#),
+            (
+                "apps/blog/package.json",
+                r#"{"name":"blog","scripts":{"dev":"x"}}"#,
+            ),
+            ("apps/types/package.json", r#"{"name":"types"}"#),
+        ] {
+            let full = dir.path().join(path);
+            if let Some(parent) = full.parent() {
+                fs::create_dir_all(parent).expect("mkdir");
+            }
+            fs::write(full, contents).expect("write");
+        }
+        let manifest = Manifest::load(dir.path()).expect("root manifest");
+
+        assert_eq!(names(&members(dir.path(), &manifest)), ["blog"]);
+        assert_eq!(names(&all(dir.path(), &manifest)), ["blog", "types"]);
     }
 
     #[test]

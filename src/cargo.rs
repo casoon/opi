@@ -117,6 +117,14 @@ pub struct Command {
 /// Taken from what these projects actually run in CI rather than from the
 /// cargo book: `fmt --check`, `clippy` with warnings denied, `test` with all
 /// features.
+///
+/// `--workspace` (and `fmt`'s `--all`) is on every one of these except `run`
+/// and `doc`. Without it, a workspace that also declares a root `[package]`
+/// builds, checks, tests and lints only that root package — cargo's own
+/// default for that shape, not `opi`'s. A purely virtual workspace already
+/// covers every member either way, so the flag costs nothing there. `run`
+/// stays out because it starts wherever the caller stands, on purpose — see
+/// `run::execute`.
 pub fn commands(project: &Project) -> Vec<&'static Command> {
     const ALL: &[Command] = &[
         Command {
@@ -127,19 +135,19 @@ pub fn commands(project: &Project) -> Vec<&'static Command> {
         },
         Command {
             name: "build",
-            args: &["build", "--release"],
+            args: &["build", "--release", "--workspace"],
             description: "Build in release mode",
             group: "Build",
         },
         Command {
             name: "check",
-            args: &["check", "--all-targets"],
+            args: &["check", "--all-targets", "--workspace"],
             description: "Type-check without building",
             group: "Build",
         },
         Command {
             name: "test",
-            args: &["test", "--all-features"],
+            args: &["test", "--all-features", "--workspace"],
             description: "Run the test suite",
             group: "Quality",
         },
@@ -149,6 +157,7 @@ pub fn commands(project: &Project) -> Vec<&'static Command> {
                 "clippy",
                 "--all-targets",
                 "--all-features",
+                "--workspace",
                 "--",
                 "-D",
                 "warnings",
@@ -158,7 +167,7 @@ pub fn commands(project: &Project) -> Vec<&'static Command> {
         },
         Command {
             name: "fmt",
-            args: &["fmt"],
+            args: &["fmt", "--all"],
             description: "Format the source",
             group: "Quality",
         },
@@ -213,14 +222,21 @@ fn lists(path: &OsStr, name: &str) -> bool {
 ///
 /// The lint matters because rustdoc renders a doc comment as HTML: a bare
 /// `<iframe>` in a comment becomes an element, and the page can end there.
+///
+/// `Format`, `Lint` and `Tests` carry `--all`/`--workspace` for the same
+/// reason `cargo::commands` does: a workspace with a root `[package]`
+/// otherwise checks only that package. `Docs` stays without it — `rustdoc`
+/// documents one target, not a workspace, and `--workspace` is not its flag
+/// to take.
 pub const CHECKS: &[(&str, &[&str])] = &[
-    ("Format", &["fmt", "--check"]),
+    ("Format", &["fmt", "--check", "--all"]),
     (
         "Lint",
         &[
             "clippy",
             "--all-targets",
             "--all-features",
+            "--workspace",
             "--",
             "-D",
             "warnings",
@@ -230,7 +246,7 @@ pub const CHECKS: &[(&str, &[&str])] = &[
         "Docs",
         &["rustdoc", "--all-features", "--", "-D", "warnings"],
     ),
-    ("Tests", &["test", "--all-features"]),
+    ("Tests", &["test", "--all-features", "--workspace"]),
 ];
 
 /// The checks a Rust project answers only where the subcommand is installed,
@@ -279,6 +295,66 @@ mod tests {
         let dir = tempfile::tempdir().expect("temp dir");
         let toml = "[workspace]\nmembers = [\"a\"]\n\n[package]\nname = \"root\"\n";
         assert_eq!(project(toml, dir.path()).name.as_deref(), Some("root"));
+    }
+
+    /// Standing inside one member of a non-virtual workspace (one with its
+    /// own root `[package]`) and running `check`, `test`, `clippy` or `build`
+    /// must cover every member, not just the one the caller happens to be
+    /// in — `cargo`'s own default without `--workspace` is the root package
+    /// alone. `run` and `doc` are deliberately left out: `run` starts
+    /// wherever the caller stands, and `doc` documents one target.
+    #[test]
+    fn projectwide_commands_carry_workspace_flags() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        std::fs::create_dir(dir.path().join("src")).expect("mkdir");
+        std::fs::write(dir.path().join("src/main.rs"), "fn main() {}").expect("write");
+        let found = project("[package]\nname = \"app\"\n", dir.path());
+
+        for name in ["build", "check", "test", "clippy"] {
+            let command = commands(&found)
+                .into_iter()
+                .find(|command| command.name == name)
+                .unwrap_or_else(|| panic!("{name} is offered"));
+            assert!(
+                command.args.contains(&"--workspace"),
+                "{name} is missing --workspace: {:?}",
+                command.args
+            );
+        }
+
+        let fmt = commands(&found)
+            .into_iter()
+            .find(|command| command.name == "fmt")
+            .expect("fmt is offered");
+        assert!(fmt.args.contains(&"--all"), "fmt is missing --all");
+
+        for name in ["run", "doc"] {
+            let command = commands(&found)
+                .into_iter()
+                .find(|command| command.name == name)
+                .unwrap_or_else(|| panic!("{name} is offered"));
+            assert!(
+                !command.args.contains(&"--workspace"),
+                "{name} should not carry --workspace"
+            );
+        }
+    }
+
+    #[test]
+    fn health_checks_carry_workspace_flags() {
+        for (name, args) in CHECKS {
+            match *name {
+                "Format" => assert!(args.contains(&"--all"), "Format is missing --all"),
+                "Docs" => assert!(
+                    !args.contains(&"--workspace"),
+                    "Docs documents one target, not a workspace"
+                ),
+                _ => assert!(
+                    args.contains(&"--workspace"),
+                    "{name} is missing --workspace: {args:?}"
+                ),
+            }
+        }
     }
 
     #[test]
