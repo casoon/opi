@@ -259,6 +259,12 @@ binary.
 
 ## Documentation
 
+**[casoon.github.io/opi](https://casoon.github.io/opi/)** — installation, a
+guide per area, the command line reference and the changelog, with the terminal
+output captured from the binary.
+
+The files below are the same documentation as it sits in the repository:
+
 - [docs/project-state.md](docs/project-state.md) — what this is and where it stands
 - [docs/architecture.md](docs/architecture.md) — the modules and how they fit
 - [docs/constraints.md](docs/constraints.md) — the boundaries the implementation respects
