@@ -1,0 +1,5 @@
+{
+  "name": "@casoon/docs",
+  "scripts": { "dev": "astro dev", "build": "astro build", "search:index": "pagefind --site dist" },
+  "scripts-info": { "search:index": "Rebuild the Pagefind search index" }
+}

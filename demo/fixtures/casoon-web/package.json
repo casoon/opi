@@ -1,0 +1,55 @@
+{
+  "name": "casoon-web",
+  "private": true,
+  "packageManager": "pnpm@10.4.1",
+  "scripts": {
+    "dev": "./bin/dev.sh",
+    "dev:docs": "pnpm --filter docs dev",
+    "dev:api": "wrangler dev",
+    "build": "pnpm -r build",
+    "build:docs": "pnpm --filter docs build",
+    "build:api": "wrangler build",
+    "preview": "astro preview",
+    "check": "biome check .",
+    "check:fix": "biome check --write .",
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "typecheck": "astro check",
+    "content:sync": "tsx scripts/sync-content.ts",
+    "content:validate": "tsx scripts/validate-content.ts",
+    "deploy": "wrangler deploy",
+    "deploy:staging": "wrangler deploy --env staging",
+    "setup": "pnpm install && lefthook install",
+    "clean": "rimraf dist .astro"
+  },
+  "scripts-info": {
+    "dev": "Start the site in development mode",
+    "dev:docs": "Start the documentation site",
+    "dev:api": "Run the API worker locally",
+    "build": "Build every package for production",
+    "build:docs": "Build the documentation site",
+    "build:api": "Build the API worker",
+    "preview": "Serve the production build locally",
+    "check": "Lint and format with Biome",
+    "check:fix": "Fix lint and format findings",
+    "test": "Run the unit tests",
+    "test:e2e": "Run the Playwright end-to-end suite",
+    "typecheck": "Type-check every package",
+    "content:sync": "Pull content from the CMS",
+    "content:validate": "Validate frontmatter against the schema",
+    "deploy": "Deploy to production",
+    "deploy:staging": "Deploy to the staging environment",
+    "setup": "Install dependencies and prepare git hooks",
+    "clean": "Remove build output"
+  },
+  "opi": {
+    "scripts": {
+      "deploy": {
+        "confirm": true
+      },
+      "deploy:staging": {
+        "confirm": true
+      }
+    }
+  }
+}

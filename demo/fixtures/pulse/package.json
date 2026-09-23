@@ -1,0 +1,16 @@
+{
+  "name": "pulse-dashboard",
+  "private": true,
+  "scripts": {
+    "dev": "./bin/dev.sh",
+    "build": "vite build",
+    "check": "biome check .",
+    "test": "vitest run"
+  },
+  "scripts-info": {
+    "dev": "Start the dashboard in development mode",
+    "build": "Bundle the dashboard for production",
+    "check": "Lint and format with Biome",
+    "test": "Run the dashboard unit tests"
+  }
+}

@@ -1,0 +1,5 @@
+{
+  "name": "@casoon/ui",
+  "scripts": { "build": "tsup", "storybook": "storybook dev -p 6006", "tokens": "style-dictionary build" },
+  "scripts-info": { "storybook": "Browse the component library", "tokens": "Regenerate the design tokens" }
+}

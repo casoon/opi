@@ -1,0 +1,12 @@
+{
+  "name": "@casoon/api",
+  "scripts": {
+    "dev": "wrangler dev",
+    "db:migrate": "../bin/migrate.sh",
+    "db:studio": "drizzle-kit studio"
+  },
+  "scripts-info": {
+    "db:migrate": "Apply pending database migrations",
+    "db:studio": "Open the database browser"
+  }
+}
