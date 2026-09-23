@@ -112,12 +112,11 @@ Build
 ```
 
 Every area follows: `cargo fmt --check`, `cargo clippy`, `cargo rustdoc` and
-`cargo test` run
-alongside the npm checks, `cargo audit` and `cargo outdated` answer for the
-crates where they are installed, and `target/` is listed with the build
-artefacts. A repository carrying both manifests gets a section each rather than
-one merged list — `Dependencies` and `Dependencies (rust)` — because "safe to
-take" orders within an ecosystem and not across two.
+`cargo test` run alongside the npm checks, `cargo audit` and `cargo outdated`
+answer for the crates where they are installed, and `target/` is listed with
+the build artefacts. A repository carrying both manifests gets a section each
+rather than one merged list — `Dependencies` and `Dependencies (rust)` —
+because "safe to take" orders within an ecosystem and not across two.
 
 Both are external cargo subcommands rather than part of the toolchain, so
 where one is missing `opi` says so along with the `cargo install` that adds
