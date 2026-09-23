@@ -111,7 +111,8 @@ Build
   cargo check   Type-check without building
 ```
 
-Every area follows: `cargo fmt --check`, `cargo clippy` and `cargo test` run
+Every area follows: `cargo fmt --check`, `cargo clippy`, `cargo rustdoc` and
+`cargo test` run
 alongside the npm checks, `cargo audit` and `cargo outdated` answer for the
 crates where they are installed, and `target/` is listed with the build
 artefacts. A repository carrying both manifests gets a section each rather than
