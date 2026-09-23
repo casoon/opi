@@ -202,7 +202,17 @@ fn lists(path: &OsStr, name: &str) -> bool {
 
 /// The checks a Rust project answers, as `(name, tool args)`.
 ///
-/// These are the same three every one of these repositories runs in CI.
+/// These are the same four every one of these repositories runs in CI.
+///
+/// `Docs` is `rustdoc` rather than `doc` because the lint level has to reach
+/// the crate being documented and nothing else. `cargo doc` would take it
+/// through `RUSTDOCFLAGS`, an environment variable this list cannot carry;
+/// `cargo rustdoc` passes it as an argument, which is the shape every other
+/// check here already has. It documents the library target where there is one
+/// — the same target a registry publishes — and the binary otherwise.
+///
+/// The lint matters because rustdoc renders a doc comment as HTML: a bare
+/// `<iframe>` in a comment becomes an element, and the page can end there.
 pub const CHECKS: &[(&str, &[&str])] = &[
     ("Format", &["fmt", "--check"]),
     (
@@ -215,6 +225,10 @@ pub const CHECKS: &[(&str, &[&str])] = &[
             "-D",
             "warnings",
         ],
+    ),
+    (
+        "Docs",
+        &["rustdoc", "--all-features", "--", "-D", "warnings"],
     ),
     ("Tests", &["test", "--all-features"]),
 ];
