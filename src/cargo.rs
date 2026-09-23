@@ -233,6 +233,21 @@ pub const CHECKS: &[(&str, &[&str])] = &[
     ("Tests", &["test", "--all-features"]),
 ];
 
+/// The checks a Rust project answers only where the subcommand is installed,
+/// as `(name, subcommand, tool args)`.
+///
+/// `cargo docs-rs` builds the documentation the way docs.rs will: the features,
+/// targets and rustdoc arguments out of `[package.metadata.docs.rs]` rather
+/// than the ones a local `cargo doc` would pick. That metadata is what decides
+/// how the published documentation looks, and nothing else in this list reads
+/// it — `Docs` above answers whether the crate documents cleanly, this answers
+/// whether the registry will render what the author meant.
+///
+/// Optional like `cargo audit` and `cargo outdated`: it ships as a separate
+/// binary, and an absent one is a check that does not exist rather than one
+/// that failed.
+pub const OPTIONAL_CHECKS: &[(&str, &str, &[&str])] = &[("docs.rs", "docs-rs", &["docs-rs"])];
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -438,6 +453,20 @@ mod tests {
     #[test]
     fn an_empty_path_finds_nothing() {
         assert!(!lists(OsStr::new(""), "audit"));
+    }
+
+    /// The subcommand decides whether the check is offered, the args decide
+    /// what runs. Where they disagree, `opi` would look for one binary and
+    /// call another.
+    #[test]
+    fn an_optional_check_calls_the_subcommand_it_is_gated_on() {
+        for (name, subcommand, args) in OPTIONAL_CHECKS {
+            assert_eq!(
+                args.first(),
+                Some(subcommand),
+                "{name} is gated on cargo-{subcommand}"
+            );
+        }
     }
 
     #[test]
