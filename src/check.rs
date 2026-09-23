@@ -214,16 +214,27 @@ impl Check {
     /// repositories carrying both manifests, "Tests" would otherwise mean two
     /// different things on two lines.
     fn cargo(root: &Path) -> Vec<Self> {
+        let build = |name: &'static str, args: Vec<&'static str>| Self {
+            name,
+            tool: "cargo",
+            scope: Some("rust".to_owned()),
+            program: PathBuf::from("cargo"),
+            args,
+            dir: root.to_path_buf(),
+        };
+
         crate::cargo::CHECKS
             .iter()
-            .map(|(name, args)| Self {
-                name,
-                tool: "cargo",
-                scope: Some("rust".to_owned()),
-                program: PathBuf::from("cargo"),
-                args: args.to_vec(),
-                dir: root.to_path_buf(),
-            })
+            .map(|(name, args)| build(name, args.to_vec()))
+            // The optional ones are separate binaries, so they are offered
+            // where they are installed and absent otherwise — the shape
+            // `cargo audit` and `cargo outdated` already have.
+            .chain(
+                crate::cargo::OPTIONAL_CHECKS
+                    .iter()
+                    .filter(|(_, subcommand, _)| crate::cargo::has_subcommand(subcommand))
+                    .map(|(name, _, args)| build(name, args.to_vec())),
+            )
             .collect()
     }
 

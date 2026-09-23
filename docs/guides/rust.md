@@ -47,10 +47,15 @@ H Health   C Clean   S Security   U Updates
 - [Health](../health/) runs `cargo fmt --check`, `cargo clippy`, `cargo rustdoc` and
   `cargo test` alongside the npm checks. `rustdoc` is there because a doc comment is
   rendered as HTML: a bare `<iframe>` in one becomes an element, and the page can end
-  there.
+  there. Where `cargo docs-rs` is installed, a fifth check builds the documentation the
+  way docs.rs will — with the features, targets and rustdoc arguments out of
+  `[package.metadata.docs.rs]`, which is what decides how the published pages look.
 - [Security](../security/) and [Updates](../updates/) answer for the crates through
   `cargo audit` and `cargo outdated`, where they are installed.
 - [Clean](../clean/) lists `target/` with the build artefacts.
+
+`cargo docs-rs` is external too, but as a check it is simply absent where it is not
+installed: a health run lists what answered, not what could have.
 
 Both `cargo audit` and `cargo outdated` are external subcommands, not part of the toolchain.
 Where one is missing, `opi` says so along with the `cargo install` that adds it, instead of

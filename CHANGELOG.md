@@ -6,6 +6,21 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- An optional fifth Cargo check, `docs.rs`: `cargo docs-rs`, where the
+  subcommand is installed.
+
+  The `Docs` check added in 0.9.0 asks whether a crate documents cleanly. This
+  asks a different question: whether the *registry* will render what the author
+  meant. `cargo docs-rs` builds with the features, targets and rustdoc
+  arguments out of `[package.metadata.docs.rs]` rather than the ones a local
+  `cargo doc` picks, and that metadata is what decides how the published pages
+  look. Nothing else in the check list reads it.
+
+  Optional like `cargo audit` and `cargo outdated` — a separate binary, so an
+  absent one is a check that does not exist rather than one that failed.
+
 ## [0.9.0] - 2026-09-23
 
 ### Added
