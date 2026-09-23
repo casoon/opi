@@ -70,6 +70,8 @@ hotkey instead.
 
 ## Crate
 
-`opi` is a binary crate without a library API, so there is no API reference on docs.rs. The
+`opi` is a binary crate without a library API, so there is no API reference on docs.rs — its
+build there fails with `no library targets found`, which is what every binary-only crate gets and
+no metadata can change. The manifest's `documentation` field therefore points at this site. The
 package is on [crates.io/crates/opi](https://crates.io/crates/opi); the internals are described in
 [Architecture](../../architecture/).

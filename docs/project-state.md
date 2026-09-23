@@ -81,3 +81,8 @@ gets a usable list, which is the point of the whole arrangement.
 
 The working backlog lives in the gitignored `plan/` directory, which is not
 part of this documentation and not published with the crate.
+
+`demo/` is part of the repository but not of the crate: it holds fixture
+projects and the scripted scenes the README's recordings are made from, and is
+excluded from the tarball together with `assets/`. Nothing in it is reachable
+from the binary.

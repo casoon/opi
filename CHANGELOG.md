@@ -21,6 +21,16 @@ All notable changes to this project are documented here. The format follows
   Optional like `cargo audit` and `cargo outdated` — a separate binary, so an
   absent one is a check that does not exist rather than one that failed.
 
+### Changed
+
+- The manifest's `documentation` field points at
+  [casoon.github.io/opi](https://casoon.github.io/opi/) instead of docs.rs.
+
+  docs.rs runs `cargo rustdoc --lib` and `opi` is a binary crate, so the build
+  fails there with `no library targets found` — as it does for every
+  binary-only crate, and no metadata changes that. The link on crates.io led
+  to an error page; it now leads to the documentation.
+
 ## [0.9.0] - 2026-09-23
 
 ### Added

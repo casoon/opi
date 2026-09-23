@@ -270,6 +270,10 @@ The files below are the same documentation as it sits in the repository:
 - [docs/conventions.md](docs/conventions.md) — the rules future changes follow
 - [docs/decisions.md](docs/decisions.md) — the decisions in force, and why
 
+[demo/](demo/) holds the fixtures and the scripted scenes the recordings are
+made from, and says what has to be true for a recording to show `opi` rather
+than the repository it was recorded in.
+
 Terminal presentation comes from [runemark](https://github.com/casoon/runemark),
 the shared presentation layer for these CLI tools.
 
