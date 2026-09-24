@@ -1,10 +1,10 @@
 //! Dependency vulnerabilities.
 //!
 //! Unlike the checks in [`crate::check`], this one is parsed rather than
-//! relayed: `npm` and `pnpm` both emit a documented JSON shape, and a tree of
-//! six hundred dependencies produces far too much prose to read. What matters
-//! is how many findings there are, how bad they are, and which package to
-//! update.
+//! relayed: npm, pnpm, bun and yarn each emit a documented JSON shape — three
+//! different ones between them — and a tree of six hundred dependencies
+//! produces far too much prose to read. What matters is how many findings
+//! there are, how bad they are, and which package to update.
 //!
 //! Two sources, kept apart. `run` asks the package manager, `cargo` asks
 //! `cargo audit`, and they produce different types on purpose: a RustSec
@@ -98,8 +98,6 @@ pub enum AuditError {
     /// is the ordinary case rather than a broken setup — and an empty section
     /// would read like "no findings", which is the one thing it must not say.
     NotInstalled,
-    /// The package manager has no audit `opi` knows how to read.
-    Unsupported(PackageManager),
     Failed(String),
 }
 
@@ -108,9 +106,6 @@ impl std::fmt::Display for AuditError {
         match self {
             Self::NotInstalled => {
                 f.write_str("cargo audit is not installed; cargo install cargo-audit adds it")
-            }
-            Self::Unsupported(manager) => {
-                write!(f, "opi cannot read {manager}'s audit output")
             }
             Self::Failed(reason) => f.write_str(reason),
         }
@@ -166,16 +161,44 @@ struct BunAdvisory {
     severity: String,
 }
 
+/// One line of `yarn npm audit --json`.
+///
+/// Measured against yarn 4.18.0: newline-separated JSON, one object per
+/// advisory, in a shape of its own rather than npm's — `value` names the
+/// package, `children` carries the rest under capitalised keys:
+///
+/// ```json
+/// {"value":"lodash","children":{"ID":1106913,"Severity":"high",
+///  "Vulnerable Versions":"<4.17.21","Dependents":["app@workspace:."]}}
+/// ```
+///
+/// As with bun, no patched range is reported — only how far back the
+/// vulnerability reaches — so [`Advisory::patched`] stays empty here too.
+#[derive(Debug, Deserialize)]
+struct YarnAdvisory {
+    value: String,
+    children: YarnChildren,
+}
+
+#[derive(Debug, Deserialize)]
+struct YarnChildren {
+    #[serde(rename = "Severity", default)]
+    severity: String,
+}
+
 /// Runs the package manager's audit and reads what it found.
 pub fn run(manager: PackageManager, root: &Path) -> Result<Audit, AuditError> {
-    // yarn reports in a shape of its own, and claiming to audit it and then
-    // showing nothing would be worse than saying so.
+    let mut command = Command::new(manager.program());
+    // Yarn's audit lives under its `npm` namespace, not as a bare subcommand,
+    // and needs telling to cover every workspace and every transitive
+    // dependency — the other managers do both without being asked.
     if matches!(manager, PackageManager::Yarn) {
-        return Err(AuditError::Unsupported(manager));
+        command.args(["npm", "audit", "--all", "--recursive", "--json"]);
+    } else {
+        command.args(["audit", "--json"]);
     }
 
-    let output = Command::new(manager.program())
-        .args(["audit", "--json"])
+    let output = command
         .current_dir(root)
         .output()
         .map_err(|error| AuditError::Failed(format!("could not run {manager}: {error}")))?;
@@ -184,27 +207,33 @@ pub fn run(manager: PackageManager, root: &Path) -> Result<Audit, AuditError> {
     // either way.
     let text = String::from_utf8_lossy(&output.stdout);
 
-    // A clean run always prints at least an empty report — `{}` for bun, a
-    // full object with zero counts for npm and pnpm (see the tests below).
-    // Stdout empty here means the manager could not produce one at all — a
-    // network error or a broken lockfile, explained on stderr instead — and
-    // reading that silence as "no findings" would be the false acquittal
-    // this project's own principle warns against. The same shape `cargo
-    // audit` handles below.
     if text.trim().is_empty() {
+        // Yarn prints one line per advisory (see `read_yarn`) and nothing at
+        // all when there are none, so silence on both streams is its clean
+        // case — the same distinction `outdated::run` makes for npm and
+        // pnpm. Every other manager here always prints at least an empty
+        // report on a clean run — `{}` for bun, a full object with zero
+        // counts for npm and pnpm (see the tests below) — so for them stdout
+        // alone being empty already means the run did not really finish; a
+        // network error or a broken lockfile explains itself on stderr
+        // instead, the same shape `cargo audit` handles below.
+        let silent = String::from_utf8_lossy(&output.stderr).trim().is_empty();
+        if matches!(manager, PackageManager::Yarn) && silent {
+            return Ok(Audit::default());
+        }
         return Err(AuditError::Failed(format!(
             "{manager} audit: {}",
             stderr_reason(&output.stderr)
         )));
     }
 
-    // The two shapes are told apart once, here, by which manager was asked —
-    // not by trying one parser and falling back to the other, which would turn
-    // a malformed report into a confusing error about the wrong format.
-    let mut advisories = if matches!(manager, PackageManager::Bun) {
-        read_bun(&text)
-    } else {
-        read_npm(&text)
+    // The shapes are told apart once, here, by which manager was asked — not
+    // by trying one parser and falling back to another, which would turn a
+    // malformed report into a confusing error about the wrong format.
+    let mut advisories = match manager {
+        PackageManager::Bun => read_bun(&text),
+        PackageManager::Yarn => read_yarn(&text),
+        PackageManager::Npm | PackageManager::Pnpm => read_npm(&text),
     }
     .map_err(|error| {
         AuditError::Failed(format!("could not read {manager}'s audit output: {error}"))
@@ -278,6 +307,31 @@ fn read_bun(text: &str) -> Result<Vec<Advisory>, serde_json::Error> {
                     severity: Severity::parse(&raw.severity)?,
                     patched: None,
                 })
+            })
+        })
+        .collect())
+}
+
+/// Reads yarn's shape: one JSON object per line, not a single document.
+///
+/// A malformed line is a malformed report, not one advisory among many —
+/// the same reasoning `read_npm` and `read_bun` already apply, unlike
+/// `outdated::read_cargo`'s per-member lines, where one crate failing to
+/// serialise must not cost the others.
+fn read_yarn(text: &str) -> Result<Vec<Advisory>, serde_json::Error> {
+    let lines: Vec<YarnAdvisory> = text
+        .lines()
+        .filter(|line| !line.trim().is_empty())
+        .map(serde_json::from_str)
+        .collect::<Result<_, _>>()?;
+
+    Ok(lines
+        .into_iter()
+        .filter_map(|raw| {
+            Some(Advisory {
+                module: raw.value,
+                severity: Severity::parse(&raw.children.severity)?,
+                patched: None,
             })
         })
         .collect())
@@ -593,6 +647,59 @@ mod tests {
     #[test]
     fn a_clean_bun_audit_reports_nothing() {
         assert!(parse_bun("{}").is_empty());
+    }
+
+    /// Two lines from a real `yarn npm audit --all --recursive --json` run
+    /// (yarn 4.18.0) against lodash@4.17.20, reformatted from its actual
+    /// single-line-per-advisory shape for readability here.
+    const YARN: &str = concat!(
+        r#"{"value":"lodash","children":{"ID":1106913,"Severity":"high","#,
+        r#""Vulnerable Versions":"<4.17.21","Dependents":["app@workspace:."]}}"#,
+        "\n",
+        r#"{"value":"minimist","children":{"ID":1097678,"Severity":"critical","#,
+        r#""Vulnerable Versions":"<0.2.1","Dependents":["app@workspace:."]}}"#,
+    );
+
+    fn parse_yarn(text: &str) -> Vec<Advisory> {
+        read_yarn(text).expect("parse")
+    }
+
+    #[test]
+    fn the_yarn_shape_is_read() {
+        let found = parse_yarn(YARN);
+        assert_eq!(found.len(), 2);
+        assert!(
+            found
+                .iter()
+                .any(|a| a.module == "lodash" && a.severity == Severity::High)
+        );
+        assert!(
+            found
+                .iter()
+                .any(|a| a.module == "minimist" && a.severity == Severity::Critical)
+        );
+    }
+
+    #[test]
+    fn yarn_names_no_patched_range_so_none_is_shown() {
+        // Like bun, it reports how far back a vulnerability reaches and
+        // nothing else — no version that has to be right to guess at.
+        assert!(parse_yarn(YARN).iter().all(|a| a.patched.is_none()));
+    }
+
+    #[test]
+    fn a_clean_yarn_audit_reports_nothing() {
+        // Yarn prints one line per advisory and nothing at all when there
+        // are none — unlike bun's `{}`, this is genuinely empty text.
+        assert!(parse_yarn("").is_empty());
+    }
+
+    #[test]
+    fn a_malformed_yarn_line_is_a_malformed_report() {
+        // Unlike `outdated::read_cargo`'s per-member lines, one bad line here
+        // is not "the other advisories are still fine" — the same strictness
+        // `read_npm` and `read_bun` already apply to their own shapes.
+        assert!(read_yarn("not json").is_err());
     }
 
     #[test]

@@ -32,8 +32,8 @@ what it always ran. A line under the heading counts what was found.
 
 Every area now answers for both ecosystems where both are present, in a section
 each: `cargo audit` and `cargo outdated` beside the package manager's own.
-Three of the four package managers are audited — bun has its own shape, yarn's
-is read by nothing here. `--updates` can also apply what it found by calling
+All four package managers are audited — npm and pnpm share a format, bun and
+yarn each have their own. `--updates` can also apply what it found by calling
 the package manager — the safe ones in one step, or each package ticked on its
 own where a major is worth taking — and runs the commit checks on the result.
 

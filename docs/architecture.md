@@ -228,17 +228,24 @@ because a blank dependency list reads like "no findings". `OutdatedError` carrie
 a `NoManifest` for that; `AuditError` no longer needs one, since Rust now has an
 audit of its own.
 
-**Three of the four package managers are audited, in two shapes.** npm and pnpm
-share npm's v6 format; bun has its own, measured against 1.3.3: a map from
-package name to a **list** of advisories, which npm's object of one each cannot
-express. The two are told apart once, by which manager was asked, rather than
-by trying one parser and falling back — a malformed report would otherwise
-produce a confusing error about the wrong format. yarn keeps the `Unsupported`
-line.
+**All four package managers are audited, in three shapes.** npm and pnpm share
+npm's v6 format; bun has its own, measured against 1.3.3: a map from package
+name to a **list** of advisories, which npm's object of one each cannot
+express. yarn has a third, measured against 4.18.0: newline-separated JSON,
+one object per advisory, `value` naming the package and `children` carrying
+the rest under capitalised keys. The three are told apart once, by which
+manager was asked, rather than by trying one parser and falling back — a
+malformed report would otherwise produce a confusing error about the wrong
+format.
 
-bun names `vulnerable_versions` and never the patched range, so its findings
-carry no remedy. Deriving "update to 4.17.21" from `<4.17.21` would be
-inventing the one number that has to be right.
+bun and yarn each name only the vulnerable range and never a patched one, so
+their findings carry no remedy. Deriving "update to 4.17.21" from `<4.17.21`
+would be inventing the one number that has to be right.
+
+yarn's shape has one more difference: a clean run prints nothing at all,
+where the other three always print at least an empty report. So for yarn
+alone, empty stdout with nothing on stderr is the clean case rather than a
+failed one — the same distinction `--updates` already made for npm and pnpm.
 
 One package can now arrive with several advisories — lodash had five in the
 fixture — and they are condensed to one line per package and severity, which is

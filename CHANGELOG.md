@@ -8,6 +8,19 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- `opi --security` reads yarn's audit output. Measured against yarn 4.18.0:
+  `yarn npm audit --all --recursive --json` prints newline-separated JSON, one
+  object per advisory, in a shape of its own rather than npm's — a third shape
+  beside npm/pnpm's and bun's, told apart the same way those already are, by
+  which manager was asked. Like bun, it names only the vulnerable range, never
+  a patched one, so its findings carry no remedy. Unlike every other manager
+  here, a clean yarn audit prints nothing at all rather than an empty report,
+  so an empty result is read as clean only when stderr is empty too — the
+  same distinction `--updates` already made for npm and pnpm.
+
+  `opi --updates` still does not read yarn: Yarn Berry dropped the `outdated`
+  command entirely, so there is nothing there to parse.
+
 - An optional fifth Cargo check, `docs.rs`: `cargo docs-rs`, where the
   subcommand is installed.
 

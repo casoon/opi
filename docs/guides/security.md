@@ -15,7 +15,7 @@ Two questions, answered by tools the project already uses:
 - **Secrets** — the secret scanner the project depends on (nosecrets or secretlint). Where
   there is none, `opi` says so rather than reporting a clean result.
 - **Dependencies** — the package manager's audit, parsed from its JSON: `npm audit` and
-  `pnpm audit` share npm's format, bun has its own. yarn's output is not read.
+  `pnpm audit` share npm's format, bun and yarn each have their own.
 
 Run on `opi`'s own repository, which has no secret scanner and no `package.json`:
 
@@ -33,9 +33,9 @@ Nothing to act on.
 
 Advisories are condensed to one line per package and severity, which is what decides what to
 do about them — the severity counts are therefore counts of vulnerable dependencies, not of
-advisories. Where the advisory names a patched range, it becomes the remedy. bun names only
-the vulnerable range, so its findings carry no remedy: deriving one would be inventing the one
-number that has to be right.
+advisories. Where the advisory names a patched range, it becomes the remedy. bun and yarn name
+only the vulnerable range, so their findings carry no remedy: deriving one would be inventing
+the one number that has to be right.
 
 ## Rust
 
