@@ -249,6 +249,15 @@ pub const CHECKS: &[(&str, &[&str])] = &[
     ("Tests", &["test", "--all-features", "--workspace"]),
 ];
 
+/// Whether `Cargo.lock` still matches the manifests, as tool args.
+///
+/// `--locked` makes cargo refuse to touch the lockfile and fail where it
+/// would have to — measured to exit 101 on drift and to change nothing
+/// either way. `metadata` rather than `build`: it resolves the dependency
+/// graph, which is all the question needs, and builds nothing. It covers the
+/// whole workspace on its own.
+pub const LOCKFILE_CHECK: &[&str] = &["metadata", "--locked", "--format-version", "1"];
+
 /// The checks a Rust project answers only where the subcommand is installed,
 /// as `(name, subcommand, tool args)`.
 ///

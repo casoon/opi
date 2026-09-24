@@ -8,6 +8,21 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- A **Lockfile** check in `opi --health` and both workflows: whether the
+  lockfile still matches `package.json` (and `Cargo.lock` the manifests),
+  asked of the package manager that wrote it — `pnpm install --frozen-lockfile
+  --lockfile-only --offline`, `npm ci --dry-run`, `bun install
+  --frozen-lockfile --dry-run`, `cargo metadata --locked`. Each was measured to
+  change nothing and to fail only on drift. yarn gets none; its only strict
+  form is a full install.
+
+  Measured across the repositories here, 72 of 104 pnpm lockfiles, 5 of 23 npm
+  and 2 of 49 Cargo ones were out of step — a dependency added to the manifest
+  and never locked, which stops every CI that installs with a frozen lockfile.
+  The other prerequisites considered — a pinned `packageManager` version,
+  `engines.node`, `rust-toolchain.toml` — never disagreed with what ran and are
+  not checked.
+
 - `opi --updates` offers bun projects **Choose in bun's own list**, which hands
   over to `bun update --interactive` and runs the commit checks afterwards.
 

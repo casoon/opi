@@ -28,11 +28,17 @@ Run on `opi`'s own repository:
 ```
 opi  before commit
 
-✓ Format (rust)  cargo
-✓ Lint (rust)    cargo
+✓ Lockfile (rust)  cargo
+✓ Docs (rust)      cargo
+✓ Format (rust)    cargo
+✓ Lint (rust)      cargo
 
 Ready to commit.
 ```
+
+The lockfile check belongs in `commit` on purpose: a dependency added to `package.json` and
+never locked is exactly what a commit should not carry, and the check is offline and takes
+well under a second.
 
 A workflow exits non-zero when it is not ready. It is a convenience before pushing, not a
 substitute for CI: what is binding stays in CI, where it cannot be skipped.

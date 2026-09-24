@@ -378,6 +378,29 @@ finds its binary in a `node_modules/.bin` at or above that package, runs it, and
 relays the result. Which tools to support was measured across 133 real projects
 rather than taken from the plan — Knip, prominent there, was present in one.
 
+yarn's Plug'n'Play linker writes no `node_modules`, so for yarn a tool not found
+on disk is started through `yarn run <tool>`, which resolves a dependency's
+binary the way a declared script would. Whether it is really installed cannot
+be answered from the filesystem there, so a missing one surfaces when the check
+runs — as the same "could not run" a missing binary produces elsewhere.
+
+**One project prerequisite is checked: the lockfile.** Of the five the plan
+listed, four were measured never to fire here — pnpm and rustup switch to the
+pinned version themselves, and every `engines.node` was a lower bound the
+installed Node cleared — while 72 of 104 pnpm lockfiles, 5 of 23 npm and 2 of
+49 Cargo ones were out of step with their manifest. Three more npm projects
+failed `npm ci` for other reasons — a `workspace:` protocol npm does not know,
+peer conflicts — which a CI would hit just the same; the check relays npm's
+own words, so they read as what they are. The package manager is
+asked with a command measured to change nothing and to fail only on drift:
+`pnpm install --frozen-lockfile --lockfile-only --offline`, `npm ci --dry-run`,
+`bun install --frozen-lockfile --dry-run`, `cargo metadata --locked`. `--offline`
+keeps pnpm's off the network without costing detection — a mismatched
+specifier is seen before anything is resolved. yarn has none: `yarn install
+--immutable` is a full install. The check needs the manager's own lockfile to
+be there; without it there is nothing to drift, and `npm ci` would fail for its
+absence instead.
+
 Checks run **per workspace member**, not only at the root, and in the member's
 own directory: a monorepo keeps TypeScript and its test runner in the packages,
 and pnpm does not hoist their binaries.

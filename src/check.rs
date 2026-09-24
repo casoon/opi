@@ -198,6 +198,7 @@ impl Check {
         manager: PackageManager,
     ) -> Vec<Self> {
         let mut checks = Self::detect_in(manifest, root, None, manager);
+        checks.extend(Self::lockfile(root, manager));
         for member in members {
             checks.extend(Self::detect_in(
                 &member.manifest,
@@ -227,9 +228,17 @@ impl Check {
             dir: root.to_path_buf(),
         };
 
+        // A library that commits no lockfile has none to be out of step with,
+        // and `--locked` would fail for want of one rather than for drift.
+        let lockfile = root
+            .join("Cargo.lock")
+            .exists()
+            .then(|| build("Lockfile", crate::cargo::LOCKFILE_CHECK.to_vec()));
+
         crate::cargo::CHECKS
             .iter()
             .map(|(name, args)| build(name, args.to_vec()))
+            .chain(lockfile)
             // The optional ones are separate binaries, so they are offered
             // where they are installed and absent otherwise — the shape
             // `cargo audit` and `cargo outdated` already have.
@@ -240,6 +249,51 @@ impl Check {
                     .map(|(name, _, args)| build(name, args.to_vec())),
             )
             .collect()
+    }
+
+    /// Whether the lockfile still matches `package.json`, asked of the package
+    /// manager that wrote it.
+    ///
+    /// The one project prerequisite worth a check. Measured across the
+    /// repositories here, a declared `packageManager` version, `engines.node`
+    /// and `rust-toolchain.toml` never disagreed with what ran — pnpm and
+    /// rustup switch versions themselves, and every `engines` range was a
+    /// lower bound the installed Node cleared — while 72 of 104 pnpm lockfiles
+    /// were out of step with their manifest: a dependency added to
+    /// `package.json` and never locked. Every CI that installs with a frozen
+    /// lockfile stops there.
+    ///
+    /// Each command was measured to change nothing and to exit non-zero only
+    /// on drift. pnpm's is `--offline` so the commit workflow never waits on
+    /// the registry; it spots a mismatched specifier before resolving
+    /// anything. yarn has no answer here: `yarn install --immutable` is a full
+    /// install, and a check that installs is not a check.
+    fn lockfile(root: &Path, manager: PackageManager) -> Option<Self> {
+        let args: &[&'static str] = match manager {
+            PackageManager::Pnpm => &[
+                "install",
+                "--frozen-lockfile",
+                "--lockfile-only",
+                "--ignore-scripts",
+                "--offline",
+            ],
+            PackageManager::Npm => &["ci", "--dry-run", "--ignore-scripts"],
+            PackageManager::Bun => &["install", "--frozen-lockfile", "--dry-run"],
+            PackageManager::Yarn => return None,
+        };
+        // Only the manager's own lockfile counts: without one there is
+        // nothing to be out of step, and `npm ci` would fail for its absence.
+        PackageManager::lockfiles_in(root)
+            .iter()
+            .any(|(_, found)| *found == manager)
+            .then(|| Self {
+                name: "Lockfile",
+                tool: manager.program(),
+                scope: None,
+                program: PathBuf::from(manager.program()),
+                args: args.to_vec(),
+                dir: root.to_path_buf(),
+            })
     }
 
     /// The checks that apply to one package, rooted at `dir`.
@@ -459,6 +513,65 @@ mod tests {
             .find(|check| check.name == "Lint")
             .expect("eslint check is offered under Yarn PnP");
         assert_eq!(lint.command_line(), "yarn run eslint .");
+    }
+
+    #[test]
+    fn a_lockfile_is_checked_by_the_manager_that_wrote_it() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        fs::write(dir.path().join("pnpm-lock.yaml"), "").expect("write");
+
+        let check = Check::lockfile(dir.path(), PackageManager::Pnpm).expect("checked");
+        assert_eq!(
+            check.command_line(),
+            "pnpm install --frozen-lockfile --lockfile-only --ignore-scripts --offline"
+        );
+    }
+
+    #[test]
+    fn no_lockfile_means_no_lockfile_check() {
+        // `npm ci` without a package-lock.json fails for its absence, which
+        // is not drift.
+        let dir = tempfile::tempdir().expect("temp dir");
+        assert!(Check::lockfile(dir.path(), PackageManager::Npm).is_none());
+    }
+
+    #[test]
+    fn another_managers_lockfile_is_not_this_ones() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        fs::write(dir.path().join("package-lock.json"), "{}").expect("write");
+        assert!(Check::lockfile(dir.path(), PackageManager::Pnpm).is_none());
+    }
+
+    #[test]
+    fn yarn_gets_no_lockfile_check() {
+        // Its only strict form is a full install, and a check that installs
+        // is not a check.
+        let dir = tempfile::tempdir().expect("temp dir");
+        fs::write(dir.path().join("yarn.lock"), "").expect("write");
+        assert!(Check::lockfile(dir.path(), PackageManager::Yarn).is_none());
+    }
+
+    #[test]
+    fn a_cargo_lockfile_is_checked_only_where_one_is_committed() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let named = |checks: Vec<Check>| checks.iter().any(|check| check.name == "Lockfile");
+
+        assert!(
+            !named(Check::cargo(dir.path())),
+            "a library without Cargo.lock"
+        );
+
+        fs::write(dir.path().join("Cargo.lock"), "").expect("write");
+        let checks = Check::cargo(dir.path());
+        let lockfile = checks
+            .iter()
+            .find(|check| check.name == "Lockfile")
+            .expect("checked");
+        assert_eq!(lockfile.label(), "Lockfile (rust)");
+        assert_eq!(
+            lockfile.command_line(),
+            "cargo metadata --locked --format-version 1"
+        );
     }
 
     #[test]

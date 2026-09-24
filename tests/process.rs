@@ -278,6 +278,55 @@ fn a_yarn_pnp_project_is_checked_through_yarn() {
     );
 }
 
+#[test]
+fn a_lockfile_out_of_step_with_its_manifest_fails_health() {
+    let fixture = Fixture::new();
+    fixture
+        .file("package.json", r#"{"name":"app","dependencies":{"ms":"2.1.3"}}"#)
+        .file("pnpm-lock.yaml", "")
+        .shim(
+            "pnpm",
+            "echo ' ERR_PNPM_OUTDATED_LOCKFILE  Cannot install with \"frozen-lockfile\" because pnpm-lock.yaml is not up to date with package.json' >&2\nexit 1",
+        );
+
+    let output = fixture.opi(".", &["--health"]);
+    let printed = stdout(&output);
+    assert_eq!(output.status.code(), Some(1), "{printed}");
+    assert!(printed.contains("Lockfile"), "{printed}");
+    assert!(printed.contains("ERR_PNPM_OUTDATED_LOCKFILE"), "{printed}");
+    assert_eq!(
+        fixture.calls("pnpm").expect("pnpm ran")[1..],
+        [
+            "install",
+            "--frozen-lockfile",
+            "--lockfile-only",
+            "--ignore-scripts",
+            "--offline"
+        ]
+    );
+}
+
+#[test]
+fn the_commit_workflow_asks_about_the_lockfile() {
+    // A dependency added to package.json and never locked is exactly what a
+    // commit should not carry, and the check is offline and fast enough to
+    // sit there.
+    let fixture = Fixture::new();
+    fixture
+        .file("package.json", r#"{"name":"app"}"#)
+        .file("package-lock.json", "{}")
+        .shim("npm", "exit 0");
+
+    let output = fixture.opi(".", &["--check", "commit"]);
+    let printed = stdout(&output);
+    assert!(output.status.success(), "{printed}");
+    assert!(printed.contains("Lockfile"), "{printed}");
+    assert_eq!(
+        fixture.calls("npm").expect("npm ran")[1..],
+        ["ci", "--dry-run", "--ignore-scripts"]
+    );
+}
+
 // --- Security ---
 
 #[test]
