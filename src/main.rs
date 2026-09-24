@@ -908,11 +908,14 @@ fn security(
 
                 print!("{}", report.render(console));
             }
-            Err(error) => println!(
-                "{} {}",
-                console.paint(Tone::Muted, "–"),
-                console.paint(Tone::Muted, format!("Dependencies — {error}"))
-            ),
+            Err(error) => {
+                clean &= !audit_failed(&error);
+                println!(
+                    "{} {}",
+                    console.paint(Tone::Muted, "–"),
+                    console.paint(Tone::Muted, format!("Dependencies — {error}"))
+                );
+            }
         }
     }
 
@@ -964,11 +967,14 @@ fn security(
 
                 print!("{}", report.render(console));
             }
-            Err(error) => println!(
-                "{} {}",
-                console.paint(Tone::Muted, "–"),
-                console.paint(Tone::Muted, format!("Dependencies (rust) — {error}"))
-            ),
+            Err(error) => {
+                clean &= !audit_failed(&error);
+                println!(
+                    "{} {}",
+                    console.paint(Tone::Muted, "–"),
+                    console.paint(Tone::Muted, format!("Dependencies (rust) — {error}"))
+                );
+            }
         }
     }
 
@@ -979,6 +985,17 @@ fn security(
     } else {
         ExitCode::FAILURE
     }
+}
+
+/// Whether an audit error leaves the question unanswered rather than
+/// answered "not here".
+///
+/// An audit that ran and failed has said nothing about the dependencies, so
+/// "Nothing to act on." would be a false acquittal. `cargo audit` not being
+/// installed is the ordinary case and is named with its remedy instead — the
+/// same split `--updates` makes.
+fn audit_failed(error: &audit::AuditError) -> bool {
+    matches!(error, audit::AuditError::Failed(_))
 }
 
 /// Runs a named workflow: the repository questions, then the checks.

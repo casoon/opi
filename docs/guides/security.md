@@ -47,4 +47,7 @@ The Rust advisory carries no severity in its JSON, and `opi` invents none. Every
 advisory therefore counts, and the next step points to `cargo audit`, where the severity is
 shown.
 
-`opi --security` exits non-zero when something needs acting on.
+`opi --security` exits non-zero when something needs acting on — including an audit that
+could not run, such as one stopped by a network error. That audit has said nothing about the
+dependencies, so it is not reported as clean. A missing `cargo audit` is named with its
+`cargo install` instead and does not fail the run.

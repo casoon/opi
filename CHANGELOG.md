@@ -54,6 +54,18 @@ All notable changes to this project are documented here. The format follows
   binary-only crate, and no metadata changes that. The link on crates.io led
   to an error page; it now leads to the documentation.
 
+### Fixed
+
+- `opi --security` no longer reports a failed audit as clean. An audit stopped
+  by a network error or a broken lockfile explains itself on stderr and
+  prints no report; `opi` named the reason but still ended with "Nothing to
+  act on." and exited 0. It now exits non-zero. A missing `cargo audit` is
+  still named with its `cargo install` rather than failing the run.
+
+  Found by the new process tests in `tests/process.rs`, which run the built
+  binary against stand-in package managers and check the argv, working
+  directory and exit code at the boundary rather than the logic behind it.
+
 ## [0.9.0] - 2026-09-23
 
 ### Added

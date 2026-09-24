@@ -22,6 +22,12 @@ cargo package --locked
 CI runs these plus `cargo doc` with warnings denied, on `1.85` and stable
 across Linux and macOS.
 
+Run `cargo package` last. Its verification build shares `target/debug` and
+rewrites the binary's dep-info to point at the packaged copy of the sources,
+so afterwards cargo considers `target/debug/opi` fresh however `src/` changes —
+the unit tests still rebuild, the binary and the process tests in `tests/` do
+not. `cargo clean -p opi` puts it right.
+
 ## Releasing
 
 `cargo publish` is run locally. The release workflow verifies the tag against
@@ -92,6 +98,17 @@ repositories, and that is worth recording where the test lives.
 Prefer a test that asserts an invariant over one that asserts a snapshot — for
 example, that a viewport never draws more lines than it was given, at every
 cursor position and several heights.
+
+The process boundary has its own suite in `tests/process.rs`, run against the
+built binary: the argv a package manager receives, the directory it starts
+in, the exit code that comes back, and what `opi` makes of a missing
+executable or an error written only to stderr. The package managers there are
+`sh` stand-ins on a `PATH` holding nothing else, recording how they were
+called and answering with output trimmed from real runs — the boundary is
+real, the registry is not, so the suite needs no network and no installed
+package manager. A behaviour that depends on a terminal (the menus, bun's
+interactive update) is covered from the pipe side only: that nothing runs
+without one.
 
 ## Comments
 
