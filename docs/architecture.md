@@ -318,6 +318,16 @@ that count is zero — across 13 pnpm projects measured, 4 had nothing in range.
 Raising is pnpm-only, and a package that hangs in a member needs `-r` there too:
 without it pnpm changes nothing and still says "Already up to date".
 
+bun gets one line of its own: **Choose in bun's own list**, which hands over to
+`bun update --interactive`. `opi` has no list to offer there — `bun outdated`
+prints a table and ignores `--json` — but bun's interactive update has one, so
+the choice goes where the list is rather than being withheld. It is offered
+without a finding to justify it, because `opi` cannot know whether anything is
+outdated; bun's list says so when nothing is. In a workspace it gets `-r` for
+the same reason pnpm does: measured with bun 1.3.3, the interactive list leaves
+a member's packages off without it. pnpm has an interactive update too, but
+there "Decide per package" already asks the same question beside the findings.
+
 After a successful update the commit workflow runs. That chain — update,
 install, check, what is red now — is the reason the action is worth having at
 all; a key that only saves typing `pnpm update` would not have been worth

@@ -1180,8 +1180,12 @@ fn apply_updates(
         .collect();
     let raises = outdated::can_raise(manager) && !safe.is_empty();
     let decides = outdated::can_raise(manager) && !found.is_empty();
+    // Offered without a finding to justify it: `opi` could not read bun's
+    // list, so it cannot know whether anything is outdated — bun's own list
+    // can, and says so when nothing is.
+    let chooses = project.npm && outdated::can_choose(manager);
 
-    if in_range == 0 && !raises && !decides {
+    if in_range == 0 && !raises && !decides && !chooses {
         return ExitCode::SUCCESS;
     }
 
@@ -1226,6 +1230,12 @@ fn apply_updates(
                 .with_description("tick what to raise, majors included"),
         );
     }
+    if chooses {
+        group = group.add_item(
+            Item::new("choose", format!("Choose in {manager}'s own list"))
+                .with_description("its interactive update, then the commit checks"),
+        );
+    }
     let menu = Menu::new().add_group(group.add_item(Item::new("cancel", "Cancel")));
 
     let interactive = io::stdout().is_terminal() && io::stderr().is_terminal();
@@ -1263,6 +1273,7 @@ fn apply_updates(
             Some(picked) => (outdated::Apply::Latest, picked),
             None => return ExitCode::SUCCESS,
         },
+        "choose" => (outdated::Apply::Choose, Vec::new()),
         _ => return ExitCode::SUCCESS,
     };
     if names.is_empty() && mode == outdated::Apply::Latest {

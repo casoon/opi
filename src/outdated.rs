@@ -351,6 +351,11 @@ pub enum Apply {
     /// safe ones are passed by name so the majors stay out, as
     /// [`Jump::breaking`] requires.
     Latest,
+    /// Hand the choice to the package manager's own interactive list.
+    ///
+    /// For bun, whose `outdated` prints a table `opi` cannot read, so there
+    /// is no list here to pick from — but `bun update --interactive` has one.
+    Choose,
 }
 
 /// Whether this manager can raise ranges without rewriting what it was not
@@ -364,6 +369,15 @@ pub enum Apply {
 /// badly.
 pub fn can_raise(manager: PackageManager) -> bool {
     matches!(manager, PackageManager::Pnpm)
+}
+
+/// Whether the choice is handed to the manager's own interactive list.
+///
+/// Only where `opi` has no list of its own to offer. pnpm has
+/// `update --interactive` too, but there "Decide per package" already asks
+/// the same question on the same screen as the findings.
+pub fn can_choose(manager: PackageManager) -> bool {
+    matches!(manager, PackageManager::Bun)
 }
 
 /// Runs the package manager's update and lets it speak for itself.
@@ -383,19 +397,8 @@ pub fn apply(
     mode: Apply,
     names: &[String],
 ) -> Result<(), OutdatedError> {
-    let mut args = vec!["update".to_owned()];
-    // Without it a package that hangs only in a member is not reached, and
-    // pnpm still says "Already up to date" — measured.
-    if workspace && matches!(manager, PackageManager::Pnpm) {
-        args.push("-r".to_owned());
-    }
-    if mode == Apply::Latest {
-        args.push("--latest".to_owned());
-        args.extend_from_slice(names);
-    }
-
     let status = Command::new(manager.program())
-        .args(&args)
+        .args(update_args(manager, workspace, mode, names))
         .current_dir(root)
         .status()
         .map_err(|error| OutdatedError::Failed(format!("could not run {manager}: {error}")))?;
@@ -407,6 +410,31 @@ pub fn apply(
             "{manager} update exited with {status}"
         )))
     }
+}
+
+/// The arguments `apply` hands the package manager.
+fn update_args(
+    manager: PackageManager,
+    workspace: bool,
+    mode: Apply,
+    names: &[String],
+) -> Vec<String> {
+    let mut args = vec!["update".to_owned()];
+    // Without it a package that hangs only in a member is not reached: pnpm
+    // still says "Already up to date", and bun's interactive list leaves the
+    // member's packages off entirely — both measured.
+    if workspace && matches!(manager, PackageManager::Pnpm | PackageManager::Bun) {
+        args.push("-r".to_owned());
+    }
+    match mode {
+        Apply::InRange => {}
+        Apply::Latest => {
+            args.push("--latest".to_owned());
+            args.extend_from_slice(names);
+        }
+        Apply::Choose => args.push("--interactive".to_owned()),
+    }
+    args
 }
 
 /// Reads the newline-separated reports into updates.
@@ -568,6 +596,43 @@ mod tests {
         assert!(!can_raise(PackageManager::Npm));
         assert!(!can_raise(PackageManager::Yarn));
         assert!(!can_raise(PackageManager::Bun));
+    }
+
+    #[test]
+    fn only_bun_hands_the_choice_to_its_own_list() {
+        // pnpm has one too, but "Decide per package" already asks there.
+        assert!(can_choose(PackageManager::Bun));
+        assert!(!can_choose(PackageManager::Pnpm));
+        assert!(!can_choose(PackageManager::Npm));
+        assert!(!can_choose(PackageManager::Yarn));
+    }
+
+    #[test]
+    fn bun_is_asked_interactively_and_recursively_in_a_workspace() {
+        // Measured with bun 1.3.3: without -r the interactive list leaves a
+        // member's outdated packages off, the same trap pnpm has.
+        assert_eq!(
+            update_args(PackageManager::Bun, true, Apply::Choose, &[]),
+            ["update", "-r", "--interactive"]
+        );
+        assert_eq!(
+            update_args(PackageManager::Bun, false, Apply::Choose, &[]),
+            ["update", "--interactive"]
+        );
+    }
+
+    #[test]
+    fn raising_passes_names_and_never_goes_blanket() {
+        let names = ["ms".to_owned()];
+        assert_eq!(
+            update_args(PackageManager::Pnpm, true, Apply::Latest, &names),
+            ["update", "-r", "--latest", "ms"]
+        );
+        assert_eq!(
+            update_args(PackageManager::Npm, true, Apply::InRange, &[]),
+            ["update"],
+            "npm walks the installed tree and needs no -r"
+        );
     }
 
     #[test]

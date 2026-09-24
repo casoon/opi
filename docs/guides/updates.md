@@ -49,6 +49,11 @@ Raising ranges — and with it the per-package list — is offered for pnpm only
 has no command that keeps the range operator: `npm install x@1.1.1` turns an exact `2.1.2`
 into `^2.1.3`.
 
+bun's `outdated` prints a table rather than JSON, so `opi` has no list of its own there.
+Instead it offers **Choose in bun's own list**, which opens `bun update --interactive` —
+with `-r` in a workspace, so members' packages are included — and runs the commit checks
+once bun is done. yarn is not offered anything: Yarn Berry has no `outdated` at all.
+
 `opi` writes nothing itself. It calls the package manager with a list of names — no
 `package.json`, no lockfile is touched by `opi`. Where two lockfiles disagree and no
 `packageManager` field settles it, the offer is withheld and the finding named instead. Rust's

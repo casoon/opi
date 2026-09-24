@@ -36,6 +36,8 @@ All four package managers are audited — npm and pnpm share a format, bun and
 yarn each have their own. `--updates` can also apply what it found by calling
 the package manager — the safe ones in one step, or each package ticked on its
 own where a major is worth taking — and runs the commit checks on the result.
+For bun, whose `outdated` `opi` cannot read, it hands over to
+`bun update --interactive` instead.
 
 Five areas sit beside the list:
 

@@ -8,6 +8,16 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- `opi --updates` offers bun projects **Choose in bun's own list**, which hands
+  over to `bun update --interactive` and runs the commit checks afterwards.
+
+  `bun outdated` prints a table and ignores `--json`, so `opi` has no list of
+  its own to pick from there, and until now offered nothing at all. bun's
+  interactive update does have one, so the choice goes to it rather than being
+  withheld. In a workspace it is called with `-r`: measured with bun 1.3.3,
+  the interactive list otherwise leaves the members' packages off — the same
+  trap pnpm has without `-r`.
+
 - `opi --security` reads yarn's audit output. Measured against yarn 4.18.0:
   `yarn npm audit --all --recursive --json` prints newline-separated JSON, one
   object per advisory, in a shape of its own rather than npm's — a third shape
