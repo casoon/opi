@@ -1,7 +1,7 @@
 import { ansiToHtml } from '@casoon/pages-theme/ansi';
 import type { ShowcaseExample } from '@casoon/pages-theme/showcase';
 
-// Real output of opi 0.9.0, run on its own repository by site/captures/capture.sh.
+// Real output of opi 0.10.0, run on its own repository by site/captures/capture.sh.
 // The .ansi files were captured in a terminal and keep their colours; the .txt files
 // were piped, which is how opi prints without a terminal.
 const files = import.meta.glob<string>('../captures/*.{ansi,txt}', {

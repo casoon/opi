@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-09-25
+
 ### Added
 
 - A **Lockfile** check in `opi --health` and both workflows: whether the
@@ -540,7 +542,8 @@ Placeholder release. Reserves the crate name on crates.io and establishes the
 repository skeleton. The binary prints its version and a development notice; no
 functionality is implemented.
 
-[Unreleased]: https://github.com/casoon/opi/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/casoon/opi/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/casoon/opi/releases/tag/v0.10.0
 [0.9.0]: https://github.com/casoon/opi/releases/tag/v0.9.0
 [0.8.0]: https://github.com/casoon/opi/releases/tag/v0.8.0
 [0.7.0]: https://github.com/casoon/opi/releases/tag/v0.7.0

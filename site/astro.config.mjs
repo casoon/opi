@@ -32,7 +32,7 @@ export default defineConfig({
       description:
         'Operations Interface — a project control center for your terminal: scripts, health, security, updates and clean for npm, pnpm, bun and Cargo projects.',
       repo: 'casoon/opi',
-      version: '0.9.0',
+      version: '0.10.0',
       license: 'MIT',
       packages: [
         { label: 'crates.io', href: 'https://crates.io/crates/opi' },
