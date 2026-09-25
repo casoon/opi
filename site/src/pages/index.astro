@@ -12,6 +12,8 @@ import {
   Terminal,
 } from '@casoon/pages-theme/components';
 import Base from '@casoon/pages-theme/layouts/Base.astro';
+// The README's hero recording, imported rather than copied so there is one file.
+import hero from '../../../assets/opi.gif';
 import { capture } from '../showcase';
 
 const usage = `opi                   # navigate: ↓ ↓ Enter
@@ -52,7 +54,14 @@ const config = `{
       <Badge>Rust 1.85+</Badge>
       <Badge>macOS · Linux</Badge>
     </Badges>
-    <Terminal slot="output" title="opi --health" dots ansi={capture('health.ansi')} />
+    <img
+      slot="output"
+      class="hero-demo"
+      src={hero.src}
+      width={hero.width}
+      height={hero.height}
+      alt="opi listing a monorepo's scripts, switching groups, searching across all of them and running one"
+    />
   </Hero>
 
   <Facts
@@ -104,3 +113,12 @@ const config = `{
     <CodeBlock code={config} lang="json" title="package.json" label="Optional refinement" />
   </Quickstart>
 </Base>
+
+<style>
+  .hero-demo {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: 10px;
+  }
+</style>
