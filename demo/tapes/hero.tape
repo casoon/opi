@@ -23,6 +23,5 @@ Left Sleep 1s
 # `/` searches every group at once, including the workspace packages.
 Type "/" Sleep 500ms
 Type "db" Sleep 1.6s
-Down Sleep 800ms
 Enter
 Sleep 4s

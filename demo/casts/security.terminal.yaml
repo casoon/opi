@@ -1,0 +1,20 @@
+# Secrets and vulnerable dependencies, from the scanners the project already
+# has. lodash 4.17.20 in the fixture is the real finding.
+version: 1
+
+terminal:
+  title: opi --security
+  cols: 92
+  rows: 18
+  theme: catppuccin-mocha
+  prompt: "{magenta}❯{/} "
+
+defaults:
+  speed: 55
+
+steps:
+  - wait: 800
+  - exec: opi --security
+    cwd: /tmp/opi-demo/pulse
+    timeout: 120000
+    idle: 1500

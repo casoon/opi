@@ -1,0 +1,27 @@
+# The third speed: no interface at all. A name runs it, and a workspace
+# member's script is addressed by path.
+version: 1
+
+terminal:
+  title: opi dev
+  cols: 92
+  rows: 24
+  theme: catppuccin-mocha
+  prompt: "{magenta}❯{/} "
+
+defaults:
+  speed: 55
+
+steps:
+  - wait: 800
+  - exec: opi dev
+    cwd: /tmp/opi-demo/casoon-web
+    # The fixture pins pnpm@10.4.1; corepack would otherwise stop and ask
+    # before downloading it, and exec: has nobody to answer.
+    env: { COREPACK_ENABLE_DOWNLOAD_PROMPT: '0' }
+    idle: 1500
+    pause: 800
+  - exec: opi api/db:migrate
+    cwd: /tmp/opi-demo/casoon-web
+    env: { COREPACK_ENABLE_DOWNLOAD_PROMPT: '0' }
+    idle: 1500

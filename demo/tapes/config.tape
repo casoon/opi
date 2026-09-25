@@ -22,6 +22,7 @@ Set WindowBarSize 36
 
 # A prompt that says nothing about whose machine this is.
 Hide
-Type `export PS1="$(printf '\033[38;5;147m❯\033[0m ')"` Enter
+# Plain on purpose: VHS mangles an escape sequence typed into PS1.
+Type `export PS1='❯ '` Enter
 Type "clear" Enter
 Show

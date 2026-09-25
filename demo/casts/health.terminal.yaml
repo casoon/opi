@@ -1,0 +1,20 @@
+# Every check the project's own tools can answer, run concurrently, with the
+# failing one's output relayed whole.
+version: 1
+
+terminal:
+  title: opi --health
+  cols: 92
+  rows: 20
+  theme: catppuccin-mocha
+  prompt: "{magenta}❯{/} "
+
+defaults:
+  speed: 55
+
+steps:
+  - wait: 800
+  - exec: opi --health
+    cwd: /tmp/opi-demo/pulse
+    timeout: 120000
+    idle: 1500

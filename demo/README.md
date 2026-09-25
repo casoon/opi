@@ -3,21 +3,29 @@
 The recordings in the README, and the fake projects they are recorded in.
 
 ```bash
-./demo/record.sh              # every tape
-./demo/record.sh hero         # one of them
+./demo/record.sh              # every scene
+./demo/record.sh health       # one of them
 ```
 
-> **Nothing has been recorded yet.** VHS 0.12 does not render on this machine —
-> it drives a headless Chrome over ttyd, and with Chrome 154 the frame
-> directory stays empty while VHS exits 0 without an error. The recordings will
-> come from our own tool instead; the tapes below stay as the scripts for those
-> scenes. See `plan/11-demo-aufnahmen.md`.
+Two kinds of scene, because no single tool covers both yet:
 
-Needs [vhs](https://github.com/charmbracelet/vhs) (`brew install vhs`), which
-brings `ttyd` and `ffmpeg` with it. The script builds `opi` in release mode,
-copies the fixtures to `/tmp/opi-demo` (`OPI_DEMO_DIR` moves that), puts the
-fresh binary first on `PATH` so the tapes can call a bare `opi`, and writes to
-`assets/`.
+- **`casts/*.terminal.yaml`** — rendered with
+  [castwright](https://github.com/casoon/castwright) to an animated SVG. Its
+  `exec:` step runs the real command in a pseudo-terminal and records what it
+  printed, so the output is `opi`'s own. Needs `castwright` on `PATH`
+  (`npm i -g @casoon/castwright node-pty`; if `exec` fails with
+  "posix_spawnp failed", `chmod +x` the `spawn-helper` the error names).
+- **`tapes/*.tape`** — the scenes that press keys *inside* the running
+  interface (tab row, search, `Enter` on a row), which castwright cannot do
+  yet. They need [vhs](https://github.com/charmbracelet/vhs) 0.12.1 or newer
+  (`brew install vhs`); 0.12.0 wrote no frames with Chrome 154 while still
+  exiting 0. `record.sh` skips them when `vhs` is not installed and fails when
+  the GIF was not written.
+
+The script builds `opi` in release mode, copies the fixtures to `/tmp/opi-demo`,
+puts the fresh binary first on `PATH` so the scenes can call a bare `opi`, and
+writes to `assets/`. The casts name `/tmp/opi-demo` in their `cwd:`, so
+`OPI_DEMO_DIR` only moves the tapes.
 
 ## Why the fixtures are copied out
 
@@ -37,18 +45,25 @@ is the fix.
 needs one check to fail, and a failure the tool actually found is worth more
 than a staged one.
 
+`pulse` also pins `lodash` 4.17.20 for the same reason: it has a published
+advisory and a newer release, so `--security` and `--updates` each have a real
+finding. `--updates` compares against what is installed, so `record.sh` runs
+`npm ci` in the copy — the only step that needs the network besides the audit.
+
 The npm scripts in both fixtures point at small shell scripts under `bin/`
 that print what the real tool would print. Nothing about `opi`'s own output is
 faked — only the projects are.
 
-## The tapes
+## The scenes
 
 | | |
 | --- | --- |
-| `hero.tape` | The start screen, the tab row, one search across every group, running a script |
-| `ecosystems.tape` | npm and cargo in a single list |
-| `health.tape` | Every check the project's tools can answer |
-| `direct.tape` | The command line, without the interface |
+| `casts/health.terminal.yaml` | Every check the project's tools can answer |
+| `casts/security.terminal.yaml` | The dependency audit, with the fixture's old lodash as the finding |
+| `casts/updates.terminal.yaml` | The same lodash as an update that is safe to take |
+| `casts/direct.terminal.yaml` | The command line, without the interface |
+| `tapes/hero.tape` | The start screen, the tab row, one search across every group, running a script |
+| `tapes/ecosystems.tape` | npm and cargo in a single list |
 
 `config.tape` holds the shared look. Each tape sources it **after** its own
 `Output`, `Set Width` and `Set Height`: VHS silently ignores a `Set` that comes

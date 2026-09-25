@@ -10,6 +10,8 @@ project — without configuring anything first.
 > bun and Cargo projects are covered; yarn's scripts, health and security
 > audit are too — its update listing is not read yet.
 
+![opi listing a monorepo's scripts, switching groups, searching across all of them and running one](https://raw.githubusercontent.com/casoon/opi/main/assets/opi.gif)
+
 ## What it does
 
 Its primary job is to be a better `npm run`. The start screen shows the
@@ -86,6 +88,8 @@ opi dev          # the root's dev
 opi blog/dev     # the blog package's dev
 ```
 
+![opi dev starting the dev server directly, then opi api/db:migrate running a workspace member's script by path](https://raw.githubusercontent.com/casoon/opi/main/assets/direct.svg)
+
 `opi` also works from anywhere inside a project, not only from the directory
 holding `package.json`.
 
@@ -94,6 +98,8 @@ rather than killing a wrapper, and the script's exit code is what your shell
 sees — `opi build && …` works.
 
 ## More than one kind of project
+
+![opi listing a repository that carries both package.json and Cargo.toml](https://raw.githubusercontent.com/casoon/opi/main/assets/ecosystems.gif)
 
 A repository can be several things at once, and `opi` does not make it choose.
 `package.json` and `Cargo.toml` are both read, and their commands share one
@@ -157,6 +163,8 @@ otherwise the protection would vanish in exactly the case it exists for.
 
 ## The other areas
 
+![opi --health running six checks in a project with package.json and Cargo.toml, one failing with rustfmt's diff shown under it](https://raw.githubusercontent.com/casoon/opi/main/assets/health.svg)
+
 Each is a hotkey in the list and a flag on the command line. Never a bare word:
 `health`, `clean` and `release` are script names in real projects, and the bare
 word stays theirs.
@@ -189,6 +197,10 @@ Output is parsed only where the format is documented (`audit --json`,
 `outdated --json`). Everything else is relayed whole and capped at twenty lines,
 with the command to see the rest: a parser that guesses at a tool's output
 breaks on that tool's next release.
+
+![opi --security finding a vulnerable lodash through npm audit, while cargo audit finds nothing](https://raw.githubusercontent.com/casoon/opi/main/assets/security.svg)
+
+![opi --updates listing lodash 4.17.20 → 4.18.1 as safe to take, with the Rust side current](https://raw.githubusercontent.com/casoon/opi/main/assets/updates.svg)
 
 There is no health score. A composite number stops meaning anything within
 weeks; what a failing tool actually said does not.
@@ -270,8 +282,8 @@ The files below are the same documentation as it sits in the repository:
 - [docs/conventions.md](docs/conventions.md) — the rules future changes follow
 - [docs/decisions.md](docs/decisions.md) — the decisions in force, and why
 
-[demo/](demo/) holds the fixtures and the scripted scenes the recordings are
-made from, and says what has to be true for a recording to show `opi` rather
+[demo/](demo/) holds the fixtures and the scripted scenes the recordings above
+are made from, and says what has to be true for a recording to show `opi` rather
 than the repository it was recorded in.
 
 Terminal presentation comes from [runemark](https://github.com/casoon/runemark),

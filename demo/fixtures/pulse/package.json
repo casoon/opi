@@ -12,5 +12,8 @@
     "build": "Bundle the dashboard for production",
     "check": "Lint and format with Biome",
     "test": "Run the dashboard unit tests"
+  },
+  "dependencies": {
+    "lodash": "4.17.20"
   }
 }
