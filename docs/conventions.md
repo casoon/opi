@@ -30,10 +30,12 @@ not. `cargo clean -p opi` puts it right.
 
 ## Releasing
 
-`cargo publish` is run locally. The release workflow verifies the tag against
-the crate version, confirms the version is on crates.io, builds the binaries
-and creates the GitHub release — it never publishes. The registry token stays
-on a maintainer machine rather than in repository secrets.
+The release workflow publishes. It verifies the tag against the crate version,
+builds the binaries, publishes through crates.io trusted publishing — a
+short-lived token from GitHub OIDC, none stored — and then creates the GitHub
+release. The publish job runs in the `crates-io` environment and waits for a
+required reviewer, and it comes after the binaries because a publish cannot be
+undone.
 
 The binaries are `aarch64`/`x86_64` macOS and `aarch64`/`x86_64` Linux, the
 Linux pair built against musl so one binary is not tied to the glibc of the

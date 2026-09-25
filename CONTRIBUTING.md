@@ -50,13 +50,14 @@ Behaviour that is easy to break and not fully covered by tests:
 
 Keep [CHANGELOG.md](CHANGELOG.md) current under `## [Unreleased]`.
 
-Releases are published from a maintainer machine, not from CI, so the registry
-token stays there and releasing is a deliberate step rather than a side effect
-of pushing a tag:
+Releases are published by the release workflow through crates.io trusted
+publishing, so no registry token is stored anywhere. The publish job runs in
+the `crates-io` environment and waits for a maintainer's approval, so releasing
+stays a deliberate step rather than a side effect of pushing a tag:
 
 1. Bump the version in `Cargo.toml` and date the release in `CHANGELOG.md`.
 2. Run the gates above, and check the tarball with `cargo package --locked`.
-3. `cargo publish`.
-4. Push the tag `v<version>`. The workflow verifies the tag matches the crate
-   version, confirms the version is on crates.io, and creates the GitHub
-   release. A tag pushed before publishing fails with that reason.
+3. Push the tag `v<version>`. The workflow verifies the tag matches the crate
+   version and builds the binaries.
+4. Approve the `Publish to crates.io` job. It publishes, and the GitHub
+   release is created after it.
