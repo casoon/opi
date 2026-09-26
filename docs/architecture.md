@@ -22,6 +22,7 @@ src/
 ├── run.rs       Task → the running script
 ├── check.rs     detect a project's tools, run them concurrently
 ├── audit.rs     package manager audit → parsed advisories
+├── supply.rs    signatures, release age, licenses — asked of the package manager
 ├── outdated.rs  package manager and cargo outdated → updates by semver jump
 ├── clean.rs     removable artefacts, measured before they are offered
 └── workflow.rs  named sequences of checks, plus repository gates
@@ -209,7 +210,7 @@ projects, and the bare word stays theirs.
 | Area | Key | Flag | What it does |
 | --- | --- | --- | --- |
 | Health | `H` | `--health` | Runs every detected check concurrently |
-| Security | `S` | `--security` | Secret scan plus a parsed dependency audit |
+| Security | `S` | `--security` | Secret scan, a parsed dependency audit, signatures, release age, licenses |
 | Updates | `U` | `--updates` | Outdated dependencies, split by semver jump, and the offer to take them |
 | Clean | `C` | `--clean` | Removable artefacts, with sizes |
 | Workflows | — | `--check commit`/`push`/`release`, `--hooks` | A named subset, the build, git gates; `push` as the pre-push hook |

@@ -18,6 +18,7 @@ mod manifest;
 mod outdated;
 mod project;
 mod run;
+mod supply;
 mod task;
 mod workflow;
 mod workspace;
@@ -933,6 +934,8 @@ fn security(
                 );
             }
         }
+        println!();
+        clean &= supply_chain(console, project.package_manager.manager, root);
     }
 
     if let Some(rust_root) = rust_root {
@@ -1012,6 +1015,120 @@ fn security(
 /// same split `--updates` makes.
 fn audit_failed(error: &audit::AuditError) -> bool {
     matches!(error, audit::AuditError::Failed(_))
+}
+
+/// Signatures, release age and licenses, beside the vulnerability audit.
+///
+/// Returns whether nothing needs acting on. Only a signature that does not
+/// verify counts against that: an unset release age or a copyleft dependency
+/// is a policy the project may have chosen, so both are reported, not judged.
+fn supply_chain(console: Console, manager: project::PackageManager, root: &Path) -> bool {
+    let line = |tone: Tone, mark: &str, text: String| {
+        println!(
+            "{} {}",
+            console.paint(tone, mark),
+            console.paint(tone, text)
+        );
+    };
+    let list = |names: &[String]| {
+        for name in names.iter().take(OUTPUT_LINES) {
+            println!("  {name}");
+        }
+        if let Some(rest) = names.len().checked_sub(OUTPUT_LINES).filter(|n| *n > 0) {
+            println!("  {}", console.paint(Tone::Muted, format!("… {rest} more")));
+        }
+    };
+
+    let mut clean = true;
+    match supply::signatures(root) {
+        Ok(found) if found.invalid.is_empty() && found.missing.is_empty() => line(
+            Tone::Success,
+            "✓",
+            "Signatures — every installed package verified".to_owned(),
+        ),
+        Ok(found) => {
+            if !found.invalid.is_empty() {
+                clean = false;
+                line(
+                    Tone::Error,
+                    "✗",
+                    format!(
+                        "Signatures — {} do not match what the registry published",
+                        plural(found.invalid.len(), "package", "packages")
+                    ),
+                );
+                list(&found.invalid);
+            }
+            if !found.missing.is_empty() {
+                line(
+                    Tone::Warning,
+                    "!",
+                    format!(
+                        "Signatures — {} without a registry signature",
+                        plural(found.missing.len(), "package", "packages")
+                    ),
+                );
+                list(&found.missing);
+            }
+        }
+        Err(reason) => line(Tone::Muted, "–", format!("Signatures — {reason}")),
+    }
+
+    match supply::release_age(manager, root) {
+        Some(supply::ReleaseAge::Set(age)) => line(
+            Tone::Success,
+            "✓",
+            format!("Release age — versions younger than {age} are not installed"),
+        ),
+        Some(supply::ReleaseAge::Unset) => {
+            line(
+                Tone::Warning,
+                "!",
+                "Release age — not set: a version installs the moment it is published".to_owned(),
+            );
+            let remedy = match manager {
+                project::PackageManager::Npm => "min-release-age=<days> in .npmrc",
+                _ => "minimumReleaseAge: <minutes> in pnpm-workspace.yaml",
+            };
+            println!("  {}", console.paint(Tone::Muted, remedy));
+        }
+        None => {}
+    }
+
+    // pnpm alone has a license report of its own; elsewhere this would take
+    // a tool the project does not have, so it is left out rather than failed.
+    if manager == project::PackageManager::Pnpm {
+        match supply::licenses(root) {
+            Ok(found) => {
+                const SHOWN: usize = 4;
+                let mut parts: Vec<String> = found
+                    .counts
+                    .iter()
+                    .take(SHOWN)
+                    .map(|(license, count)| format!("{count} {license}"))
+                    .collect();
+                let others: usize = found.counts.iter().skip(SHOWN).map(|(_, n)| n).sum();
+                if others > 0 {
+                    parts.push(format!("{others} other"));
+                }
+                let (tone, mark) = if found.notable.is_empty() {
+                    (Tone::Success, "✓")
+                } else {
+                    (Tone::Warning, "!")
+                };
+                line(tone, mark, format!("Licenses — {}", parts.join(" · ")));
+                let notable: Vec<String> = found
+                    .notable
+                    .iter()
+                    .map(|(license, name)| format!("{name}  {license}"))
+                    .collect();
+                list(&notable);
+            }
+            Err(reason) => line(Tone::Muted, "–", format!("Licenses — {reason}")),
+        }
+    }
+
+    clean
 }
 
 /// Runs a named workflow: the repository questions, then the checks.

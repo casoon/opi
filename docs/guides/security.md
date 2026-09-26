@@ -1,6 +1,6 @@
 ---
 title: Security
-description: A secret scan and a parsed dependency audit, one section per ecosystem.
+description: A secret scan, a parsed dependency audit per ecosystem, and three supply-chain questions for npm projects.
 order: 5
 ---
 
@@ -28,6 +28,33 @@ No secret scanner: this project depends on none that opi knows.
 
 Nothing to act on.
 ```
+
+## Supply chain
+
+An npm project gets three more lines, each answered by the package manager itself:
+
+- **Signatures** — `npm audit signatures`: whether every installed package carries a valid
+  registry signature. It reads `node_modules`, so it works under pnpm and bun too; under
+  Yarn Plug'n'Play there is nothing for it to read. A signature that does not verify is the
+  only one of the three that fails the run.
+- **Release age** — whether freshly published versions are held back:
+  `minimumReleaseAge` for pnpm, `min-release-age` for npm. Asked with `config get`, so a
+  global setting counts as well as the workspace file. yarn and bun are not asked.
+- **Licenses** — pnpm only, from `pnpm licenses list --prod`: the most common licenses with
+  their counts, and by name every package under a copyleft, source-available, missing or
+  `UNLICENSED` license. npm, bun and Cargo have no license report of their own.
+
+```
+✓ Signatures — every installed package verified
+! Release age — not set: a version installs the moment it is published
+  minimumReleaseAge: <minutes> in pnpm-workspace.yaml
+! Licenses — 480 MIT · 22 ISC · 11 Apache-2.0 · 9 BSD-2-Clause · 20 other
+  @img/sharp-libvips-darwin-arm64  LGPL-3.0-or-later
+  lightningcss  MPL-2.0
+```
+
+An unset release age and a copyleft dependency are reported, not judged: both can be a
+deliberate choice, so neither changes the exit code.
 
 ## Findings
 
