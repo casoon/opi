@@ -150,9 +150,11 @@ names its own program. That second variant is what lets a second ecosystem
 exist without a second list.
 
 A Rust project defines no scripts, so its commands are a fixed set rather than
-something read out of the manifest. They are the ones these repositories
-actually run in CI: `fmt --check`, `clippy` with warnings denied, `rustdoc`
-with warnings denied, and `test --all-features`. `cargo run` is offered only where something is runnable.
+something read out of the manifest. The list offers run, build, check,
+test, clippy, fmt and doc; `cargo run` only where something is runnable.
+Health checks what these repositories actually run in CI: `fmt --check`,
+`clippy` with warnings denied, `rustdoc` with warnings denied, `test`, and
+`metadata --locked` where `Cargo.lock` is committed.
 
 `Cargo.toml` is read without a TOML parser. Two facts are wanted — the package
 name and whether a binary exists — and a dependency to learn them would cost
@@ -203,7 +205,8 @@ while the others would pass a literal `--` through.
 
 ## The areas
 
-All five are reachable two ways: a hotkey in the list, and a flag. Never a bare
+Health, security, updates and clean are reachable two ways: a hotkey in the
+list, and a flag; the workflows and `--hooks` are flags only. Never a bare
 word — `health`, `clean`, `release` and `commit` are all script names in real
 projects, and the bare word stays theirs.
 
@@ -468,7 +471,8 @@ output still decide it — but it is why those counts are legible in a pipe.
   heading, so `Group::Workspace` still decides what belongs together; only the
   row is shortened.
 - `Menu::with_summary` carries the line under the heading — entries, groups,
-  and packages where a workspace has any. Two of those three stop being
+  packages where a workspace has any, and any task runner files beside the
+  manifest (`also Makefile`), which are named but never read. Two of those three stop being
   countable off the screen once the groups are tabs.
 - A list larger than the terminal is fitted to it by runemark: taller lists
   scroll, and entries are shortened rather than wrapped. Within a tab that

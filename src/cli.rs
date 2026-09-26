@@ -117,7 +117,7 @@ Options:
       --security          Scan for secrets and vulnerable dependencies
       --updates           Show dependencies with newer versions
       --check <workflow>  Run a workflow: commit, push or release
-      --hooks             Run the push workflow as the pre-push hook
+      --hooks             Install the push workflow as the pre-push hook
   -h, --help              Show this help
   -V, --version           Show the version
 

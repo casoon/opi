@@ -45,9 +45,10 @@ H Health   C Clean   S Security   U Updates
 ## Every area follows
 
 - [Health](../health/) runs `cargo fmt --check`, `cargo clippy`, `cargo rustdoc` and
-  `cargo test` alongside the npm checks. `rustdoc` is there because a doc comment is
+  `cargo test` alongside the npm checks, and `cargo metadata --locked` where `Cargo.lock` is
+  committed. `rustdoc` is there because a doc comment is
   rendered as HTML: a bare `<iframe>` in one becomes an element, and the page can end
-  there. Where `cargo docs-rs` is installed, a fifth check builds the documentation the
+  there. Where `cargo docs-rs` is installed, one more check builds the documentation the
   way docs.rs will — with the features, targets and rustdoc arguments out of
   `[package.metadata.docs.rs]`, which is what decides how the published pages look.
 - [Security](../security/) and [Updates](../updates/) answer for the crates through

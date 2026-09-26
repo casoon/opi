@@ -60,8 +60,8 @@ It does name them. A `Makefile`, `justfile`, `Taskfile.yml` or a `mise.toml` wit
 the manifest shows up in the line under the heading — `also Makefile` — so the list does not
 pass for everything the project can do. Named only: their targets are never read and never run.
 
-Workflows (`commit`, `push`, `release`) are named lists of existing task names, not a new
-task type.
+Workflows (`commit`, `push`, `release`) are named subsets of the existing checks, plus the
+build and repository gates — not a new task type.
 
 ## Orchestration, not reimplementation
 
@@ -71,7 +71,7 @@ Knip, vulnerabilities from the package manager's own audit. `opi` detects which
 tool a project uses, invokes it, and relays the result.
 
 Output is parsed only where the format is documented — `audit --json`,
-`outdated --json`. Everything else is relayed whole and capped, because a
+`outdated --json`, `audit signatures --json`, `licenses list --json`. Everything else is relayed whole and capped, because a
 parser that guesses at a tool's output breaks on that tool's next release.
 
 Consequence: adapters must be swappable. The "Lint" check exists independently
@@ -110,9 +110,11 @@ inside the project directory, does not follow symlinks, and rejects paths from
 the `opi` key that escape the project (`..`, absolute paths). `node_modules/` is
 never preselected.
 
-***opi* itself writes nothing else.** `--updates` can now apply what it found,
-but only by calling the package manager with a list of names. No
-`package.json`, no lockfile, no `pnpm-workspace.yaml` is written by `opi`.
+***opi* itself writes nothing else** — save the one line `opi --hooks` adds
+to the pre-push hook, appended, never replacing what is there. `--updates` can
+apply what it found, but only by calling the package manager with a list of
+names. No `package.json`, no lockfile, no `pnpm-workspace.yaml` is written by
+`opi`.
 Catalogs, overrides and `workspace:` protocols stay the problem of the tool
 that understands them.
 

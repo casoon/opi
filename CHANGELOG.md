@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-09-26
+
 ### Added
 
 - A **push** workflow, `opi --check push`: every detected check, then the
@@ -561,7 +563,8 @@ Placeholder release. Reserves the crate name on crates.io and establishes the
 repository skeleton. The binary prints its version and a development notice; no
 functionality is implemented.
 
-[Unreleased]: https://github.com/casoon/opi/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/casoon/opi/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/casoon/opi/releases/tag/v0.11.0
 [0.10.0]: https://github.com/casoon/opi/releases/tag/v0.10.0
 [0.9.0]: https://github.com/casoon/opi/releases/tag/v0.9.0
 [0.8.0]: https://github.com/casoon/opi/releases/tag/v0.8.0

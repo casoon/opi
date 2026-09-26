@@ -24,7 +24,7 @@ The name follows the flag, so a project script called `commit`, `push` or `relea
 
 The build runs after the other checks and one at a time, since a build beside them would slow
 every one of them down. It is the project's own `build` script — or, in a workspace whose root
-has none, each member's — and `cargo build --workspace --locked` for Rust.
+has none, each member's — and `cargo build --workspace` for Rust, with `--locked` where `Cargo.lock` is committed.
 
 "Not behind upstream" compares with the last fetched state of the upstream branch rather than
 asking the remote, so the hook never waits on the network. A branch without an upstream skips

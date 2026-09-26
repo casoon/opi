@@ -13,7 +13,7 @@ grouped and labelled, with the package manager detected rather than typed. Healt
 updates and clean sit one hotkey away, and three workflows run the right checks before a
 commit, a push or a release — the push one as a pre-push hook if you want it binding.
 
-**Status:** `0.10.0`. npm, pnpm, bun and Cargo projects are covered; yarn's scripts, health and
+**Status:** `0.11.0`. npm, pnpm, bun and Cargo projects are covered; yarn's scripts, health and
 security audit are too — its update listing is not read yet. `opi` runs on macOS and Linux
 only.
 
@@ -29,7 +29,7 @@ only.
 `opi` reimplements none of the tools it surfaces. It detects which one a project depends on —
 Biome, ESLint, Prettier, `tsc`, `astro check`, Vitest, Jest, fallow, Knip, a secret scanner,
 `cargo` — runs it, and relays what came back. Output is parsed only where the format is
-documented (`audit --json`, `outdated --json`).
+documented (`audit --json`, `outdated --json`, `audit signatures --json`, `licenses list --json`).
 
 The project's own files are the only interface: `package.json` and `Cargo.toml`. There is no
 `opi.toml`; an optional `opi` key in `package.json` refines what is already there.

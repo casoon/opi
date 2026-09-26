@@ -5,7 +5,7 @@
 Go into any repository, type `opi`, and get a usable interface for that
 project — without configuring anything first.
 
-> **Status: `0.10.0`.** Scripts are the main thing; health, security, updates,
+> **Status: `0.11.0`.** Scripts are the main thing; health, security, updates,
 > clean and the commit/push/release workflows are built on top of them. npm, pnpm,
 > bun and Cargo projects are covered; yarn's scripts, health and security
 > audit are too — its update listing is not read yet.
@@ -178,7 +178,7 @@ word stays theirs.
 | | `opi --check commit` | The fast checks, before you commit |
 | | `opi --check push` | Everything plus the build, on a clean tree that is not behind upstream |
 | | `opi --check release` | Everything plus the build, a clean tree and an untagged version |
-| | `opi --hooks` | Runs `opi --check push` as the pre-push hook |
+| | `opi --hooks` | Installs `opi --check push` as the pre-push hook |
 
 ```
 astro-v7-workspace  health
@@ -196,7 +196,7 @@ checks run per member, in the member, because that is where the tools and their
 config live.
 
 Output is parsed only where the format is documented (`audit --json`,
-`outdated --json`). Everything else is relayed whole and capped at twenty lines,
+`outdated --json`, `audit signatures --json`, `licenses list --json`). Everything else is relayed whole and capped at twenty lines,
 with the command to see the rest: a parser that guesses at a tool's output
 breaks on that tool's next release.
 
@@ -240,9 +240,10 @@ instead.
   and Taskfile for no gain.
 - **Orchestration, not reimplementation.** `opi` is a UX layer over proven
   tooling.
-- **`opi` writes nothing.** Clean removes what you pick, and updates are
-  applied by the package manager. No file is ever rewritten by `opi` itself,
-  and where a tool cannot do something cleanly it is not offered rather than
+- **`opi` writes nothing.** Clean removes what you pick, updates are applied
+  by the package manager, and `opi --hooks` adds one line to the pre-push hook
+  without touching the rest. No manifest or lockfile is ever rewritten by
+  `opi` itself, and where a tool cannot do something cleanly it is not offered rather than
   offered badly.
 
 ## Install

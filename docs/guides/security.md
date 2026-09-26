@@ -31,7 +31,8 @@ Nothing to act on.
 
 ## Supply chain
 
-An npm project gets three more lines, each answered by the package manager itself:
+A `package.json` project gets up to three more lines, each answered by the package manager
+itself — pnpm all three, npm two, bun and yarn only the signatures:
 
 - **Signatures** — `npm audit signatures`: whether every installed package carries a valid
   registry signature. It reads `node_modules`, so it works under pnpm and bun too; under

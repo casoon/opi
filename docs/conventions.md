@@ -59,6 +59,7 @@ One module per layer, named for what it produces:
 | `run` | a task → the running process |
 | `check` | a project's tools → concurrent results |
 | `audit` | a package manager's audit → parsed advisories |
+| `supply` | signatures, release age, licenses → asked of the package manager |
 | `outdated` | a package manager's `outdated` → updates by semver jump |
 | `clean` | removable paths, measured |
 | `workflow` | named sequences of checks, plus repository gates |

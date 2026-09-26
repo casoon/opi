@@ -49,6 +49,9 @@ From the list, a hotkey opens each area; on the command line it is a flag:
 | `U` | `opi --updates` | [Updates](../../guides/updates/) |
 | `C` | `opi --clean` | [Clean](../../guides/clean/) |
 | | `opi --check commit` | [Workflows](../../guides/workflows/) |
+| | `opi --check push` | [Workflows](../../guides/workflows/) |
+| | `opi --check release` | [Workflows](../../guides/workflows/) |
+| | `opi --hooks` | [Workflows](../../guides/workflows/#the-pre-push-hook) |
 
 Never a bare word: `health`, `clean` and `release` are script names in real projects, and
 the bare word stays theirs.

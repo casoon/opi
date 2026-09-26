@@ -59,7 +59,8 @@ gets a usable list, which is the point of the whole arrangement.
 - **Write a project's files.** Clean removes what it is told to and
   `--updates` calls the package manager with a list of names; `opi` itself
   writes no manifest, no lockfile and no catalog, and no check runs in a
-  fixing mode. See [constraints.md](constraints.md).
+  fixing mode. The one exception is the line `opi --hooks` appends to the
+  pre-push hook. See [constraints.md](constraints.md).
 - **.NET.** No standalone marker appeared in the 231 directories measured.
 - **Windows.** See [decisions.md](decisions.md).
 

@@ -149,12 +149,16 @@ state — it is not a history.
 
 > **Reporting beats acting, where acting is a guess**
 >
-> `opi --updates` shows what is outdated and stops. Clean is the only code that
-> writes, and it removes only what it has measured and been told to.
+> `opi --updates` separates what is outdated by semver jump, and applies only
+> the safe ones, only on request, and only by calling the package manager with
+> a list of names. Majors never ride along. Clean removes only what it has
+> measured and been told to; `opi --hooks` appends one line to a hook.
 >
-> *Reason:* applying an update rewrites `package.json` and a lockfile, and with
-> pnpm catalogs the versions may not live in `package.json` at all. The package
-> manager already does it correctly.
+> *Reason:* the package manager rewrites `package.json`, the lockfile and pnpm
+> catalogs correctly — measured, including the 45 of 79 workspaces here that
+> use a catalog. opi writing any of them itself would be the guess. (The rule
+> used to be "updates are never applied"; see
+> [constraints.md](constraints.md) for why it narrowed.)
 >
 > *Consequence:* the value of the screen is the separation — "two safe, one
 > major" is a decision, a column of version numbers is homework.

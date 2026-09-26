@@ -28,6 +28,11 @@ Quality
 The descriptions come from the project's `scripts-info`; see
 [Configuration](../configuration/).
 
+The line under the heading counts entries, groups and, in a workspace, packages. Where a
+`Makefile`, `justfile`, `Taskfile.yml` or a `mise.toml` with tasks sits beside the manifest, it
+says so too — `7 entries · 3 groups · also Makefile` — so the list does not pass for everything
+the project can do. `opi` names those files but never reads or runs them.
+
 ## Grouping
 
 A script is grouped by the segment before its first `:` — `build:landings:watch` belongs to

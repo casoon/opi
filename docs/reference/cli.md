@@ -8,7 +8,7 @@ order: 1
 anything built in, so every built-in area is a flag or a hotkey, never a bare word.
 
 ```
-opi 0.10.0 — Operations Interface
+opi 0.11.0 — Operations Interface
 
 Usage:
   opi                     List what this project can do
@@ -25,7 +25,7 @@ Options:
       --security          Scan for secrets and vulnerable dependencies
       --updates           Show dependencies with newer versions
       --check <workflow>  Run a workflow: commit, push or release
-      --hooks             Run the push workflow as the pre-push hook
+      --hooks             Install the push workflow as the pre-push hook
   -h, --help              Show this help
   -V, --version           Show the version
 
