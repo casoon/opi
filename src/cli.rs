@@ -31,6 +31,8 @@ pub enum Invocation {
     Workflow(String),
     /// Show dependencies with newer versions.
     Updates,
+    /// Install the push workflow as the pre-push hook.
+    Hooks,
     /// A flag `opi` does not know, before any script name.
     UnknownFlag(String),
 }
@@ -72,6 +74,7 @@ where
         "--clean" => Invocation::Clean,
         "--security" => Invocation::Security,
         "--updates" => Invocation::Updates,
+        "--hooks" => Invocation::Hooks,
         // The name follows the flag rather than standing alone, so a project
         // script called "commit" or "release" keeps its word.
         "--check" => args
@@ -113,7 +116,8 @@ Options:
       --clean             Show and remove build artefacts
       --security          Scan for secrets and vulnerable dependencies
       --updates           Show dependencies with newer versions
-      --check <workflow>  Run a workflow: commit or release
+      --check <workflow>  Run a workflow: commit, push or release
+      --hooks             Run the push workflow as the pre-push hook
   -h, --help              Show this help
   -V, --version           Show the version
 
@@ -234,6 +238,7 @@ mod tests {
         assert_eq!(parse(["--clean"]), Invocation::Clean);
         assert_eq!(parse(["--security"]), Invocation::Security);
         assert_eq!(parse(["--updates"]), Invocation::Updates);
+        assert_eq!(parse(["--hooks"]), Invocation::Hooks);
         // "clean" is a script name in 41 of 133 measured projects.
         assert_eq!(parse(["health"]), run("health", &[]));
         assert_eq!(parse(["clean"]), run("clean", &[]));

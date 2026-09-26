@@ -47,7 +47,7 @@ Five areas sit beside the list:
 | Security | `S` | `--security` |
 | Updates | `U` | `--updates` |
 | Clean | `C` | `--clean` |
-| Workflows | — | `--check commit`, `--check release` |
+| Workflows | — | `--check commit`, `--check push`, `--check release`, `--hooks` |
 
 A project can say more about a script through the `opi` key in `package.json`:
 a description that wins over `scripts-info`, an explicit group, a favourite, a

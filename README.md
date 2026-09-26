@@ -6,7 +6,7 @@ Go into any repository, type `opi`, and get a usable interface for that
 project — without configuring anything first.
 
 > **Status: `0.10.0`.** Scripts are the main thing; health, security, updates,
-> clean and the commit/release workflows are built on top of them. npm, pnpm,
+> clean and the commit/push/release workflows are built on top of them. npm, pnpm,
 > bun and Cargo projects are covered; yarn's scripts, health and security
 > audit are too — its update listing is not read yet.
 
@@ -176,7 +176,9 @@ word stays theirs.
 | `U` | `opi --updates` | What is outdated, split into safe and major — and the offer to take it |
 | `C` | `opi --clean` | Removable artefacts, with what each one costs |
 | | `opi --check commit` | The fast checks, before you commit |
-| | `opi --check release` | Everything, plus a clean tree and an untagged version |
+| | `opi --check push` | Everything plus the build, on a clean tree that is not behind upstream |
+| | `opi --check release` | Everything plus the build, a clean tree and an untagged version |
+| | `opi --hooks` | Runs `opi --check push` as the pre-push hook |
 
 ```
 astro-v7-workspace  health

@@ -296,6 +296,62 @@ impl Check {
             })
     }
 
+    /// What the push and release workflows build, once every other check is
+    /// done.
+    ///
+    /// Orchestrated, not reimplemented: the project's own `build` script, run
+    /// by its package manager. A workspace root with a `build` script is
+    /// trusted to build its members; without one, each member that has a
+    /// `build` script is built in place. Rust builds with `--locked`, so a
+    /// build that only works by rewriting `Cargo.lock` fails here, as it
+    /// would in CI.
+    pub fn builds(
+        manifest: &Manifest,
+        members: &[Member],
+        rust_root: Option<&Path>,
+        root: &Path,
+        manager: PackageManager,
+    ) -> Vec<Self> {
+        let script = |dir: &Path, scope: Option<String>| Self {
+            name: "Build",
+            tool: manager.program(),
+            scope,
+            program: PathBuf::from(manager.program()),
+            args: vec!["run", "build"],
+            dir: dir.to_path_buf(),
+        };
+
+        let mut builds = Vec::new();
+        if manifest.scripts.contains_key("build") {
+            builds.push(script(root, None));
+        } else {
+            builds.extend(
+                members
+                    .iter()
+                    .filter(|member| member.manifest.scripts.contains_key("build"))
+                    .map(|member| script(&member.path, Some(member.name.clone()))),
+            );
+        }
+
+        if let Some(rust_root) = rust_root {
+            // As with the lockfile check: without a Cargo.lock, `--locked`
+            // would fail for want of one rather than for drift.
+            let mut args = vec!["build", "--workspace"];
+            if rust_root.join("Cargo.lock").exists() {
+                args.push("--locked");
+            }
+            builds.push(Self {
+                name: "Build",
+                tool: "cargo",
+                scope: Some("rust".to_owned()),
+                program: PathBuf::from("cargo"),
+                args,
+                dir: rust_root.to_path_buf(),
+            });
+        }
+        builds
+    }
+
     /// The checks that apply to one package, rooted at `dir`.
     ///
     /// A tool the package does not depend on produces no check at all — an

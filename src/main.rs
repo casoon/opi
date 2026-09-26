@@ -155,6 +155,7 @@ fn main() -> ExitCode {
             &project,
             &root,
         ),
+        Invocation::Hooks => hooks(&root),
         Invocation::Run {
             name,
             args,
@@ -1011,7 +1012,7 @@ fn run_workflow(
 
     let Some(workflow) = workflow::Workflow::parse(name) else {
         let block = ErrorBlock::new(format!("No workflow named {name}"))
-            .with_remedy("Known workflows: commit, release.");
+            .with_remedy("Known workflows: commit, push, release.");
         write_block(&block, Console::stderr(ColorMode::Auto));
         return ExitCode::FAILURE;
     };
@@ -1059,7 +1060,18 @@ fn run_workflow(
     .filter(|check| workflow.includes(check.name))
     .collect();
 
-    if checks.is_empty() {
+    let builds = if workflow.builds() {
+        check::Check::builds(
+            manifest,
+            members,
+            rust_root,
+            root,
+            project.package_manager.manager,
+        )
+    } else {
+        Vec::new()
+    };
+    if checks.is_empty() && builds.is_empty() {
         println!(
             "{}",
             console.paint(Tone::Muted, "No checks apply to this project.")
@@ -1068,10 +1080,11 @@ fn run_workflow(
 
     let width = checks
         .iter()
+        .chain(&builds)
         .map(|check| check.label().chars().count())
         .max()
         .unwrap_or(0);
-    let reports = check::run_all(checks, |report| {
+    let print = |report: &check::Report| {
         let (tone, mark) = match report {
             report if report.passed() => (Tone::Success, "✓"),
             report if report.unusable() => (Tone::Warning, "!"),
@@ -1083,7 +1096,15 @@ fn run_workflow(
             console.paint(tone, format!("{:width$}", report.check.label())),
             console.paint(Tone::Muted, report.check.tool),
         );
-    });
+    };
+    let mut reports = check::run_all(checks, print);
+    // After the checks and one at a time: a build pins the machine, and run
+    // beside the checks it would slow every one of them down.
+    for build in builds {
+        let report = build.run();
+        print(&report);
+        reports.push(report);
+    }
 
     let failed = reports.iter().filter(|report| !report.passed()).count();
     println!();
@@ -1115,6 +1136,45 @@ fn run_workflow(
         );
         ExitCode::SUCCESS
     }
+}
+
+/// Installs `opi --check push` as the repository's pre-push hook.
+fn hooks(root: &Path) -> ExitCode {
+    let console = Console::stdout(ColorMode::Auto);
+    let (message, hook) = match workflow::install_hook(root) {
+        Ok(workflow::HookInstall::Created(hook)) => ("Installed the pre-push hook", hook),
+        Ok(workflow::HookInstall::Appended(hook)) => ("Added opi to the pre-push hook", hook),
+        Ok(workflow::HookInstall::Present(hook)) => ("The pre-push hook already runs opi", hook),
+        Err(error) => {
+            let block = match error {
+                workflow::HookError::NotARepository => ErrorBlock::new("Not a git repository")
+                    .with_remedy("Hooks belong to a repository; run git init first."),
+                workflow::HookError::Io(error) => {
+                    ErrorBlock::new("Cannot write the hook").with_explanation(format!("{error}"))
+                }
+            };
+            write_block(&block, Console::stderr(ColorMode::Auto));
+            return ExitCode::FAILURE;
+        }
+    };
+    let shown = hook.strip_prefix(root).map_or_else(
+        |_| hook.display().to_string(),
+        |path| path.display().to_string(),
+    );
+    println!(
+        "{} {}  {}",
+        console.paint(Tone::Success, "✓"),
+        console.paint(Tone::Success, message),
+        console.paint(Tone::Muted, shown)
+    );
+    println!(
+        "{}",
+        console.paint(
+            Tone::Muted,
+            "Every push now runs `opi --check push`; `git push --no-verify` skips it."
+        )
+    );
+    ExitCode::SUCCESS
 }
 
 /// Shows which dependencies have moved on, separated by how far.

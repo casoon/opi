@@ -24,7 +24,8 @@ Options:
       --clean             Show and remove build artefacts
       --security          Scan for secrets and vulnerable dependencies
       --updates           Show dependencies with newer versions
-      --check <workflow>  Run a workflow: commit or release
+      --check <workflow>  Run a workflow: commit, push or release
+      --hooks             Run the push workflow as the pre-push hook
   -h, --help              Show this help
   -V, --version           Show the version
 
@@ -41,7 +42,7 @@ hotkey instead.
 - A literal `--` directly after the script name is dropped; a second one is passed on.
 - `--yes` (`-y`) is the only flag that may precede a script. After the script name it
   belongs to the script.
-- `--check` needs a workflow name, `commit` or `release`.
+- `--check` needs a workflow name: `commit`, `push` or `release`.
 - An unknown flag before the script is an error, and so is an unknown script name — with
   a suggestion where one is close.
 
@@ -65,6 +66,7 @@ hotkey instead.
 | `opi <script>` | The script's own — the script replaces the `opi` process |
 | `opi --health` | Non-zero when a check fails |
 | `opi --check <workflow>` | Non-zero when not ready |
+| `opi --hooks` | Non-zero outside a git repository or when the hook cannot be written |
 | `opi --security` | Non-zero when something needs acting on |
 | Unknown flag or script | `1` |
 

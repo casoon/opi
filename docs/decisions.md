@@ -180,3 +180,19 @@ state — it is not a history.
 >
 > *Reason:* a composite score stops meaning anything within weeks; concrete
 > results stay useful.
+
+> **opi is the CI for repositories without one**
+>
+> `opi --check push` runs every check and the build, and `opi --hooks` installs
+> it as the pre-push hook. A failing run blocks the push; `git push --no-verify`
+> is the way past it.
+>
+> *Reason:* the private repositories here run no CI on push, and the
+> replacement was a hand-written `verify` script and husky hook per repository.
+> opi already knew the tools; what was missing was the build, a gate on the
+> upstream branch and a hook nobody has to maintain.
+>
+> *Consequence:* workflows are no longer only "a convenience before pushing".
+> The push workflow is meant to be binding, which is why it blocks rather than
+> warns, and why its gates stay offline — a hook that waits on the network is a
+> hook people disable.

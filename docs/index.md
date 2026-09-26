@@ -10,8 +10,8 @@ anything first.
 
 Its primary job is to be a better `npm run`: the start screen shows the project's scripts,
 grouped and labelled, with the package manager detected rather than typed. Health, security,
-updates and clean sit one hotkey away, and two workflows run the right checks before a commit
-or a release.
+updates and clean sit one hotkey away, and three workflows run the right checks before a
+commit, a push or a release — the push one as a pre-push hook if you want it binding.
 
 **Status:** `0.10.0`. npm, pnpm, bun and Cargo projects are covered; yarn's scripts, health and
 security audit are too — its update listing is not read yet. `opi` runs on macOS and Linux

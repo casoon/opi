@@ -212,7 +212,7 @@ projects, and the bare word stays theirs.
 | Security | `S` | `--security` | Secret scan plus a parsed dependency audit |
 | Updates | `U` | `--updates` | Outdated dependencies, split by semver jump, and the offer to take them |
 | Clean | `C` | `--clean` | Removable artefacts, with sizes |
-| Workflows | — | `--check commit`/`release` | A named subset, plus git gates |
+| Workflows | — | `--check commit`/`push`/`release`, `--hooks` | A named subset, the build, git gates; `push` as the pre-push hook |
 
 **Security and updates ask whether there is an npm project at all.**
 `Project::package_manager` always holds a value — the absence of every signal
