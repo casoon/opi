@@ -227,6 +227,14 @@ that keeps the operator: `npm install x@1.1.1` turns an exact `2.1.2` into
 `packageManager` field settles it, the offer is withheld and the finding named
 instead.
 
+### Before every push
+
+For a repository without CI, `opi --hooks` makes the push workflow the
+pre-push hook: every check, then the build, and a push that fails any of them
+does not leave the machine. `git push --no-verify` is the way past it.
+
+![opi --hooks installing the pre-push hook, then git push running every check and the build and refusing the push because rustfmt found a diff](https://raw.githubusercontent.com/casoon/opi/main/assets/push.svg)
+
 ## Design rules
 
 - **Zero configuration.** `opi` must be useful in an unmodified repository. A

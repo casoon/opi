@@ -1,0 +1,27 @@
+# The push workflow as a pre-push hook: installed once, then every push runs
+# the checks and the build first. The fixture's unformatted report.rs is what
+# stops this one.
+version: 1
+
+terminal:
+  title: git push
+  cols: 92
+  rows: 28
+  theme: catppuccin-mocha
+  prompt: "{magenta}❯{/} "
+
+defaults:
+  speed: 55
+
+steps:
+  - wait: 800
+  - exec: opi --hooks
+    cwd: /tmp/opi-demo/pulse
+    idle: 1500
+    pause: 1200
+  - exec: git push
+    cwd: /tmp/opi-demo/pulse
+    # git speaks the recording machine's language otherwise.
+    env: { LC_ALL: C }
+    timeout: 180000
+    idle: 2500

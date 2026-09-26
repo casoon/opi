@@ -14,7 +14,11 @@ Two kinds of scene, because no single tool covers both yet:
   `exec:` step runs the real command in a pseudo-terminal and records what it
   printed, so the output is `opi`'s own. Needs `castwright` on `PATH`
   (`npm i -g @casoon/castwright node-pty`; if `exec` fails with
-  "posix_spawnp failed", `chmod +x` the `spawn-helper` the error names).
+  "posix_spawnp failed", `chmod +x` the `spawn-helper` the error names). Under
+  Volta, global packages are isolated from each other and castwright cannot
+  find `node-pty`; install both into one directory instead, with
+  `"allowScripts": {"node-pty": true}` in its `package.json` since npm 11
+  runs no install scripts otherwise, and put its `node_modules/.bin` on `PATH`).
 - **`tapes/*.tape`** — the scenes that press keys *inside* the running
   interface (tab row, search, `Enter` on a row), which castwright cannot do
   yet. They need [vhs](https://github.com/charmbracelet/vhs) 0.12.1 or newer
@@ -50,6 +54,10 @@ advisory and a newer release, so `--security` and `--updates` each have a real
 finding. `--updates` compares against what is installed, so `record.sh` runs
 `npm ci` in the copy — the only step that needs the network besides the audit.
 
+For the push scene `record.sh` turns the `pulse` copy into a git repository
+with a bare upstream beside it and one commit not yet pushed, so the hook has
+something to guard. The same unformatted `report.rs` is what stops the push.
+
 The npm scripts in both fixtures point at small shell scripts under `bin/`
 that print what the real tool would print. Nothing about `opi`'s own output is
 faked — only the projects are.
@@ -59,9 +67,10 @@ faked — only the projects are.
 | | |
 | --- | --- |
 | `casts/health.terminal.yaml` | Every check the project's tools can answer |
-| `casts/security.terminal.yaml` | The dependency audit, with the fixture's old lodash as the finding |
+| `casts/security.terminal.yaml` | The dependency audit, with the fixture's old lodash as the finding, and the supply-chain lines |
 | `casts/updates.terminal.yaml` | The same lodash as an update that is safe to take |
 | `casts/direct.terminal.yaml` | The command line, without the interface |
+| `casts/push.terminal.yaml` | `opi --hooks`, then a `git push` the hook refuses |
 | `tapes/hero.tape` | The start screen, the tab row, one search across every group, running a script |
 | `tapes/ecosystems.tape` | npm and cargo in a single list |
 

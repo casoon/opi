@@ -29,6 +29,18 @@ export PATH="$work/bin:$PATH"
 # --updates compares against what is installed; without node_modules npm
 # reports no current version and there is nothing to compare.
 (cd "$work/pulse" && npm ci --ignore-scripts --no-audit --no-fund --silent)
+# The push scene needs a repository with an upstream and one commit not yet
+# pushed, so its pre-push hook has something to guard.
+(
+  cd "$work/pulse"
+  git() { command git -c user.name=demo -c user.email=demo@example.com "$@"; }
+  printf 'node_modules/\ntarget/\nCargo.lock\n' > .gitignore
+  git init -q -b main && git add -A && git commit -qm "Start the dashboard"
+  git init -q --bare "$work/pulse.git"
+  git remote add origin "$work/pulse.git" && git push -q -u origin main
+  printf '# pulse\n\nThe team dashboard.\n' > README.md
+  git add README.md && git commit -qm "Describe the dashboard"
+)
 
 mkdir -p "$root/assets"
 

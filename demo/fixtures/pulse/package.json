@@ -3,7 +3,7 @@
   "private": true,
   "scripts": {
     "dev": "./bin/dev.sh",
-    "build": "vite build",
+    "build": "./bin/build.sh",
     "check": "biome check .",
     "test": "vitest run"
   },
