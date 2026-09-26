@@ -197,6 +197,16 @@ fn list(
             "{}",
             console.paint(Tone::Muted, "This project defines no scripts.")
         );
+        let others = task::other_runners(directory);
+        if !others.is_empty() {
+            println!(
+                "{}",
+                console.paint(
+                    Tone::Muted,
+                    format!("Its tasks may live in {}.", others.join(", "))
+                )
+            );
+        }
         return ExitCode::SUCCESS;
     }
 
@@ -313,8 +323,10 @@ fn layout(entries: usize, groups: usize) -> Layout {
 /// tab layout two of the three are no longer on screen at once.
 ///
 /// Packages are named only where there are some. A single-package project
-/// saying "1 package" would answer a question nobody in it has.
-fn summary(sections: &[(&task::Group, &[Task])], entries: usize) -> String {
+/// saying "1 package" would answer a question nobody in it has. The same goes
+/// for task runner files beside the manifest: named when present, so the list
+/// does not pass for everything the project can do.
+fn summary(sections: &[(&task::Group, &[Task])], entries: usize, others: &[String]) -> String {
     let mut parts = vec![
         plural(entries, "entry", "entries"),
         plural(sections.len(), "group", "groups"),
@@ -326,6 +338,9 @@ fn summary(sections: &[(&task::Group, &[Task])], entries: usize) -> String {
         .count();
     if packages > 0 {
         parts.push(plural(packages, "package", "packages"));
+    }
+    if !others.is_empty() {
+        parts.push(format!("also {}", others.join(", ")));
     }
 
     parts.join(" · ")
@@ -345,7 +360,7 @@ fn build_menu(project: &Project, tasks: &[Task], directory: &Path) -> Menu {
     let mut menu = Menu::new()
         .with_heading(project.display_name(directory))
         .with_note(toolchains(tasks, project))
-        .with_summary(summary(&sections, entries))
+        .with_summary(summary(&sections, entries, &task::other_runners(directory)))
         .with_layout(layout(entries, sections.len()));
 
     let mut packaged = false;
@@ -1551,7 +1566,7 @@ mod tests {
             (TaskGroup::Quality, 4),
         ]);
         let sections = by_group(&tasks);
-        assert_eq!(summary(&sections, 15), "15 entries · 3 groups");
+        assert_eq!(summary(&sections, 15, &[]), "15 entries · 3 groups");
     }
 
     #[test]
@@ -1560,8 +1575,8 @@ mod tests {
         // project has.
         let tasks = sections(&[(TaskGroup::Development, 1)]);
         let sections = by_group(&tasks);
-        assert!(!summary(&sections, 1).contains("package"));
-        assert_eq!(summary(&sections, 1), "1 entry · 1 group");
+        assert!(!summary(&sections, 1, &[]).contains("package"));
+        assert_eq!(summary(&sections, 1, &[]), "1 entry · 1 group");
     }
 
     #[test]
@@ -1572,6 +1587,19 @@ mod tests {
             (TaskGroup::Workspace("@casoon/starter".to_owned()), 1),
         ]);
         let sections = by_group(&tasks);
-        assert_eq!(summary(&sections, 4), "4 entries · 3 groups · 2 packages");
+        assert_eq!(
+            summary(&sections, 4, &[]),
+            "4 entries · 3 groups · 2 packages"
+        );
+    }
+
+    #[test]
+    fn the_summary_names_other_task_runners() {
+        let tasks = sections(&[(TaskGroup::Development, 2)]);
+        let sections = by_group(&tasks);
+        assert_eq!(
+            summary(&sections, 2, &["Makefile".to_owned()]),
+            "2 entries · 1 group · also Makefile"
+        );
     }
 }

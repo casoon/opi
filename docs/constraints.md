@@ -56,7 +56,11 @@ exists — and nothing else.
 competes with npm scripts, `just`, `make`, `mise` and Taskfile — a contest with
 no upside — while also becoming a tool that must be configured first.
 
-Workflows (`commit`, `release`) are named lists of existing task names, not a new
+It does name them. A `Makefile`, `justfile`, `Taskfile.yml` or a `mise.toml` with tasks beside
+the manifest shows up in the line under the heading — `also Makefile` — so the list does not
+pass for everything the project can do. Named only: their targets are never read and never run.
+
+Workflows (`commit`, `push`, `release`) are named lists of existing task names, not a new
 task type.
 
 ## Orchestration, not reimplementation

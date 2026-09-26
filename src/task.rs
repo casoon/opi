@@ -8,6 +8,8 @@
 //! The rule this module exists to enforce: **the script name is not the user
 //! interface.** A flat alphabetical list of raw names is what `opi` is for.
 
+use std::path::Path;
+
 use crate::manifest::Manifest;
 use crate::workspace::Member;
 
@@ -435,6 +437,47 @@ pub fn from_cargo(project: &crate::cargo::Project) -> Vec<Task> {
             hidden: false,
         })
         .collect()
+}
+
+/// Task runner files opi recognises but neither reads nor runs.
+///
+/// Named so the list does not look like everything the project can do when a
+/// Makefile beside it holds half of it. Only named: reading targets out of a
+/// Makefile or a justfile is the start of a task system of its own, which opi
+/// deliberately does not have. Matched against the directory's real entries,
+/// so a case-insensitive filesystem does not report `Makefile` twice.
+const OTHER_RUNNERS: &[&str] = &[
+    "Makefile",
+    "makefile",
+    "GNUmakefile",
+    "justfile",
+    "Justfile",
+    ".justfile",
+    "Taskfile.yml",
+    "Taskfile.yaml",
+    "mise.toml",
+    ".mise.toml",
+];
+
+/// The task runner files in `dir` besides the manifests, by their own name.
+///
+/// A `mise.toml` counts only where it defines tasks; most of them only pin
+/// tool versions, and naming those would be noise.
+pub fn other_runners(dir: &Path) -> Vec<String> {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return Vec::new();
+    };
+    let mut found: Vec<String> = entries
+        .filter_map(|entry| entry.ok()?.file_name().into_string().ok())
+        .filter(|name| OTHER_RUNNERS.contains(&name.as_str()))
+        .filter(|name| {
+            !name.ends_with("mise.toml")
+                || std::fs::read_to_string(dir.join(name))
+                    .is_ok_and(|contents| contents.lines().any(|line| line.starts_with("[tasks")))
+        })
+        .collect();
+    found.sort();
+    found
 }
 
 /// Orders a combined task list and puts the hidden ones last.
@@ -1035,5 +1078,27 @@ mod tests {
             sections.iter().map(|(_, tasks)| tasks.len()).sum::<usize>(),
             names(&tasks).len()
         );
+    }
+
+    #[test]
+    fn other_task_runners_are_named_not_read() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        std::fs::write(dir.path().join("Makefile"), "build:\n\tcc main.c\n").expect("write");
+        std::fs::write(dir.path().join("justfile"), "test:\n  cargo test\n").expect("write");
+        std::fs::write(dir.path().join("README.md"), "").expect("write");
+        assert_eq!(other_runners(dir.path()), ["Makefile", "justfile"]);
+    }
+
+    #[test]
+    fn a_mise_file_counts_only_with_tasks() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        std::fs::write(dir.path().join("mise.toml"), "[tools]\nnode = \"22\"\n").expect("write");
+        assert!(other_runners(dir.path()).is_empty());
+        std::fs::write(
+            dir.path().join("mise.toml"),
+            "[tools]\nnode = \"22\"\n\n[tasks.build]\nrun = \"vite build\"\n",
+        )
+        .expect("write");
+        assert_eq!(other_runners(dir.path()), ["mise.toml"]);
     }
 }

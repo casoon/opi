@@ -16,6 +16,20 @@ All notable changes to this project are documented here. The format follows
 - `opi --hooks` installs `opi --check push` as the pre-push hook — in
   `.husky/pre-push` where the repository has husky, otherwise wherever git
   keeps its hooks. Idempotent; an existing hook keeps its lines.
+- The list names task runner files beside the manifest — `Makefile`,
+  `justfile`, `Taskfile.yml`, a `mise.toml` with tasks — in the line under the
+  heading (`also Makefile`). Named only, never read or run.
+
+### Added
+
+- A **push** workflow, `opi --check push`: every detected check, then the
+  build, on a working tree that is clean and not behind its upstream branch.
+  The build is the project's own `build` script (each member's in a workspace
+  whose root has none) and `cargo build --workspace --locked`, run after the
+  other checks and one at a time. `release` builds too; `commit` stays fast.
+- `opi --hooks` installs `opi --check push` as the pre-push hook — in
+  `.husky/pre-push` where the repository has husky, otherwise wherever git
+  keeps its hooks. Idempotent; an existing hook keeps its lines.
 
 ## [0.10.0] - 2026-09-25
 
