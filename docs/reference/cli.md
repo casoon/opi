@@ -76,4 +76,4 @@ hotkey instead.
 build there fails with `no library targets found`, which is what every binary-only crate gets and
 no metadata can change. The manifest's `documentation` field therefore points at this site. The
 package is on [crates.io/crates/opi](https://crates.io/crates/opi); the internals are described in
-[Architecture](../../architecture/).
+[Architecture](https://github.com/casoon/opi/blob/main/docs/architecture.md).

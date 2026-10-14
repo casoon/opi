@@ -2,36 +2,31 @@
 import {
   Badge,
   Badges,
-  BuildOutput,
+  Button,
   CodeBlock,
   Facts,
   Features,
   Hero,
   Install,
   Quickstart,
-  Terminal,
+  Tabs,
 } from '@casoon/pages-theme/components';
 import Base from '@casoon/pages-theme/layouts/Base.astro';
-// The README's hero recording, imported rather than copied so there is one file.
+import { url } from '@casoon/pages-theme/url';
+// The README's recordings, imported rather than copied so there is one file each.
+// opi.gif is recorded with vhs (keys pressed inside the interface); the SVGs are castwright
+// scenes from demo/casts/*.terminal.yaml with opi's real output (demo/record.sh).
 import hero from '../../../assets/opi.gif';
-import { capture } from '../showcase';
+import healthSvg from '../../../assets/health.svg?url';
+import pushSvg from '../../../assets/push.svg?url';
+import securitySvg from '../../../assets/security.svg?url';
+import updatesSvg from '../../../assets/updates.svg?url';
+import Diagram from '../components/Diagram.astro';
 
-const usage = `opi                   # navigate: ↓ ↓ Enter
-opi                   # filter:   /dep ↵
-opi dev               # direct, no interface
-opi build --verbose   # arguments go to the script
-opi blog/dev          # a workspace member's script`;
-
-const config = `{
-  "scripts": { "dev": "astro dev", "deploy": "wrangler deploy" },
-  "scripts-info": { "dev": "Start development server" },
-  "opi": {
-    "scripts": {
-      "dev":    { "favorite": true },
-      "deploy": { "group": "Deployment", "confirm": true }
-    }
-  }
-}`;
+const usage = `opi                 # pick a script
+opi dev             # run one directly
+opi --check commit  # checks before a commit
+opi --hooks         # checks before every push`;
 ---
 
 <Base>
@@ -64,6 +59,28 @@ const config = `{
     />
   </Hero>
 
+  <Features
+    heading="Who it is for"
+    items={[
+      {
+        title: 'You switch between projects',
+        body: 'Every repository has its own scripts, package manager and checks. opi shows what this one can do the moment you type it — no README to dig through, no npm run without arguments.',
+      },
+      {
+        title: 'Scripts first',
+        body: 'Enter runs the highlighted script, / filters across every group, and the script replaces the opi process — Ctrl-C reaches your dev server and its exit code reaches your shell.',
+      },
+      {
+        title: 'Your tools, not new ones',
+        body: 'Health runs what the project already depends on — Biome, ESLint, tsc, astro check, Vitest, cargo — concurrently, and relays what they said.',
+      },
+      {
+        title: 'opi writes nothing',
+        body: 'Clean removes what you choose; updates are applied by the package manager. No package.json and no lockfile is ever rewritten by opi itself.',
+      },
+    ]}
+  />
+
   <Facts
     items={[
       { value: '0', label: 'configuration files needed' },
@@ -73,36 +90,93 @@ const config = `{
     ]}
   />
 
-  <Features
-    items={[
-      {
-        title: 'Scripts first',
-        body: 'The start screen is the script list. Enter runs the highlighted entry, / filters across every group, and the script replaces the opi process — Ctrl-C reaches your dev server and its exit code reaches your shell.',
-      },
-      {
-        title: 'Orchestration, not reimplementation',
-        body: 'Health runs the tools the project already depends on — Biome, ESLint, tsc, astro check, Vitest, cargo — concurrently, and relays what they said. Output is parsed only where the format is documented.',
-      },
-      {
-        title: 'Your scripts keep their names',
-        body: 'health, clean and release are script names in real projects, so every built-in area is a flag or a hotkey, never a bare word.',
-      },
-      {
-        title: 'opi writes nothing',
-        body: 'Clean removes what you choose; updates are applied by the package manager, followed by the commit checks. No package.json and no lockfile is ever rewritten by opi itself.',
-      },
-    ]}
-  />
+  <section class="block" aria-labelledby="areas-heading">
+    <h2 id="areas-heading">One key away</h2>
+    <p class="lead">
+      Recorded with opi 0.11.0 in a small demo project that has <code>package.json</code> and{' '}
+      <code>Cargo.toml</code>, an unformatted Rust file and an old lodash — so every scene has a
+      real finding.
+    </p>
+    <Tabs
+      label="opi areas"
+      tabs={[
+        { id: 'health', label: 'Health' },
+        { id: 'security', label: 'Security' },
+        { id: 'updates', label: 'Updates' },
+        { id: 'push', label: 'Before a push' },
+      ]}
+    >
+      <div slot="health">
+        <img
+          class="scene"
+          src={healthSvg}
+          width="796.8"
+          height="404"
+          loading="lazy"
+          alt="opi --health running five checks in a project with package.json and Cargo.toml: Lockfile (npm), Docs, Lint and Tests (rust) pass, Format (rust) fails and rustfmt's diff of src/report.rs is shown under it, ending with '1 of 5 checks failed.'"
+        />
+      </div>
+      <div slot="security">
+        <img
+          class="scene"
+          src={securitySvg}
+          width="796.8"
+          height="368"
+          loading="lazy"
+          alt="opi --security: no secret scanner in this project, one high vulnerability in lodash with the remedy to update, every installed package's signature verified, a note that no minimum release age is set, and no known vulnerabilities on the Rust side"
+        />
+      </div>
+      <div slot="updates">
+        <img
+          class="scene"
+          src={updatesSvg}
+          width="796.8"
+          height="332"
+          loading="lazy"
+          alt="opi --updates listing lodash 4.17.20 → 4.18.1 as a minor update that is safe to take, with the Rust dependencies current"
+        />
+      </div>
+      <div slot="push">
+        <img
+          class="scene"
+          src={pushSvg}
+          width="796.8"
+          height="548"
+          loading="lazy"
+          alt="opi --hooks installing the pre-push hook, then git push running opi --check push: working tree clean, not behind upstream, the checks and both builds, with Format (rust) failing, so the push is refused"
+        />
+      </div>
+    </Tabs>
+    <div class="links">
+      <Button href={url('docs/guides/health/')} variant="secondary">Health</Button>
+      <Button href={url('docs/guides/security/')} variant="secondary">Security</Button>
+      <Button href={url('docs/guides/updates/')} variant="secondary">Updates</Button>
+      <Button href={url('showcase/')} variant="secondary">More output in the showcase</Button>
+    </div>
+  </section>
 
-  <BuildOutput
-    caption="Captured from opi 0.11.0 on its own repository with site/captures/capture.sh, piped — the showcase has the other areas."
-    file="site/captures/list.txt"
-  >
-    <Terminal ansi={capture('list.txt')} />
-  </BuildOutput>
+  <section class="block" aria-labelledby="flow-heading">
+    <h2 id="flow-heading">Before a commit, before a push</h2>
+    <div class="text">
+      <p>
+        <code>opi --check commit</code> runs the fast checks — everything except tests and dead
+        code — so it stays quick enough to run every time. <code>opi --check push</code> adds two
+        questions about the repository, the tests and the build.
+      </p>
+      <p>
+        <code>opi --hooks</code> installs the push check as git's pre-push hook. A repository
+        without CI then cannot push a red state by accident; <code>git push --no-verify</code>{' '}
+        remains the way around it.
+      </p>
+    </div>
+    <Diagram name="push-flow" format="svg" narrow={{ width: 560, height: 880 }} />
+    <div class="links">
+      <Button href={url('docs/guides/workflows/')} variant="secondary">Workflows in detail</Button>
+    </div>
+  </section>
 
   <Quickstart
-    lead="Install, change into a project, type opi. The full walkthrough lives in the documentation."
+    lead="Install, change into a project, type opi. Grouping and confirmations can be refined in package.json — see Configuration in the documentation."
     steps={[
       'Install the release binary with the install script, or build it with <code>cargo install opi</code>.',
       'Change into any directory of a project with a <code>package.json</code> or <code>Cargo.toml</code>.',
@@ -110,7 +184,6 @@ const config = `{
     ]}
   >
     <CodeBlock code={usage} lang="sh" label="Usage" />
-    <CodeBlock code={config} lang="json" title="package.json" label="Optional refinement" />
   </Quickstart>
 </Base>
 
@@ -120,5 +193,46 @@ const config = `{
     width: 100%;
     height: auto;
     border-radius: 10px;
+  }
+  .block {
+    max-width: var(--max);
+    margin: 0 auto;
+    padding: 0 24px 96px;
+  }
+  h2 {
+    margin: 0 0 14px;
+    color: var(--heading);
+    font-size: 30px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+  .lead {
+    max-width: 72ch;
+    margin: 0 0 20px;
+    font-size: 15.5px;
+  }
+  .text {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
+    gap: 0 48px;
+  }
+  .text p {
+    margin: 0 0 16px;
+    font-size: 15.5px;
+  }
+  /* Never scale a terminal scene beyond a readable size. */
+  .scene {
+    display: block;
+    width: 100%;
+    max-width: 800px;
+    height: auto;
+    margin: 16px auto 0;
+  }
+  .links {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    margin-top: 20px;
   }
 </style>

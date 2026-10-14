@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "type": "flow",
+  "title": "What opi does before a push",
+  "description": "You run git push. The pre-push hook that opi --hooks installed starts opi --check push. It first asks whether the working tree is clean and the branch is not behind its upstream, then runs every check the project's own tools answer, concurrently, and builds the project after them, one build at a time. If a gate or a step failed, the push is refused with a non-zero exit code; otherwise git pushes.",
+  "source": "src/workflow.rs (Workflow::gates, includes, builds), src/main.rs (the --check run), src/check.rs",
+  "width": 1240,
+  "height": 320,
+  "flow": {
+    "nodes": [
+      { "id": "push", "label": "git push", "kind": "start" },
+      { "id": "hook", "label": "opi --check push", "sublabel": "pre-push hook" },
+      { "id": "gates", "label": "Repository gates", "sublabel": "clean tree, not behind" },
+      { "id": "checks", "label": "Project checks", "sublabel": "lint, types, tests, secrets…" },
+      { "id": "build", "label": "Build", "sublabel": "after the checks" },
+      { "id": "ok", "label": "All passed?", "kind": "decision" },
+      { "id": "refused", "label": "Push refused", "sublabel": "exit code non-zero", "kind": "end" },
+      { "id": "pushed", "label": "Push goes on", "kind": "end" }
+    ],
+    "edges": [
+      { "from": "push", "to": "hook" },
+      { "from": "hook", "to": "gates" },
+      { "from": "gates", "to": "checks" },
+      { "from": "checks", "to": "build" },
+      { "from": "build", "to": "ok" },
+      { "from": "ok", "to": "refused", "label": "no" },
+      { "from": "ok", "to": "pushed", "label": "yes" }
+    ],
+    "mainPath": ["push", "hook", "gates", "checks", "build", "ok", "pushed"],
+    "orientation": "landscape"
+  }
+}
