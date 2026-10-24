@@ -137,6 +137,22 @@
       "run",
       "child"
     ],
-    "orientation": "portrait"
+    "orientation": "portrait",
+    "sameRank": [
+      [
+        "npm",
+        "cargo"
+      ],
+      [
+        "project",
+        "task"
+      ]
+    ],
+    "notes": [
+      {
+        "on": "npm",
+        "text": "Each manifest is parsed once; nothing re-reads a file"
+      }
+    ]
   }
 }
