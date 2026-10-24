@@ -38,7 +38,7 @@ This builds `opi` locally. It needs Rust `1.85` or newer.
 `opi` runs a script by replacing its own process with `exec`, so `Ctrl-C` reaches the dev
 server rather than killing a wrapper, and its interactive list drives termios directly.
 Windows offers neither. Building on Windows fails with an explicit message rather than
-producing a degraded binary — see [Constraints](https://github.com/casoon/opi/blob/main/docs/constraints.md).
+producing a degraded binary — see [Constraints](../../constraints/).
 
 ## Another `opi`
 

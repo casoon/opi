@@ -36,11 +36,11 @@ The project's own files are the only interface: `package.json` and `Cargo.toml`.
 
 ## Project documentation
 
-The repository's `docs/` folder also describes the codebase as it stands — for contributors,
-and for anyone who wants to know why `opi` behaves the way it does. These pages live on GitHub:
+These pages also describe the codebase as it stands — for contributors, and for anyone who
+wants to know why `opi` behaves the way it does:
 
-- [Project state](https://github.com/casoon/opi/blob/main/docs/project-state.md) — what this is and where it stands
-- [Architecture](https://github.com/casoon/opi/blob/main/docs/architecture.md) — the modules and how they fit
-- [Constraints](https://github.com/casoon/opi/blob/main/docs/constraints.md) — the boundaries the implementation respects
-- [Conventions](https://github.com/casoon/opi/blob/main/docs/conventions.md) — the rules future changes follow
-- [Decisions](https://github.com/casoon/opi/blob/main/docs/decisions.md) — the decisions in force, and why
+- [Project state](project-state/) — what this is and where it stands
+- [Architecture](architecture/) — the modules and how they fit
+- [Constraints](constraints/) — the boundaries the implementation respects
+- [Conventions](conventions/) — the rules future changes follow
+- [Decisions](decisions/) — the decisions in force, and why

@@ -19,6 +19,9 @@ export default defineConfig({
         { label: 'GitHub releases', href: 'https://github.com/casoon/opi/releases' },
       ],
       docsGroups: {
+        // The theme puts pages at the root of docs/ in the first group, so the first
+        // group is theirs: Overview and the pages about the codebase itself.
+        '': 'The project',
         'getting-started': 'Getting started',
         guides: 'Guides',
         reference: 'Reference',

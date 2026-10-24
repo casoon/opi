@@ -19,6 +19,12 @@ minor release may change existing behaviour.
   name. Every workspace flag missed `runemark`'s Node binding, so its tests ran
   in CI and nowhere else. A manifest wired to nothing stays out, like `opi`'s
   own `demo/fixtures/pulse`.
+- **Docs:** the pages describing the codebase — project state, architecture,
+  constraints, conventions, decisions — are on the project page, under **The
+  project**, instead of being linked as raw markdown on GitHub. They already
+  carried page frontmatter; the content glob never matched a file sitting
+  directly in `docs/`. Details:
+  [Project state](https://casoon.github.io/opi/docs/project-state/).
 
 ### Fixed
 
