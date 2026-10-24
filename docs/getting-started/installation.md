@@ -13,6 +13,10 @@ curl -fsSL https://raw.githubusercontent.com/casoon/opi/main/install.sh | sh
 The script downloads the release binary for your platform, checks it against the published
 SHA-256 and puts it in `~/.local/bin`. Nothing else is touched.
 
+This exists because `cargo install opi` builds the binary on your machine, and needing a Rust
+toolchain is a poor requirement for a tool whose point is that you can use it in any
+repository. The binaries come out of CI; publishing the crate stays local.
+
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `OPI_INSTALL_DIR` | `$HOME/.local/bin` | Where the binary goes |

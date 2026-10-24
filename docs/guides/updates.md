@@ -43,7 +43,14 @@ includes a major. **Decide per package** lists every finding as a ticked line, m
 them — for the case the bulk lines cannot reach: one major you have read the release notes
 for, beside a dozen minors you have not thought about. The safe ones start ticked and the
 majors do not, so confirming without touching anything does what "Raise the ranges" does,
-and a major is only ever taken deliberately.
+and a major is only ever taken deliberately. Leaving the list without confirming applies
+nothing, and an empty selection is a no-op rather than a call with no names.
+
+The bulk split is staying inside the ranges against raising them, rather than the list's own
+safe-against-breaking one, because that ordering is the wrong question here. Measured: three
+dependencies, two of them "safe", and `pnpm update` moved none — an exact pin and a `~` range
+each already had what they asked for. As a line to retype nobody notices; as a key it would be
+an action that does nothing and reports success.
 
 Raising ranges — and with it the per-package list — is offered for pnpm only, because npm
 has no command that keeps the range operator: `npm install x@1.1.1` turns an exact `2.1.2`
@@ -56,5 +63,29 @@ once bun is done. yarn is not offered anything: Yarn Berry has no `outdated` at 
 
 `opi` writes nothing itself. It calls the package manager with a list of names — no
 `package.json`, no lockfile is touched by `opi`. Where two lockfiles disagree and no
-`packageManager` field settles it, the offer is withheld and the finding named instead. Rust's
-section carries no next step, because `cargo update` writes the lockfile.
+`packageManager` field settles it, the offer is withheld and the finding named instead, since
+writing with the wrong manager leaves a lockfile the team did not ask for. Without a terminal
+nothing is applied at all. Rust's section carries no next step, because `cargo update` writes
+the lockfile — the line `--updates` does not cross.
+
+That `opi` applies anything is itself a reversal. The rule used to be that updates are never
+applied, because pnpm catalogs put versions outside `package.json`; measured, pnpm rewrites
+the catalog correctly, and **45 of 79 workspaces here use one** — the exception was the rule.
+
+## Limits
+
+**A pnpm workspace has to be asked with `-r`.** Asked at the root alone, `pnpm outdated`
+found 2 of 11 outdated packages on one real repository — and where a root declares no
+dependencies of its own it answers `{}`, which reads as "everything is current" over stale
+packages. 79 of 133 npm projects measured here are pnpm workspaces. The same trap applies to
+`bun update --interactive`, measured with bun 1.3.3: without `-r` the interactive list leaves
+the members' packages off.
+
+**npm needs none of that.** It walks the installed tree rather than the manifests and already
+sees every member, measured both ways on a two-member workspace.
+
+**pnpm's JSON is keyed by package name**, so a package present at two versions in two members
+shows one of them. `pnpm outdated -r` prints both rows itself.
+
+**`Jump` never learns where a version came from.** Cargo treating `0.12 → 0.13` as breaking
+needed no rule of its own: that rule was already there, and already applied to npm.

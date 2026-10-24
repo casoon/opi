@@ -44,7 +44,8 @@ hotkey instead.
   belongs to the script.
 - `--check` needs a workflow name: `commit`, `push` or `release`.
 - An unknown flag before the script is an error, and so is an unknown script name — with
-  a suggestion where one is close.
+  a suggestion where one is close, matched by optimal string alignment, so a transposition
+  counts as one edit rather than two.
 
 ## Keys in the list
 
