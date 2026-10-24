@@ -60,9 +60,9 @@ gets a usable list, which is the point of the whole arrangement.
   `--updates` calls the package manager with a list of names; `opi` itself
   writes no manifest, no lockfile and no catalog, and no check runs in a
   fixing mode. The one exception is the line `opi --hooks` appends to the
-  pre-push hook. See [Constraints](constraints/).
+  pre-push hook. See [Constraints](../constraints/).
 - **.NET.** No standalone marker appeared in the 231 directories measured.
-- **Windows.** See [Decisions](decisions/).
+- **Windows.** See [Decisions](../decisions/).
 
 ## Stack
 
@@ -77,10 +77,10 @@ gets a usable list, which is the point of the whole arrangement.
 
 ## Documentation in this directory
 
-- [Architecture](architecture/) — the modules that exist and how they fit
-- [Constraints](constraints/) — the boundaries the implementation respects
-- [Conventions](conventions/) — the rules future changes follow
-- [Decisions](decisions/) — the decisions in force, and why
+- [Architecture](../architecture/) — the modules that exist and how they fit
+- [Constraints](../constraints/) — the boundaries the implementation respects
+- [Conventions](../conventions/) — the rules future changes follow
+- [Decisions](../decisions/) — the decisions in force, and why
 
 The working backlog lives in the gitignored `plan/` directory, which is not
 part of this documentation and not published with the crate.

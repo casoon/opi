@@ -11,6 +11,7 @@ export default defineConfig({
       name: 'opi',
       description:
         'Operations Interface — a project control center for your terminal: scripts, health, security, updates and clean for npm, pnpm, bun and Cargo projects.',
+      tagline: 'Project control center for the terminal',
       repo: 'casoon/opi',
       version: '0.11.0',
       license: 'MIT',

@@ -6,7 +6,7 @@ order: 4
 
 Rules future changes follow. Everything here is visible in the code as it
 stands; where a rule is a decision rather than an observation, it is in
-[Decisions](decisions/) instead.
+[Decisions](../decisions/) instead.
 
 ## Validation
 
@@ -124,7 +124,7 @@ through to the script is not.
 A diagram on these pages is a chartlet specification in `site/diagrams/<name>.json`,
 placed with `<Diagram name="<name>" />` in an `.mdx` page. The theme renders no
 mermaid, so a mermaid block reaches the site as highlighted source rather than a
-picture — which is how the flow in [Architecture](architecture/) looked until it
+picture — which is how the flow in [Architecture](../architecture/) looked until it
 became a chartlet flow.
 
 A diagram is rendered at build time in the light and the dark theme, and carries its

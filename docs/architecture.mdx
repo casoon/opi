@@ -186,7 +186,7 @@ terminal, the signals and the exit status, so `Ctrl-C` reaches a dev server
 instead of killing a wrapper, and `opi build && …` works in a shell chain.
 `opi` does not return to its list afterwards, because it no longer exists.
 
-This is why `opi` is Unix-only — see [Constraints](constraints/).
+This is why `opi` is Unix-only — see [Constraints](../constraints/).
 
 npm is the only package manager given a `--` before forwarded arguments; it
 needs the separator to tell its own flags from the script's and strips it,
@@ -298,7 +298,7 @@ both ecosystems.
 
 **Updates can apply what it found, by delegating.** `opi` calls the package
 manager with a list of names and writes nothing itself — see
-[Constraints](constraints/) for what that rules out and why.
+[Constraints](../constraints/) for what that rules out and why.
 
 The choice offered is not safe against breaking. That is the *list's* ordering,
 and it is the wrong question for the action: measured on one project, three
@@ -451,7 +451,7 @@ output still decide it — but it is why those counts are legible in a pipe.
   groups in a row above the list and shows only the active one's entries. The
   thresholds are `main`'s, not runemark's: a menu knows how many entries it
   has, not how much of the screen its caller is willing to spend. Why a count
-  rather than the terminal's height is in [Decisions](decisions/).
+  rather than the terminal's height is in [Decisions](../decisions/).
 - **Workspace packages share one tab**, marked off by a divider, via
   `Group::in_tab`. One each does not scale — the largest workspace measured
   here has 52 packages against 6 action groups — and it put two questions on

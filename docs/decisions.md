@@ -158,7 +158,7 @@ state — it is not a history.
 > catalogs correctly — measured, including the 45 of 79 workspaces here that
 > use a catalog. opi writing any of them itself would be the guess. (The rule
 > used to be "updates are never applied"; see
-> [Constraints](constraints/) for why it narrowed.)
+> [Constraints](../constraints/) for why it narrowed.)
 >
 > *Consequence:* the value of the screen is the separation — "two safe, one
 > major" is a decision, a column of version numbers is homework.
