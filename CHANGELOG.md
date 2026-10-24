@@ -6,6 +6,19 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Rust:** `cargo rustdoc` runs a second time with `--all-features` where the
+  manifest has a feature to turn on. A link from an always compiled item to one
+  behind a feature resolves in the one feature set and not in the other — on
+  `runemark`, `--all-features` passed while the default set reported three
+  errors.
+- **Rust:** a package below the project root that belongs to no workspace, tied
+  to the root by a path dependency, gets a test run of its own under its package
+  name. Every workspace flag missed `runemark`'s Node binding, so its tests ran
+  in CI and nowhere else. A manifest wired to nothing stays out, like `opi`'s
+  own `demo/fixtures/pulse`.
+
 ## [0.11.0] - 2026-09-26
 
 ### Added

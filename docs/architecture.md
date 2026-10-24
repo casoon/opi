@@ -154,7 +154,13 @@ something read out of the manifest. The list offers run, build, check,
 test, clippy, fmt and doc; `cargo run` only where something is runnable.
 Health checks what these repositories actually run in CI: `fmt --check`,
 `clippy` with warnings denied, `rustdoc` with warnings denied, `test`, and
-`metadata --locked` where `Cargo.lock` is committed.
+`metadata --locked` where `Cargo.lock` is committed. `rustdoc` runs a second
+time with `--all-features` where the manifest has a feature to turn on, because
+a link from an always compiled item to one behind a feature resolves in the one
+feature set and not in the other. A package below the root that belongs to no
+workspace and is tied to the root by a path dependency — a Node binding beside
+the crate — gets its tests run where it lives, since no `--workspace` reaches
+it.
 
 `Cargo.toml` is read without a TOML parser. Two facts are wanted — the package
 name and whether a binary exists — and a dependency to learn them would cost

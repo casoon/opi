@@ -228,6 +228,9 @@ fn lists(path: &OsStr, name: &str) -> bool {
 /// otherwise checks only that package. `Docs` stays without it — `rustdoc`
 /// documents one target, not a workspace, and `--workspace` is not its flag
 /// to take.
+///
+/// `Docs` documents the default feature set. `FEATURE_CHECKS` below adds the
+/// other set where there is one; the comment there says why one is not enough.
 pub const CHECKS: &[(&str, &[&str])] = &[
     ("Format", &["fmt", "--check", "--all"]),
     (
@@ -242,12 +245,68 @@ pub const CHECKS: &[(&str, &[&str])] = &[
             "warnings",
         ],
     ),
-    (
-        "Docs",
-        &["rustdoc", "--all-features", "--", "-D", "warnings"],
-    ),
+    ("Docs", &["rustdoc", "--", "-D", "warnings"]),
     ("Tests", &["test", "--all-features", "--workspace"]),
 ];
+
+/// The checks a Rust project answers only where features change what compiles,
+/// as `(name, tool args)`.
+///
+/// `Docs` above documents the default feature set, which is what `cargo doc`
+/// gives anyone who runs it. That leaves the opposite mistake uncaught: an item
+/// behind a feature documents cleanly while it is compiled, but a link to it
+/// from an item that is always compiled cannot resolve without the feature.
+/// Measured on `runemark`, where `Picked` is unconditional and linked to
+/// `Menu::run_multi` behind `select`: `rustdoc --all-features` passed and
+/// `rustdoc` on the default set reported three errors. One feature set answers
+/// half the question, so both run.
+///
+/// Conditional rather than a fifth entry in `CHECKS`: with no feature to turn
+/// on, the two invocations compile the same crate, and a check that repeats the
+/// one above it is noise in every Rust project without features.
+pub const FEATURE_CHECKS: &[(&str, &[&str])] = &[(
+    "Docs, all features",
+    &["rustdoc", "--all-features", "--", "-D", "warnings"],
+)];
+
+/// Whether `--all-features` would compile anything the default set does not.
+///
+/// Line-wise rather than parsed, for the reason `read` gives. Two shapes turn a
+/// feature on: a key in `[features]` other than `default`, and a dependency
+/// marked `optional = true`, which cargo exposes as a feature of its own name.
+/// A manifest with neither has one feature set, not two. An `optional` outside
+/// a dependency table would be a false positive, which costs a second rustdoc
+/// run and nothing else.
+pub fn has_optional_features(root: &Path) -> bool {
+    std::fs::read_to_string(root.join("Cargo.toml"))
+        .map(|text| declares_optional_features(&text))
+        .unwrap_or(false)
+}
+
+fn declares_optional_features(text: &str) -> bool {
+    let mut in_features = false;
+
+    for line in text.lines() {
+        let line = line.trim();
+        if line.starts_with('[') {
+            in_features = line == "[features]";
+            continue;
+        }
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        if in_features {
+            let key = line.split('=').next().unwrap_or_default().trim();
+            if !key.is_empty() && key != "default" {
+                return true;
+            }
+        } else if line.replace(' ', "").contains("optional=true") {
+            return true;
+        }
+    }
+
+    false
+}
 
 /// Whether `Cargo.lock` still matches the manifests, as tool args.
 ///
@@ -257,6 +316,131 @@ pub const CHECKS: &[(&str, &[&str])] = &[
 /// graph, which is all the question needs, and builds nothing. It covers the
 /// whole workspace on its own.
 pub const LOCKFILE_CHECK: &[&str] = &["metadata", "--locked", "--format-version", "1"];
+
+/// A cargo package below the project root that no workspace flag reaches.
+pub struct Sibling {
+    /// What to call its checks, for the scope column.
+    pub name: String,
+    /// Where they run.
+    pub path: PathBuf,
+}
+
+/// Cargo packages below `root` that `--workspace` does not reach.
+///
+/// A repository can carry a second package that belongs to no workspace.
+/// `runemark`'s Node binding is one: its own `[package]`, its own lockfile,
+/// `publish = false`, and no `[workspace]` at the repository root for it to be
+/// a member of. Every workspace flag in `CHECKS` misses it, so its tests ran in
+/// CI and nowhere else — for four weeks, with one of them failing.
+///
+/// A root that declares a workspace is left alone: it already answers for its
+/// members, and a package it put in `exclude` is excluded on purpose. So this
+/// looks only where the root is a plain package, and there every other manifest
+/// below it is outside the root package by construction — no member list to
+/// expand, which is what kept a TOML parser and glob expansion out of this
+/// module in the first place.
+///
+/// Being below the root is not enough to be part of it; see `wired_to`.
+pub fn siblings(root: &Path) -> Vec<Sibling> {
+    let Ok(text) = std::fs::read_to_string(root.join("Cargo.toml")) else {
+        return Vec::new();
+    };
+    if declares_workspace(&text) {
+        return Vec::new();
+    }
+
+    let mut found = Vec::new();
+    collect(root, &text, root, 1, &mut found);
+    found
+}
+
+/// How far below the root a package is still the project's own.
+///
+/// `bindings/node` sits at two and `crates/<name>` at two; nothing measured
+/// here goes deeper. A manifest ends the descent in its branch: what lies under
+/// it belongs to it, and its own `--workspace` covers that.
+const DEPTH: usize = 3;
+
+fn collect(root: &Path, root_text: &str, dir: &Path, depth: usize, found: &mut Vec<Sibling>) {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if !path.is_dir() {
+            continue;
+        }
+        let Some(dir_name) = path.file_name().and_then(OsStr::to_str) else {
+            continue;
+        };
+        // Build output and installed dependencies hold manifests by the
+        // thousand, and a dotted directory is not where a crate lives.
+        if dir_name.starts_with('.') || matches!(dir_name, "target" | "node_modules") {
+            continue;
+        }
+
+        match std::fs::read_to_string(path.join("Cargo.toml")) {
+            // A manifest ends the descent whether or not it turns out to be
+            // part of this project: what lies under somebody else's package is
+            // theirs too.
+            Ok(text) => {
+                if wired_to(root, root_text, &path, &text) {
+                    let name = read(&text, &path)
+                        .name
+                        .unwrap_or_else(|| dir_name.to_owned());
+                    found.push(Sibling { name, path });
+                }
+            }
+            Err(_) if depth < DEPTH => collect(root, root_text, &path, depth + 1, found),
+            Err(_) => {}
+        }
+    }
+}
+
+/// Whether a package below the root is part of this project.
+///
+/// A path dependency between the two is the evidence. `runemark`'s binding
+/// declares `runemark = { path = "../.." }`; a crate the root depends on by
+/// path points the other way. Either direction means the two are built from one
+/// repository on purpose.
+///
+/// Without one, a manifest below the root is somebody else's. `opi`'s own
+/// `demo/fixtures/pulse` is the case that forced this: a fixture crate for
+/// recording the README, tracked in git, with no dependency either way. Running
+/// its tests on every health run would report a failure that belongs to no
+/// project — and a false alarm in a repository that is otherwise green is worse
+/// than the gap this closes.
+fn wired_to(root: &Path, root_text: &str, dir: &Path, text: &str) -> bool {
+    points_at(dir, text, root) || points_at(root, root_text, dir)
+}
+
+/// Whether any `path = "…"` in `text`, read relative to `from`, is `target`.
+fn points_at(from: &Path, text: &str, target: &Path) -> bool {
+    let Ok(target) = target.canonicalize() else {
+        return false;
+    };
+
+    text.lines().filter_map(path_value).any(|value| {
+        from.join(value)
+            .canonicalize()
+            .is_ok_and(|path| path == target)
+    })
+}
+
+/// The value of a `path = "…"` key on one manifest line.
+///
+/// Line-wise like the rest of this module. A dependency written as an inline
+/// table carries the key on the dependency's own line, one written as a table
+/// of its own on a line by itself, and both read the same way. `paths = […]`
+/// does not match: what follows `path` has to be the assignment.
+fn path_value(line: &str) -> Option<&str> {
+    let rest = line.split_once("path")?.1.trim_start();
+    let rest = rest.strip_prefix('=')?.trim_start();
+    let quote = rest.chars().next().filter(|c| *c == '"' || *c == '\'')?;
+    let rest = &rest[quote.len_utf8()..];
+    Some(&rest[..rest.find(quote)?])
+}
 
 /// The checks a Rust project answers only where the subcommand is installed,
 /// as `(name, subcommand, tool args)`.
@@ -364,6 +548,175 @@ mod tests {
                 ),
             }
         }
+    }
+
+    #[test]
+    fn the_documentation_checks_cover_both_feature_sets() {
+        let docs = CHECKS
+            .iter()
+            .find(|(name, _)| *name == "Docs")
+            .expect("Docs is checked");
+        assert!(
+            !docs.1.contains(&"--all-features"),
+            "Docs should document the set `cargo doc` documents"
+        );
+
+        for (name, args) in FEATURE_CHECKS {
+            assert!(
+                args.contains(&"--all-features"),
+                "{name} is the other feature set: {args:?}"
+            );
+            assert!(
+                !args.contains(&"--workspace"),
+                "{name} documents one target, not a workspace"
+            );
+        }
+    }
+
+    /// Writes a manifest at `relative` below `root`, creating the path.
+    fn manifest(root: &Path, relative: &str, toml: &str) {
+        let dir = root.join(relative);
+        std::fs::create_dir_all(&dir).expect("mkdir");
+        std::fs::write(dir.join("Cargo.toml"), toml).expect("write");
+    }
+
+    const PACKAGE: &str = "[package]\nname = \"root\"\nversion = \"0.1.0\"\n";
+
+    /// A package that depends on the root `up` levels above it, as the Node
+    /// binding that prompted all this does.
+    fn wired(name: &str, up: &str) -> String {
+        format!("[package]\nname = \"{name}\"\n\n[dependencies]\nroot = {{ path = \"{up}\" }}\n")
+    }
+
+    #[test]
+    fn a_package_outside_any_workspace_is_found_by_its_name() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        std::fs::write(dir.path().join("Cargo.toml"), PACKAGE).expect("write");
+        manifest(
+            dir.path(),
+            "bindings/node",
+            &wired("runemark-node", "../.."),
+        );
+
+        let found = siblings(dir.path());
+        assert_eq!(found.len(), 1, "the binding is outside the root package");
+        assert_eq!(found[0].name, "runemark-node");
+        assert_eq!(found[0].path, dir.path().join("bindings/node"));
+    }
+
+    #[test]
+    fn a_crate_the_root_depends_on_by_path_counts_the_other_way_round() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        std::fs::write(
+            dir.path().join("Cargo.toml"),
+            format!("{PACKAGE}\n[dependencies]\ninner = {{ path = \"crates/inner\" }}\n"),
+        )
+        .expect("write");
+        manifest(dir.path(), "crates/inner", "[package]\nname = \"inner\"\n");
+
+        let found = siblings(dir.path());
+        assert_eq!(found.len(), 1, "the root builds it, but never tests it");
+        assert_eq!(found[0].name, "inner");
+    }
+
+    #[test]
+    fn a_fixture_crate_wired_to_nothing_is_not_the_project() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        std::fs::write(dir.path().join("Cargo.toml"), PACKAGE).expect("write");
+        // `opi`'s own `demo/fixtures/pulse`: tracked, and a dependency of
+        // nothing. Its tests belong to no project here.
+        manifest(
+            dir.path(),
+            "demo/fixtures/pulse",
+            "[package]\nname = \"pulse\"\nversion = \"0.4.2\"\n\n[dependencies]\n",
+        );
+
+        assert!(siblings(dir.path()).is_empty());
+    }
+
+    #[test]
+    fn a_workspace_root_answers_for_what_lies_below_it() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        std::fs::write(
+            dir.path().join("Cargo.toml"),
+            "[workspace]\nmembers = [\"crates/*\"]\n",
+        )
+        .expect("write");
+        manifest(dir.path(), "crates/one", "[package]\nname = \"one\"\n");
+
+        assert!(
+            siblings(dir.path()).is_empty(),
+            "--workspace already reaches a member, and an excluded package is excluded on purpose"
+        );
+    }
+
+    #[test]
+    fn build_output_and_installed_dependencies_are_not_the_project() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        std::fs::write(dir.path().join("Cargo.toml"), PACKAGE).expect("write");
+        // Each one is wired to the root, so only the directory it sits in can
+        // be the reason it stays out.
+        manifest(
+            dir.path(),
+            "target/package/dep-1.0",
+            &wired("dep", "../../.."),
+        );
+        manifest(dir.path(), "node_modules/thing", &wired("thing", "../.."));
+        manifest(dir.path(), ".cargo/vendored", &wired("vendored", "../.."));
+
+        assert!(siblings(dir.path()).is_empty());
+    }
+
+    #[test]
+    fn a_manifest_ends_the_descent_in_its_branch() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        std::fs::write(dir.path().join("Cargo.toml"), PACKAGE).expect("write");
+        manifest(dir.path(), "nested", &wired("nested", ".."));
+        manifest(dir.path(), "nested/inner", &wired("inner", "../.."));
+
+        let found = siblings(dir.path());
+        assert_eq!(found.len(), 1, "what lies under a package is the package's");
+        assert_eq!(found[0].name, "nested");
+    }
+
+    #[test]
+    fn a_package_buried_deeper_than_the_descent_is_left_alone() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        std::fs::write(dir.path().join("Cargo.toml"), PACKAGE).expect("write");
+        manifest(dir.path(), "a/b/c/deep", &wired("deep", "../../../.."));
+
+        assert!(siblings(dir.path()).is_empty());
+    }
+
+    #[test]
+    fn a_path_key_is_read_only_as_an_assignment() {
+        assert_eq!(path_value("root = { path = \"../..\" }"), Some("../.."));
+        assert_eq!(path_value("path = '../x'"), Some("../x"));
+        assert_eq!(path_value("paths = [\"../..\"]"), None);
+        assert_eq!(path_value("version = \"1.0\""), None);
+    }
+
+    #[test]
+    fn a_second_feature_set_exists_only_where_a_feature_does() {
+        // Nothing to turn on: one feature set, so one documentation run.
+        assert!(!declares_optional_features(
+            "[package]\nname = \"a\"\n\n[dependencies]\nserde = \"1\"\n"
+        ));
+        // `default` is the set `Docs` already documents.
+        assert!(!declares_optional_features(
+            "[package]\nname = \"a\"\n\n[features]\ndefault = []\n"
+        ));
+        assert!(declares_optional_features(
+            "[package]\nname = \"a\"\n\n[features]\nselect = [\"dep:libc\"]\n"
+        ));
+        // An optional dependency is a feature of its own name.
+        assert!(declares_optional_features(
+            "[dependencies]\nindicatif = { version = \"0.18\", optional = true }\n"
+        ));
+        // A commented-out feature is not one.
+        assert!(!declares_optional_features(
+            "[features]\n# select = [\"dep:libc\"]\n"
+        ));
     }
 
     #[test]

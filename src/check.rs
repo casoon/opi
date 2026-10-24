@@ -238,7 +238,33 @@ impl Check {
         crate::cargo::CHECKS
             .iter()
             .map(|(name, args)| build(name, args.to_vec()))
+            // Feature-dependent: a second documentation run, offered where the
+            // manifest has a feature to turn on and absent where both runs
+            // would compile the same crate.
+            .chain(
+                crate::cargo::FEATURE_CHECKS
+                    .iter()
+                    .filter(|_| crate::cargo::has_optional_features(root))
+                    .map(|(name, args)| build(name, args.to_vec())),
+            )
             .chain(lockfile)
+            // A package no workspace flag reaches is checked where it lives.
+            // Tests only: that is the gap CI found, and a second copy of every
+            // Rust check per package would bury the project's own results.
+            .chain(crate::cargo::siblings(root).into_iter().map(|sibling| {
+                let (name, args) = crate::cargo::CHECKS
+                    .iter()
+                    .find(|(name, _)| *name == "Tests")
+                    .expect("Tests is one of the Rust checks");
+                Self {
+                    name,
+                    tool: "cargo",
+                    scope: Some(sibling.name),
+                    program: PathBuf::from("cargo"),
+                    args: args.to_vec(),
+                    dir: sibling.path,
+                }
+            }))
             // The optional ones are separate binaries, so they are offered
             // where they are installed and absent otherwise — the shape
             // `cargo audit` and `cargo outdated` already have.

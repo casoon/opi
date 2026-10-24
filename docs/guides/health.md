@@ -38,7 +38,7 @@ opi  health
 | Dead code | fallow, Knip |
 | Secrets | nosecrets, secretlint |
 | Lockfile | the package manager's own frozen install, changing nothing — pnpm, npm and bun |
-| Rust | `cargo fmt --check`, `cargo clippy` and `cargo rustdoc` with warnings denied, `cargo test --all-features`, and `cargo metadata --locked` where `Cargo.lock` is committed |
+| Rust | `cargo fmt --check`, `cargo clippy` and `cargo rustdoc` with warnings denied, `cargo test --all-features`, and `cargo metadata --locked` where `Cargo.lock` is committed. `cargo rustdoc` runs twice where the manifest has features, once per feature set; a package below the root that no `--workspace` reaches gets a test run of its own, listed under its name |
 
 A tool applies when the package declares it as a dependency; its binary is taken from a
 `node_modules/.bin` at or above the package. A yarn project using Plug'n'Play has no
