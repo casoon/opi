@@ -18,6 +18,7 @@ export default defineConfig({
         { label: 'crates.io', href: 'https://crates.io/crates/opi' },
         { label: 'GitHub releases', href: 'https://github.com/casoon/opi/releases' },
       ],
+      mdxComponents: './src/mdx-components.ts',
       docsGroups: {
         // The theme puts pages at the root of docs/ in the first group, so the first
         // group is theirs: Overview and the pages about the codebase itself.

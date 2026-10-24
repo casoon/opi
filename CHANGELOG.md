@@ -26,6 +26,13 @@ minor release may change existing behaviour.
   directly in `docs/`. Details:
   [Project state](https://casoon.github.io/opi/docs/project-state/).
 
+### Changed
+
+- **Docs:** the flow in Architecture is a chartlet diagram rather than a mermaid
+  block, which the theme renders as highlighted source. It comes with a focus
+  control, a data table and a light and a dark variant. Details:
+  [Architecture](https://casoon.github.io/opi/docs/architecture/#flow).
+
 ### Fixed
 
 - **Docs:** the changelog shows its whole content on the project page again.

@@ -1,0 +1,142 @@
+{
+  "schemaVersion": 1,
+  "type": "flow",
+  "title": "One run of opi, from argv to the process that replaces it",
+  "description": "opi reads the command line into an Invocation. That starts two discoveries, one for package.json and one for Cargo.toml; either may come back empty and only both being empty is an error. Both feed project::Project, which holds the name and the package manager, and task::Task, which holds the entries. A script named on the command line goes straight to run::execute. Otherwise the tasks become a runemark menu: a selected entry runs, a hotkey opens one of the four areas health, security, updates and clean, and where no terminal can answer the menu prints itself to stdout instead. A flag on the command line reaches the areas without the menu. run::execute then replaces the opi process with the script, so the exit code and Ctrl-C are the script's.",
+  "source": "src/cli.rs, src/manifest.rs, src/cargo.rs, src/project.rs, src/task.rs, src/run.rs",
+  "width": 560,
+  "height": 1180,
+  "flow": {
+    "nodes": [
+      {
+        "id": "args",
+        "label": "std::env::args",
+        "kind": "start"
+      },
+      {
+        "id": "cli",
+        "label": "cli::parse",
+        "sublabel": "Invocation"
+      },
+      {
+        "id": "npm",
+        "label": "manifest::discover",
+        "sublabel": "package.json"
+      },
+      {
+        "id": "cargo",
+        "label": "cargo::discover",
+        "sublabel": "Cargo.toml"
+      },
+      {
+        "id": "project",
+        "label": "project::Project",
+        "sublabel": "name, package manager"
+      },
+      {
+        "id": "task",
+        "label": "task::Task",
+        "sublabel": "the entries"
+      },
+      {
+        "id": "menu",
+        "label": "runemark::Menu"
+      },
+      {
+        "id": "areas",
+        "label": "The areas",
+        "sublabel": "health · security · updates · clean"
+      },
+      {
+        "id": "render",
+        "label": "Menu::render",
+        "sublabel": "to stdout",
+        "kind": "end"
+      },
+      {
+        "id": "run",
+        "label": "run::execute"
+      },
+      {
+        "id": "child",
+        "label": "pnpm run dev · cargo test",
+        "kind": "end"
+      }
+    ],
+    "edges": [
+      {
+        "from": "args",
+        "to": "cli"
+      },
+      {
+        "from": "cli",
+        "to": "npm"
+      },
+      {
+        "from": "cli",
+        "to": "cargo"
+      },
+      {
+        "from": "cli",
+        "to": "areas",
+        "label": "a flag"
+      },
+      {
+        "from": "npm",
+        "to": "project"
+      },
+      {
+        "from": "cargo",
+        "to": "project"
+      },
+      {
+        "from": "npm",
+        "to": "task"
+      },
+      {
+        "from": "cargo",
+        "to": "task"
+      },
+      {
+        "from": "task",
+        "to": "run",
+        "label": "a named script"
+      },
+      {
+        "from": "task",
+        "to": "menu",
+        "label": "no script named"
+      },
+      {
+        "from": "menu",
+        "to": "run",
+        "label": "Selected"
+      },
+      {
+        "from": "menu",
+        "to": "areas",
+        "label": "Hotkey"
+      },
+      {
+        "from": "menu",
+        "to": "render",
+        "label": "Unavailable"
+      },
+      {
+        "from": "run",
+        "to": "child",
+        "label": "exec, replaces this process"
+      }
+    ],
+    "mainPath": [
+      "args",
+      "cli",
+      "npm",
+      "task",
+      "menu",
+      "run",
+      "child"
+    ],
+    "orientation": "portrait"
+  }
+}

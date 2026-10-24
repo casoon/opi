@@ -9,7 +9,7 @@ import { glob } from 'astro/loaders';
 // as raw markdown on GitHub instead.
 export const collections = {
   docs: defineCollection({
-    loader: glob({ pattern: ['*.md', '*/**/*.{md,mdx}'], base: '../docs' }),
+    loader: glob({ pattern: ['*.{md,mdx}', '*/**/*.{md,mdx}'], base: '../docs' }),
     schema: docsSchema,
   }),
 };

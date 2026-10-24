@@ -6,7 +6,7 @@ order: 4
 
 Rules future changes follow. Everything here is visible in the code as it
 stands; where a rule is a decision rather than an observation, it is in
-[decisions.md](decisions.md) instead.
+[Decisions](decisions/) instead.
 
 ## Validation
 
@@ -118,6 +118,21 @@ without one.
 Explain why, not what. A comment that restates the line below it is noise; a
 comment saying which package manager needs `--` and which would pass it
 through to the script is not.
+
+## Diagrams
+
+A diagram on these pages is a chartlet specification in `site/diagrams/<name>.json`,
+placed with `<Diagram name="<name>" />` in an `.mdx` page. The theme renders no
+mermaid, so a mermaid block reaches the site as highlighted source rather than a
+picture — which is how the flow in [Architecture](architecture/) looked until it
+became a chartlet flow.
+
+A diagram is rendered at build time in the light and the dark theme, and carries its
+own description and data table, so it is readable without the picture. Keep it
+portrait at the width of the content column: a landscape diagram is scaled down to
+about 540 px there and stops being legible. The prose beside it still has to say what
+it shows — a diagram that only repeats the text is sediment, and one that carries a
+fact the text does not is a fact nobody can read aloud.
 
 ## Dependencies
 
