@@ -12,6 +12,7 @@ import {
   Tabs,
 } from '@casoon/pages-theme/components';
 import Base from '@casoon/pages-theme/layouts/Base.astro';
+import config from 'virtual:casoon-pages/config';
 import { url } from '@casoon/pages-theme/url';
 // The README's recordings, imported rather than copied so there is one file each.
 // opi.gif is recorded with vhs (keys pressed inside the interface); the SVGs are castwright
@@ -45,7 +46,7 @@ opi --hooks         # checks before every push`;
     />
     <Badges>
       <Badge>MIT</Badge>
-      <Badge>crates.io 0.11.0</Badge>
+      <Badge>crates.io {config.version}</Badge>
       <Badge>Rust 1.85+</Badge>
       <Badge>macOS · Linux</Badge>
     </Badges>
