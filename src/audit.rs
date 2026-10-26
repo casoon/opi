@@ -58,7 +58,7 @@ impl Severity {
 }
 
 /// One vulnerable package.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Advisory {
     pub module: String,
     pub severity: Severity,

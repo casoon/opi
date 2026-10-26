@@ -128,6 +128,12 @@ Both are external cargo subcommands rather than part of the toolchain, so
 where one is missing `opi` says so along with the `cargo install` that adds
 it, instead of leaving a section that reads like "nothing found".
 
+`opi --security` also runs `osv-scanner` over the lockfiles (npm, pnpm, yarn,
+bun, Cargo) as a section of its own, `Dependencies (osv)`. It is an additional
+source, not a replacement: the native audits stay, and OSV lists only the
+packages they did not already report. Where one of them is missing or failed,
+all OSV findings are shown. Without `osv-scanner` the section says so.
+
 In a Cargo workspace `opi` works on the workspace even when started inside one
 of its crates — that is where `target/` lives and where the checks reach every
 member. `cargo run` still follows you: it is offered in a binary crate, because
@@ -196,7 +202,7 @@ checks run per member, in the member, because that is where the tools and their
 config live.
 
 Output is parsed only where the format is documented (`audit --json`,
-`outdated --json`, `audit signatures --json`, `licenses list --json`). Everything else is relayed whole and capped at twenty lines,
+`osv-scanner --format json`, `outdated --json`, `audit signatures --json`, `licenses list --json`). Everything else is relayed whole and capped at twenty lines,
 with the command to see the rest: a parser that guesses at a tool's output
 breaks on that tool's next release.
 
