@@ -9,6 +9,9 @@ minor release may change existing behaviour.
 
 ### Added
 
+- **Security:** `--security` lists dependencies that come from git, a tarball URL or a
+  path outside the workspace, read from `package-lock.json`, `pnpm-lock.yaml`,
+  `yarn.lock`, `bun.lock` and `Cargo.lock`, with the source each was resolved from.
 - **Rust:** `cargo rustdoc` runs a second time with `--all-features` where the
   manifest has a feature to turn on. A link from an always compiled item to one
   behind a feature resolves in the one feature set and not in the other — on

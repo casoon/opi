@@ -172,7 +172,7 @@ word stays theirs.
 | | | |
 | --- | --- | --- |
 | `H` | `opi --health` | Runs every check the project's tools can answer, concurrently |
-| `S` | `opi --security` | Secret scan, a parsed dependency audit per ecosystem, signatures, release age and licenses |
+| `S` | `opi --security` | Secret scan, a parsed dependency audit per ecosystem, signatures, release age, licenses and dependencies from outside the registry |
 | `U` | `opi --updates` | What is outdated, split into safe and major — and the offer to take it |
 | `C` | `opi --clean` | Removable artefacts, with what each one costs |
 | | `opi --check commit` | The fast checks, before you commit |
@@ -199,6 +199,11 @@ Output is parsed only where the format is documented (`audit --json`,
 `outdated --json`, `audit signatures --json`, `licenses list --json`). Everything else is relayed whole and capped at twenty lines,
 with the command to see the rest: a parser that guesses at a tool's output
 breaks on that tool's next release.
+
+The one thing `--security` reads itself is the lockfile: `package-lock.json`,
+`pnpm-lock.yaml`, `yarn.lock`, `bun.lock` and `Cargo.lock` name every dependency
+resolved from git, a tarball URL or a path outside the workspace, with its
+source. `bun.lockb`, bun's binary lockfile, is not read.
 
 ![opi --security finding a vulnerable lodash through npm audit, while cargo audit finds nothing](https://raw.githubusercontent.com/casoon/opi/main/assets/security.svg)
 
