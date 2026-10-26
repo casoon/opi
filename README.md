@@ -163,7 +163,7 @@ otherwise the protection would vanish in exactly the case it exists for.
 
 ## The other areas
 
-![opi --health running six checks in a project with package.json and Cargo.toml, one failing with rustfmt's diff shown under it](https://raw.githubusercontent.com/casoon/opi/main/assets/health.svg)
+![opi --health running five checks in a project with package.json and Cargo.toml, one failing with rustfmt's diff shown under it](https://raw.githubusercontent.com/casoon/opi/main/assets/health.svg)
 
 Each is a hotkey in the list and a flag on the command line. Never a bare word:
 `health`, `clean` and `release` are script names in real projects, and the bare

@@ -39,9 +39,15 @@ minor release may change existing behaviour.
 - **Contributors:** the site builds with chartlet `0.21.0` instead of `0.19.0`,
   whose flow charts took neither `sameRank` nor `notes` — the two manifest
   discoveries stand side by side now, and the note on parsing sits beside them.
+- **Contributors:** `demo/record.sh` records every scene in a fresh copy of the
+  fixtures, so no scene sees the Cargo.lock or pre-push hook an earlier one
+  left behind; it also finds the binary under a shared cargo target directory
+  and pins castwright `0.5.0`. All recordings are made again with opi `0.11.0`.
 
 ### Fixed
 
+- **Docs:** the README describes the health recording as five checks, the
+  number it shows, instead of six.
 - **Docs:** the changelog shows its whole content on the project page again.
   The theme's parser ends an entry at the first blank line, so every entry
   written as several paragraphs lost all but the first — the measurements, the

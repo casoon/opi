@@ -16,15 +16,27 @@ set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
 work="${OPI_DEMO_DIR:-/tmp/opi-demo}"
+# The version the SVGs in assets/ are built with; a different one changes
+# every file without a change to any scene.
+castwright_version=0.5.0
 
 echo "building opi…"
 cargo build --release --manifest-path "$root/Cargo.toml" --quiet
+# CARGO_TARGET_DIR or a cargo config may put the binary outside the repository.
+target="$(cargo metadata --manifest-path "$root/Cargo.toml" --format-version 1 --no-deps |
+  node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(JSON.parse(s).target_directory))')"
 
-rm -rf "$work"
+# Each scene records in a fresh copy of the prepared fixtures. A scene leaves
+# state behind — the cargo checks write a Cargo.lock, which adds the
+# "Lockfile (rust)" check to the next --health; `opi --hooks` writes the hook,
+# so the next push scene reports it already present — and a shared copy would
+# show that state instead of what a fresh project prints.
+pristine="$work.pristine"
+rm -rf "$work" "$pristine"
 mkdir -p "$work/bin"
 cp -R "$root/demo/fixtures/." "$work/"
 # The tapes call a bare `opi`, so the recording shows the tool and not a path.
-cp "$root/target/release/opi" "$work/bin/opi"
+cp "$target/release/opi" "$work/bin/opi"
 export PATH="$work/bin:$PATH"
 # --updates compares against what is installed; without node_modules npm
 # reports no current version and there is nothing to compare.
@@ -41,6 +53,10 @@ export PATH="$work/bin:$PATH"
   printf '# pulse\n\nThe team dashboard.\n' > README.md
   git add README.md && git commit -qm "Describe the dashboard"
 )
+# The copy keeps its absolute paths (the upstream at $work/pulse.git), so it is
+# restored to the same place before each scene.
+cp -R "$work" "$pristine"
+fresh() { rm -rf "$work" && cp -R "$pristine" "$work"; }
 
 mkdir -p "$root/assets"
 
@@ -55,12 +71,16 @@ fi
 for name in "${scenes[@]}"; do
   cast="$root/demo/casts/$name.terminal.yaml"
   if [ -f "$cast" ]; then
-    command -v castwright >/dev/null || { echo "castwright is not installed: npm i -g @casoon/castwright node-pty"; exit 1; }
+    command -v castwright >/dev/null || { echo "castwright is not installed: npm i -g @casoon/castwright@$castwright_version node-pty"; exit 1; }
+    have="$(node -p "require(require('path').join(require('fs').realpathSync('$(command -v castwright)'), '../../package.json')).version")"
+    [ "$have" = "$castwright_version" ] || { echo "castwright $have on PATH, the scenes are built with $castwright_version"; exit 1; }
     echo "rendering $name…"
+    fresh
     castwright build "$cast" -o "$root/assets" --format svg --loop-delay 6000 --allow-exec
     out="$root/assets/$name.svg"
   elif command -v vhs >/dev/null; then
     echo "recording $name…"
+    fresh
     (cd "$root/demo/tapes" && vhs "$name.tape")
     # A tape names its own file, and hero.tape's is opi.gif.
     out="$root/assets/$(sed -n 's/^Output "\(.*\)"/\1/p' "$root/demo/tapes/$name.tape" | xargs basename)"
