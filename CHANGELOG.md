@@ -9,6 +9,12 @@ minor release may change existing behaviour.
 
 ### Added
 
+- **Security:** `opi --security` lists the installed dependencies that declare
+  `preinstall`, `install` or `postinstall` scripts and whether the project
+  allows them — pnpm's `onlyBuiltDependencies` / `ignoredBuiltDependencies`,
+  bun's `trustedDependencies`, npm's `ignore-scripts`. Scripts nothing has
+  decided on are named.
+
 - **Rust:** `cargo rustdoc` runs a second time with `--all-features` where the
   manifest has a feature to turn on. A link from an always compiled item to one
   behind a feature resolves in the one feature set and not in the other — on

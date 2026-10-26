@@ -18,6 +18,7 @@ mod manifest;
 mod outdated;
 mod project;
 mod run;
+mod scripts;
 mod supply;
 mod task;
 mod workflow;
@@ -1095,6 +1096,8 @@ fn supply_chain(console: Console, manager: project::PackageManager, root: &Path)
         None => {}
     }
 
+    install_scripts(console, manager, root);
+
     // pnpm alone has a license report of its own; elsewhere this would take
     // a tool the project does not have, so it is left out rather than failed.
     if manager == project::PackageManager::Pnpm {
@@ -1129,6 +1132,64 @@ fn supply_chain(console: Console, manager: project::PackageManager, root: &Path)
     }
 
     clean
+}
+
+/// Dependencies with install scripts and whether the project allows them.
+///
+/// Reported, never judged: an unreviewed script is a policy gap worth a look,
+/// not a failure.
+fn install_scripts(console: Console, manager: project::PackageManager, root: &Path) {
+    let Some(found) = scripts::install_scripts(manager, root) else {
+        return;
+    };
+    let count = |status| found.packages.iter().filter(|(_, s)| *s == status).count();
+    let (allowed, ignored) = (
+        count(scripts::Status::Allowed),
+        count(scripts::Status::Ignored),
+    );
+    let unreviewed: Vec<&str> = found
+        .packages
+        .iter()
+        .filter(|(_, status)| *status == scripts::Status::Unreviewed)
+        .map(|(name, _)| name.as_str())
+        .collect();
+    let summary = format!(
+        "{} with install scripts: {allowed} allowed · {ignored} ignored · {} not reviewed",
+        plural(found.packages.len(), "dependency", "dependencies"),
+        unreviewed.len()
+    );
+    if unreviewed.is_empty() {
+        println!(
+            "{} {}",
+            console.paint(Tone::Success, "✓"),
+            console.paint(Tone::Success, format!("Install scripts — {summary}"))
+        );
+        return;
+    }
+    let tone = Tone::Warning;
+    println!(
+        "{} {}",
+        console.paint(tone, "!"),
+        console.paint(tone, format!("Install scripts — {summary}"))
+    );
+    for name in unreviewed.iter().take(OUTPUT_LINES) {
+        println!("  {name}");
+    }
+    if let Some(rest) = unreviewed
+        .len()
+        .checked_sub(OUTPUT_LINES)
+        .filter(|n| *n > 0)
+    {
+        println!("  {}", console.paint(Tone::Muted, format!("… {rest} more")));
+    }
+    let remedy = match manager {
+        project::PackageManager::Pnpm => {
+            "list them in onlyBuiltDependencies or ignoredBuiltDependencies"
+        }
+        project::PackageManager::Bun => "trust them in trustedDependencies, or leave them blocked",
+        _ => "they run on install; ignore-scripts=true in .npmrc turns that off",
+    };
+    println!("  {}", console.paint(Tone::Muted, remedy));
 }
 
 /// Runs a named workflow: the repository questions, then the checks.
