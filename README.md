@@ -172,7 +172,7 @@ word stays theirs.
 | | | |
 | --- | --- | --- |
 | `H` | `opi --health` | Runs every check the project's tools can answer, concurrently |
-| `S` | `opi --security` | Secret scan, a parsed dependency audit per ecosystem, signatures, release age and licenses |
+| `S` | `opi --security` | Secret scan, a parsed dependency audit per ecosystem, signatures, release age and licenses, workflow actions not pinned to a commit SHA |
 | `U` | `opi --updates` | What is outdated, split into safe and major — and the offer to take it |
 | `C` | `opi --clean` | Removable artefacts, with what each one costs |
 | | `opi --check commit` | The fast checks, before you commit |
