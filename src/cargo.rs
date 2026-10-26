@@ -269,6 +269,57 @@ pub const FEATURE_CHECKS: &[(&str, &[&str])] = &[(
     &["rustdoc", "--all-features", "--", "-D", "warnings"],
 )];
 
+/// The documentable packages of a virtual workspace, empty anywhere else.
+///
+/// `cargo rustdoc` documents one target of one package, and at a manifest that
+/// is only a `[workspace]` there is no package to pick: cargo refuses before
+/// rustdoc runs. `Docs` therefore runs once per member there, with `-p`.
+///
+/// Members come from `cargo metadata`, which resolves globs and exclusions the
+/// way cargo does. A package with neither a library nor a binary has nothing
+/// for rustdoc to document and is left out.
+pub fn virtual_members(root: &Path) -> Vec<String> {
+    let virtual_root = std::fs::read_to_string(root.join("Cargo.toml"))
+        .is_ok_and(|text| declares_workspace(&text) && read(&text, root).name.is_none());
+    if !virtual_root {
+        return Vec::new();
+    }
+    std::process::Command::new("cargo")
+        .args(["metadata", "--no-deps", "--format-version", "1"])
+        .current_dir(root)
+        .output()
+        .ok()
+        .filter(|output| output.status.success())
+        .map(|output| documentable_members(&String::from_utf8_lossy(&output.stdout)))
+        .unwrap_or_default()
+}
+
+/// Workspace members with a library or binary target, out of `cargo metadata
+/// --no-deps` output.
+fn documentable_members(json: &str) -> Vec<String> {
+    let Ok(metadata) = serde_json::from_str::<serde_json::Value>(json) else {
+        return Vec::new();
+    };
+    let documentable = |package: &serde_json::Value| {
+        package["targets"].as_array().is_some_and(|targets| {
+            targets.iter().any(|target| {
+                target["kind"].as_array().is_some_and(|kinds| {
+                    kinds.iter().any(|kind| {
+                        matches!(kind.as_str(), Some("lib" | "rlib" | "proc-macro" | "bin"))
+                    })
+                })
+            })
+        })
+    };
+    metadata["packages"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter(|package| documentable(package))
+        .filter_map(|package| package["name"].as_str().map(str::to_owned))
+        .collect()
+}
+
 /// Whether `--all-features` would compile anything the default set does not.
 ///
 /// Line-wise rather than parsed, for the reason `read` gives. Two shapes turn a
@@ -463,6 +514,42 @@ mod tests {
 
     fn project(toml: &str, root: &Path) -> Project {
         read(toml, root)
+    }
+
+    #[test]
+    fn only_members_with_something_to_document_are_listed() {
+        let json = r#"{"packages":[
+            {"name":"core","targets":[{"kind":["lib"]}]},
+            {"name":"app","targets":[{"kind":["bin"]}]},
+            {"name":"macros","targets":[{"kind":["proc-macro"]}]},
+            {"name":"bench","targets":[{"kind":["bench"]}]}]}"#;
+        assert_eq!(documentable_members(json), ["core", "app", "macros"]);
+        assert!(documentable_members("not json").is_empty());
+    }
+
+    #[test]
+    fn a_virtual_workspace_lists_its_members_and_a_package_does_not() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        std::fs::create_dir_all(dir.path().join("crates/a/src")).expect("dirs");
+        std::fs::write(dir.path().join("crates/a/src/lib.rs"), "").expect("write");
+        std::fs::write(
+            dir.path().join("crates/a/Cargo.toml"),
+            "[package]\nname = \"a\"\nversion = \"0.1.0\"\nedition = \"2021\"\n",
+        )
+        .expect("write");
+        std::fs::write(
+            dir.path().join("Cargo.toml"),
+            "[workspace]\nmembers = [\"crates/a\"]\nresolver = \"2\"\n",
+        )
+        .expect("write");
+        assert_eq!(virtual_members(dir.path()), ["a"]);
+
+        std::fs::write(
+            dir.path().join("Cargo.toml"),
+            "[package]\nname = \"r\"\n\n[workspace]\n",
+        )
+        .expect("write");
+        assert!(virtual_members(dir.path()).is_empty());
     }
 
     #[test]

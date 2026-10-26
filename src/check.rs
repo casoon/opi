@@ -235,8 +235,31 @@ impl Check {
             .exists()
             .then(|| build("Lockfile", crate::cargo::LOCKFILE_CHECK.to_vec()));
 
+        // `cargo rustdoc` cannot start at a virtual manifest, so Docs there is
+        // one run per member instead; see `cargo::virtual_members`.
+        let members = crate::cargo::virtual_members(root);
+        let per_member = members.iter().map(|member| Self {
+            name: "Docs",
+            tool: "cargo",
+            scope: Some(member.clone()),
+            program: PathBuf::from("cargo"),
+            // Leaked: arguments are `&'static str`, and the few member names
+            // live as long as the process anyway.
+            args: vec![
+                "rustdoc",
+                "-p",
+                Box::leak(member.clone().into_boxed_str()),
+                "--all-features",
+                "--",
+                "-D",
+                "warnings",
+            ],
+            dir: root.to_path_buf(),
+        });
+
         crate::cargo::CHECKS
             .iter()
+            .filter(|(name, _)| members.is_empty() || *name != "Docs")
             .map(|(name, args)| build(name, args.to_vec()))
             // Feature-dependent: a second documentation run, offered where the
             // manifest has a feature to turn on and absent where both runs
@@ -247,6 +270,7 @@ impl Check {
                     .filter(|_| crate::cargo::has_optional_features(root))
                     .map(|(name, args)| build(name, args.to_vec())),
             )
+            .chain(per_member)
             .chain(lockfile)
             // A package no workspace flag reaches is checked where it lives.
             // Tests only: that is the gap CI found, and a second copy of every

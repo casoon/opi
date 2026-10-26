@@ -53,6 +53,9 @@ minor release may change existing behaviour.
   written as several paragraphs lost all but the first — the measurements, the
   reasoning and the limits, which is most of what the entries said. Each entry
   is one paragraph now, and nothing is left outside a list item.
+- **Rust:** the Docs check runs at a virtual workspace root. `cargo rustdoc`
+  refuses a manifest without a package, so Docs now runs once per member with
+  `-p <member> --all-features`.
 
 ## [0.11.0] - 2026-09-26
 
