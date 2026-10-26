@@ -13,7 +13,7 @@ Two kinds of scene, because no single tool covers both yet:
   [castwright](https://github.com/casoon/castwright) to an animated SVG. Its
   `exec:` step runs the real command in a pseudo-terminal and records what it
   printed, so the output is `opi`'s own. Needs `castwright` on `PATH`
-  (`npm i -g @casoon/castwright node-pty`; if `exec` fails with
+  (`npm i -g @casoon/castwright@0.5.0 node-pty`; if `exec` fails with
   "posix_spawnp failed", `chmod +x` the `spawn-helper` the error names). Under
   Volta, global packages are isolated from each other and castwright cannot
   find `node-pty`; install both into one directory instead, with
@@ -26,9 +26,13 @@ Two kinds of scene, because no single tool covers both yet:
   exiting 0. `record.sh` skips them when `vhs` is not installed and fails when
   the GIF was not written.
 
-The script builds `opi` in release mode, copies the fixtures to `/tmp/opi-demo`,
-puts the fresh binary first on `PATH` so the scenes can call a bare `opi`, and
-writes to `assets/`. The casts name `/tmp/opi-demo` in their `cwd:`, so
+The script builds `opi` in release mode, prepares the fixtures once, puts the
+fresh binary first on `PATH` so the scenes can call a bare `opi`, and writes to
+`assets/`. Every scene records in its own fresh copy at `/tmp/opi-demo`: the
+cargo checks write a `Cargo.lock` and `opi --hooks` writes a hook, and a scene
+that inherited either would show a lockfile check or an already installed hook
+that a fresh project does not have. The SVGs are built with castwright 0.5.0;
+the script stops on another version. The casts name `/tmp/opi-demo` in their `cwd:`, so
 `OPI_DEMO_DIR` only moves the tapes.
 
 ## Why the fixtures are copied out
