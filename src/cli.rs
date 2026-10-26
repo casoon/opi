@@ -33,6 +33,8 @@ pub enum Invocation {
     Updates,
     /// Install the push workflow as the pre-push hook.
     Hooks,
+    /// Write CycloneDX SBOMs, into the given directory or the project root.
+    Sbom(Option<String>),
     /// A flag `opi` does not know, before any script name.
     UnknownFlag(String),
 }
@@ -75,6 +77,8 @@ where
         "--security" => Invocation::Security,
         "--updates" => Invocation::Updates,
         "--hooks" => Invocation::Hooks,
+        // The directory is optional, and a following flag is not a directory.
+        "--sbom" => Invocation::Sbom(args.next().filter(|dir| !dir.starts_with('-'))),
         // The name follows the flag rather than standing alone, so a project
         // script called "commit" or "release" keeps its word.
         "--check" => args
@@ -117,6 +121,7 @@ Options:
       --security          Scan for secrets and vulnerable dependencies
       --updates           Show dependencies with newer versions
       --check <workflow>  Run a workflow: commit, push or release
+      --sbom [dir]        Write CycloneDX SBOMs, one file per ecosystem
       --hooks             Install the push workflow as the pre-push hook
   -h, --help              Show this help
   -V, --version           Show the version
@@ -146,6 +151,16 @@ mod tests {
             args: Vec::new(),
             confirmed: true,
         }
+    }
+
+    #[test]
+    fn sbom_takes_an_optional_directory() {
+        assert_eq!(parse(["--sbom"]), Invocation::Sbom(None));
+        assert_eq!(
+            parse(["--sbom", "out"]),
+            Invocation::Sbom(Some("out".to_owned()))
+        );
+        assert_eq!(parse(["--sbom", "--yes"]), Invocation::Sbom(None));
     }
 
     #[test]

@@ -179,6 +179,14 @@ word stays theirs.
 | | `opi --check push` | Everything plus the build, on a clean tree that is not behind upstream |
 | | `opi --check release` | Everything plus the build, a clean tree and an untagged version |
 | | `opi --hooks` | Installs `opi --check push` as the pre-push hook |
+| | `opi --sbom [dir]` | CycloneDX SBOMs, one file per ecosystem, written to `dir` or the project root |
+
+`--sbom` writes `sbom-npm.cdx.json` (from `npm sbom`, or `pnpm sbom` in a pnpm
+project; Yarn and Bun projects use `npm sbom` too, which reads their
+lockfile and `node_modules`) and `sbom-cargo.cdx.json` (from `cargo cyclonedx`).
+The documents are not merged, so each stays attributable to its producer. A
+missing producer is named with the command that installs it, e.g.
+`cargo install cargo-cyclonedx`.
 
 ```
 astro-v7-workspace  health
