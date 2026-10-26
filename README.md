@@ -172,7 +172,7 @@ word stays theirs.
 | | | |
 | --- | --- | --- |
 | `H` | `opi --health` | Runs every check the project's tools can answer, concurrently |
-| `S` | `opi --security` | Secret scan, a parsed dependency audit per ecosystem, signatures, release age and licenses |
+| `S` | `opi --security` | Secret scan, a parsed dependency audit per ecosystem, signatures, release age and licenses (pnpm, npm, bun and Cargo; production dependencies only) |
 | `U` | `opi --updates` | What is outdated, split into safe and major — and the offer to take it |
 | `C` | `opi --clean` | Removable artefacts, with what each one costs |
 | | `opi --check commit` | The fast checks, before you commit |
@@ -196,7 +196,7 @@ checks run per member, in the member, because that is where the tools and their
 config live.
 
 Output is parsed only where the format is documented (`audit --json`,
-`outdated --json`, `audit signatures --json`, `licenses list --json`). Everything else is relayed whole and capped at twenty lines,
+`outdated --json`, `audit signatures --json`, `licenses list --json`, `sbom --sbom-format cyclonedx`, `cargo metadata`). Everything else is relayed whole and capped at twenty lines,
 with the command to see the rest: a parser that guesses at a tool's output
 breaks on that tool's next release.
 

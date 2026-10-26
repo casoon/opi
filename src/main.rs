@@ -995,6 +995,7 @@ fn security(
                 );
             }
         }
+        license_report(console, supply::cargo_licenses(rust_root));
     }
 
     println!();
@@ -1095,40 +1096,58 @@ fn supply_chain(console: Console, manager: project::PackageManager, root: &Path)
         None => {}
     }
 
-    // pnpm alone has a license report of its own; elsewhere this would take
-    // a tool the project does not have, so it is left out rather than failed.
-    if manager == project::PackageManager::Pnpm {
-        match supply::licenses(root) {
-            Ok(found) => {
-                const SHOWN: usize = 4;
-                let mut parts: Vec<String> = found
-                    .counts
-                    .iter()
-                    .take(SHOWN)
-                    .map(|(license, count)| format!("{count} {license}"))
-                    .collect();
-                let others: usize = found.counts.iter().skip(SHOWN).map(|(_, n)| n).sum();
-                if others > 0 {
-                    parts.push(format!("{others} other"));
-                }
-                let (tone, mark) = if found.notable.is_empty() {
-                    (Tone::Success, "✓")
-                } else {
-                    (Tone::Warning, "!")
-                };
-                line(tone, mark, format!("Licenses — {}", parts.join(" · ")));
-                let notable: Vec<String> = found
-                    .notable
-                    .iter()
-                    .map(|(license, name)| format!("{name}  {license}"))
-                    .collect();
-                list(&notable);
-            }
-            Err(reason) => line(Tone::Muted, "–", format!("Licenses — {reason}")),
-        }
+    if let Some(licenses) = supply::licenses(manager, root) {
+        license_report(console, licenses);
     }
 
     clean
+}
+
+/// The license line, with the notable packages beneath it.
+fn license_report(console: Console, found: Result<supply::Licenses, String>) {
+    let found = match found {
+        Ok(found) => found,
+        Err(reason) => {
+            println!(
+                "{} {}",
+                console.paint(Tone::Muted, "–"),
+                console.paint(Tone::Muted, format!("Licenses — {reason}"))
+            );
+            return;
+        }
+    };
+    const SHOWN: usize = 4;
+    let mut parts: Vec<String> = found
+        .counts
+        .iter()
+        .take(SHOWN)
+        .map(|(license, count)| format!("{count} {license}"))
+        .collect();
+    let others: usize = found.counts.iter().skip(SHOWN).map(|(_, n)| n).sum();
+    if others > 0 {
+        parts.push(format!("{others} other"));
+    }
+    let (tone, mark) = if found.notable.is_empty() {
+        (Tone::Success, "✓")
+    } else {
+        (Tone::Warning, "!")
+    };
+    println!(
+        "{} {}",
+        console.paint(tone, mark),
+        console.paint(tone, format!("Licenses — {}", parts.join(" · ")))
+    );
+    for (license, name) in found.notable.iter().take(OUTPUT_LINES) {
+        println!("  {name}  {license}");
+    }
+    if let Some(rest) = found
+        .notable
+        .len()
+        .checked_sub(OUTPUT_LINES)
+        .filter(|n| *n > 0)
+    {
+        println!("  {}", console.paint(Tone::Muted, format!("… {rest} more")));
+    }
 }
 
 /// Runs a named workflow: the repository questions, then the checks.
