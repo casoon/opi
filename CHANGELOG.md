@@ -32,6 +32,10 @@ minor release may change existing behaviour.
   block, which the theme renders as highlighted source. It comes with a focus
   control, a data table and a light and a dark variant. Details:
   [Architecture](https://casoon.github.io/opi/docs/architecture/#flow).
+- **Docs:** the recordings on the project page's start page are readable at
+  their size. The hero recording is made at about 55 columns for its column and
+  at 43 for phones instead of shrinking the README's 95-column GIF, and the
+  scenes under **One key away** have 50-column variants for phones.
 - **Contributors:** the site builds with chartlet `0.21.0` instead of `0.19.0`,
   whose flow charts took neither `sameRank` nor `notes` — the two manifest
   discoveries stand side by side now, and the note on parsing sits beside them.

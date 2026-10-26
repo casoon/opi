@@ -14,14 +14,22 @@ import {
 import Base from '@casoon/pages-theme/layouts/Base.astro';
 import config from 'virtual:casoon-pages/config';
 import { url } from '@casoon/pages-theme/url';
-// The README's recordings, imported rather than copied so there is one file each.
-// opi.gif is recorded with vhs (keys pressed inside the interface); the SVGs are castwright
-// scenes from demo/casts/*.terminal.yaml with opi's real output (demo/record.sh).
-import hero from '../../../assets/opi.gif';
+// The README's recordings, imported rather than copied so there is one file each. The hero
+// GIFs are recorded with vhs (keys pressed inside the interface): demo/tapes/hero.tape at about
+// 55 columns for the hero column and at about 43 for phones, since the README's opi.gif shrinks
+// to unreadable text there. The SVGs are castwright scenes from demo/casts/*.terminal.yaml with
+// opi's real output (demo/record.sh).
+import heroColumn from '../../../assets/opi-column.gif';
+import heroPhone from '../../../assets/opi-phone.gif';
 import healthSvg from '../../../assets/health.svg?url';
 import pushSvg from '../../../assets/push.svg?url';
 import securitySvg from '../../../assets/security.svg?url';
 import updatesSvg from '../../../assets/updates.svg?url';
+// The same scenes at 50 columns for phones, where the 92-column ones shrink below 6 px.
+import healthNarrowSvg from '../../../assets/health-narrow.svg?url';
+import pushNarrowSvg from '../../../assets/push-narrow.svg?url';
+import securityNarrowSvg from '../../../assets/security-narrow.svg?url';
+import updatesNarrowSvg from '../../../assets/updates-narrow.svg?url';
 import Diagram from '../components/Diagram.astro';
 
 const usage = `opi                 # pick a script
@@ -50,14 +58,21 @@ opi --hooks         # checks before every push`;
       <Badge>Rust 1.85+</Badge>
       <Badge>macOS · Linux</Badge>
     </Badges>
-    <img
-      slot="output"
-      class="hero-demo"
-      src={hero.src}
-      width={hero.width}
-      height={hero.height}
-      alt="opi listing a monorepo's scripts, switching groups, searching across all of them and running one"
-    />
+    <picture slot="output">
+      <source
+        media="(max-width: 640px)"
+        srcset={heroPhone.src}
+        width={heroPhone.width}
+        height={heroPhone.height}
+      />
+      <img
+        class="hero-demo"
+        src={heroColumn.src}
+        width={heroColumn.width}
+        height={heroColumn.height}
+        alt="opi listing a monorepo's scripts, switching groups, searching across all of them and running one"
+      />
+    </picture>
   </Hero>
 
   <Features
@@ -108,44 +123,76 @@ opi --hooks         # checks before every push`;
       ]}
     >
       <div slot="health">
-        <img
-          class="scene"
-          src={healthSvg}
-          width="796.8"
-          height="404"
-          loading="lazy"
-          alt="opi --health running five checks in a project with package.json and Cargo.toml: Lockfile (npm), Docs, Lint and Tests (rust) pass, Format (rust) fails and rustfmt's diff of src/report.rs is shown under it, ending with '1 of 5 checks failed.'"
-        />
+        <picture>
+          <source
+            media="(max-width: 640px)"
+            srcset={healthNarrowSvg}
+            width="444"
+            height="476"
+          />
+          <img
+            class="scene"
+            src={healthSvg}
+            width="796.8"
+            height="404"
+            loading="lazy"
+            alt="opi --health running five checks in a project with package.json and Cargo.toml: Lockfile (npm), Docs, Lint and Tests (rust) pass, Format (rust) fails and rustfmt's diff of src/report.rs is shown under it, ending with '1 of 5 checks failed.'"
+          />
+        </picture>
       </div>
       <div slot="security">
-        <img
-          class="scene"
-          src={securitySvg}
-          width="796.8"
-          height="368"
-          loading="lazy"
-          alt="opi --security: no secret scanner in this project, one high vulnerability in lodash with the remedy to update, every installed package's signature verified, a note that no minimum release age is set, and no known vulnerabilities on the Rust side"
-        />
+        <picture>
+          <source
+            media="(max-width: 640px)"
+            srcset={securityNarrowSvg}
+            width="444"
+            height="512"
+          />
+          <img
+            class="scene"
+            src={securitySvg}
+            width="796.8"
+            height="368"
+            loading="lazy"
+            alt="opi --security: no secret scanner in this project, one high vulnerability in lodash with the remedy to update, every installed package's signature verified, a note that no minimum release age is set, and no known vulnerabilities on the Rust side"
+          />
+        </picture>
       </div>
       <div slot="updates">
-        <img
-          class="scene"
-          src={updatesSvg}
-          width="796.8"
-          height="332"
-          loading="lazy"
-          alt="opi --updates listing lodash 4.17.20 → 4.18.1 as a minor update that is safe to take, with the Rust dependencies current"
-        />
+        <picture>
+          <source
+            media="(max-width: 640px)"
+            srcset={updatesNarrowSvg}
+            width="444"
+            height="314"
+          />
+          <img
+            class="scene"
+            src={updatesSvg}
+            width="796.8"
+            height="332"
+            loading="lazy"
+            alt="opi --updates listing lodash 4.17.20 → 4.18.1 as a minor update that is safe to take, with the Rust dependencies current"
+          />
+        </picture>
       </div>
       <div slot="push">
-        <img
-          class="scene"
-          src={pushSvg}
-          width="796.8"
-          height="548"
-          loading="lazy"
-          alt="opi --hooks installing the pre-push hook, then git push running opi --check push: working tree clean, not behind upstream, the checks and both builds, with Format (rust) failing, so the push is refused"
-        />
+        <picture>
+          <source
+            media="(max-width: 640px)"
+            srcset={pushNarrowSvg}
+            width="444"
+            height="692"
+          />
+          <img
+            class="scene"
+            src={pushSvg}
+            width="796.8"
+            height="548"
+            loading="lazy"
+            alt="opi --hooks installing the pre-push hook, then git push running opi --check push: working tree clean, not behind upstream, the checks and both builds, with Format (rust) failing, so the push is refused"
+          />
+        </picture>
       </div>
     </Tabs>
     <div class="links">
@@ -228,6 +275,14 @@ opi --hooks         # checks before every push`;
     max-width: 800px;
     height: auto;
     margin: 16px auto 0;
+  }
+  /* On a phone the narrow scene takes part of the tab panel's padding, for a larger font. */
+  @media (max-width: 640px) {
+    .scene {
+      width: calc(100% + 20px);
+      max-width: none;
+      margin-inline: -10px;
+    }
   }
   .links {
     display: flex;

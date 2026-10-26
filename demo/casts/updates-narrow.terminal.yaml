@@ -1,0 +1,21 @@
+# updates.terminal.yaml at 50 columns, for the project page on a phone.
+# Newer versions, sorted by how safe they are to take — npm and cargo in one
+# report.
+version: 1
+
+terminal:
+  title: opi --updates
+  cols: 50
+  rows: 15
+  theme: catppuccin-mocha
+  prompt: "{magenta}❯{/} "
+
+defaults:
+  speed: 55
+
+steps:
+  - wait: 800
+  - exec: opi --updates
+    cwd: /tmp/opi-demo/pulse
+    timeout: 120000
+    idle: 1500
