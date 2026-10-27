@@ -15,6 +15,7 @@ mod check;
 mod clean;
 mod cli;
 mod manifest;
+mod osv;
 mod outdated;
 mod project;
 mod run;
@@ -795,6 +796,8 @@ fn security(
     println!();
 
     let mut clean = true;
+    // Packages the native audits reported, so the OSV section can skip them.
+    let mut known: Vec<(&str, String)> = Vec::new();
 
     // Secrets is a check like any other; this only makes it reachable without
     // waiting for the tests to finish.
@@ -874,6 +877,7 @@ fn security(
                 console.paint(Tone::Success, "Dependencies — no known vulnerabilities")
             ),
             Ok(found) => {
+                known.extend(found.advisories.iter().map(|a| ("npm", a.module.clone())));
                 let serious = found
                     .advisories
                     .iter()
@@ -956,6 +960,7 @@ fn security(
                 // sort them by — see `audit::CargoAdvisory` — and because
                 // `cargo audit` fails on any of them itself.
                 clean = false;
+                known.extend(found.iter().map(|a| ("crates.io", a.package.clone())));
 
                 let mut report = Report::new("Dependencies (rust)", Verdict::Failed)
                     .with_detail_level(DetailLevel::Detailed)
@@ -1000,12 +1005,90 @@ fn security(
         license_report(console, supply::cargo_licenses(rust_root));
     }
 
+    if project.npm || rust_root.is_some() {
+        println!();
+        clean &= osv_audit(console, root, &known);
+    }
+
     println!();
     if clean {
         println!("{}", console.paint(Tone::Success, "Nothing to act on."));
         ExitCode::SUCCESS
     } else {
         ExitCode::FAILURE
+    }
+}
+
+/// The lockfile audit through `osv-scanner`, beside the native ones: only what
+/// they did not already report. Returns whether nothing needs acting on.
+fn osv_audit(console: Console, root: &Path, known: &[(&str, String)]) -> bool {
+    let name = "Dependencies (osv)";
+    match osv::run(root) {
+        Ok(found) => {
+            let found = osv::without_known(found, known);
+            if found.is_empty() {
+                println!(
+                    "{} {}",
+                    console.paint(Tone::Success, "✓"),
+                    console.paint(
+                        Tone::Success,
+                        format!("{name} — nothing beyond the audits above")
+                    )
+                );
+                return true;
+            }
+            let serious = found.iter().any(|f| f.advisory.severity.serious());
+            let verdict = |serious: bool| {
+                if serious {
+                    Verdict::Failed
+                } else {
+                    Verdict::Warning
+                }
+            };
+            let mut report =
+                Report::new(name, verdict(serious)).with_detail_level(DetailLevel::Detailed);
+            let audit = audit::Audit {
+                advisories: found.iter().map(|f| f.advisory.clone()).collect(),
+            };
+            for (severity, count) in audit.counts() {
+                report = report.add_metric(
+                    Metric::new(severity.label(), count.to_string())
+                        .with_verdict(verdict(severity.serious())),
+                );
+            }
+            let mut group = FindingGroup::new("Vulnerable packages in the lockfiles");
+            for advisory in &audit.advisories {
+                let mut finding = Finding::new(
+                    if advisory.severity.serious() {
+                        Tone::Error
+                    } else {
+                        Tone::Warning
+                    },
+                    &advisory.module,
+                )
+                .with_rule_id(advisory.severity.label());
+                if let Some(patched) = &advisory.patched {
+                    finding = finding.with_remedy(format!("update to {patched}"));
+                }
+                group = group.add_finding(finding);
+            }
+            print!("{}", report.add_group(group).render(console));
+            !serious
+        }
+        Err(error) => {
+            let reason = match &error {
+                audit::AuditError::NotInstalled => {
+                    "osv-scanner is not installed; see google.github.io/osv-scanner".to_owned()
+                }
+                other => other.to_string(),
+            };
+            println!(
+                "{} {}",
+                console.paint(Tone::Muted, "–"),
+                console.paint(Tone::Muted, format!("{name} — {reason}"))
+            );
+            !audit_failed(&error)
+        }
     }
 }
 

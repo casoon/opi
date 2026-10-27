@@ -12,6 +12,11 @@ minor release may change existing behaviour.
 - **Security:** the license line of `opi --security` also covers npm and bun projects
   (from `npm sbom`) and Cargo projects (from `cargo metadata`), production dependencies
   only, with the same notable licenses as for pnpm.
+- **Security:** `opi --security` adds a `Dependencies (osv)` section from
+  `osv-scanner`, which reads the npm, pnpm, yarn, bun and Cargo lockfiles
+  against the OSV database. It runs alongside `npm audit`, `cargo audit` and
+  the others and shows only the packages they did not report; without
+  `osv-scanner` the section says so.
 - **Rust:** `cargo rustdoc` runs a second time with `--all-features` where the
   manifest has a feature to turn on. A link from an always compiled item to one
   behind a feature resolves in the one feature set and not in the other — on
