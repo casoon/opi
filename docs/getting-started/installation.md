@@ -25,6 +25,26 @@ repository. The binaries come out of CI; publishing the crate stays local.
 Release binaries exist for macOS on Apple silicon and Intel, and for Linux on x86-64 and
 arm64. The Linux binaries are static musl builds, so the distribution does not matter.
 
+## Verify a download
+
+Official binaries come only from the
+[GitHub releases of `casoon/opi`](https://github.com/casoon/opi/releases), built there by the
+release workflow. Check the hash, the signed build provenance and the attested SBOM:
+
+```sh
+shasum -a 256 -c opi-<version>-<target>.tar.gz.sha256
+gh attestation verify opi-<version>-<target>.tar.gz --repo casoon/opi
+gh attestation verify opi-<version>-<target>.tar.gz --repo casoon/opi \
+  --predicate-type https://cyclonedx.org/bom
+```
+
+Each release also carries the SBOM itself, `opi-v<version>.cdx.json`, in CycloneDX. The
+binaries are built with `cargo auditable`, so the dependency list sits inside them:
+
+```sh
+cargo audit bin opi
+```
+
 ## From crates.io
 
 ```sh

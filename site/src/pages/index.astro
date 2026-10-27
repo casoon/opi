@@ -1,17 +1,22 @@
 ---
+import { readFile } from 'node:fs/promises';
 import {
   Badge,
   Badges,
   Button,
   CodeBlock,
   Facts,
+  Faq,
   Features,
   Hero,
   Install,
+  Keymap,
   Quickstart,
+  ReleaseHighlights,
   Tabs,
 } from '@casoon/pages-theme/components';
 import Base from '@casoon/pages-theme/layouts/Base.astro';
+import { parseChangelog } from '@casoon/pages-theme/lib/changelog';
 import config from 'virtual:casoon-pages/config';
 import { url } from '@casoon/pages-theme/url';
 // The README's recordings, imported rather than copied so there is one file each. The hero
@@ -31,6 +36,13 @@ import pushNarrowSvg from '../../../assets/push-narrow.svg?url';
 import securityNarrowSvg from '../../../assets/security-narrow.svg?url';
 import updatesNarrowSvg from '../../../assets/updates-narrow.svg?url';
 import Diagram from '../components/Diagram.astro';
+
+// Skip "Unreleased": it has no version to show as "New in v…" yet.
+const latestRelease = config.changelog
+  ? parseChangelog(await readFile(config.changelog, 'utf8')).find(
+      (r) => r.version.toLowerCase() !== 'unreleased'
+    )
+  : undefined;
 
 const usage = `opi                 # pick a script
 opi dev             # run one directly
@@ -203,6 +215,29 @@ opi --hooks         # checks before every push`;
     </div>
   </section>
 
+  <Keymap
+    heading="Keys in the list"
+    groups={[
+      {
+        heading: 'Scripts',
+        items: [
+          { label: 'Run the highlighted script', keys: ['Enter'] },
+          { label: 'Move', keys: ['↑', '↓'] },
+          { label: 'Filter across every group', keys: ['/'] },
+        ],
+      },
+      {
+        heading: 'Areas',
+        items: [
+          { label: 'Health', keys: ['H'] },
+          { label: 'Security', keys: ['S'] },
+          { label: 'Updates', keys: ['U'] },
+          { label: 'Clean', keys: ['C'] },
+        ],
+      },
+    ]}
+  />
+
   <section class="block" aria-labelledby="flow-heading">
     <h2 id="flow-heading">Before a commit, before a push</h2>
     <div class="text">
@@ -223,6 +258,8 @@ opi --hooks         # checks before every push`;
     </div>
   </section>
 
+  {latestRelease && <ReleaseHighlights release={latestRelease} />}
+
   <Quickstart
     lead="Install, change into a project, type opi. Grouping and confirmations can be refined in package.json — see Configuration in the documentation."
     steps={[
@@ -233,6 +270,23 @@ opi --hooks         # checks before every push`;
   >
     <CodeBlock code={usage} lang="sh" label="Usage" />
   </Quickstart>
+
+  <Faq
+    items={[
+      {
+        q: 'How do I know a downloaded binary is the one GitHub built?',
+        a: 'Every release archive carries a signed build provenance attestation, and the release has a CycloneDX SBOM attested against each archive. <code>gh attestation verify</code> checks both; the installation page has the commands.',
+      },
+      {
+        q: 'Can I check a downloaded binary for known vulnerabilities?',
+        a: 'Yes. The release binaries are built with <code>cargo auditable</code>, which embeds the dependency list, so <code>cargo audit bin opi</code> works on the file itself.',
+      },
+      {
+        q: 'Does opi write anything into my project?',
+        a: 'Only what you ask for. <code>opi --sbom</code> writes into <code>.opi/sbom/</code>, a folder with a <code>.gitignore</code> of its own, so it never shows up as an untracked file.',
+      },
+    ]}
+  />
 </Base>
 
 <style>

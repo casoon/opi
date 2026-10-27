@@ -72,6 +72,15 @@ Four more lines appear where there is something to say:
 An unset release age and a copyleft dependency are reported, not judged: both can be a
 deliberate choice, so neither changes the exit code.
 
+## SBOM
+
+`opi --sbom [dir]` writes a CycloneDX SBOM per ecosystem: `sbom-npm.cdx.json` from `npm sbom`
+(or `pnpm sbom`), `sbom-cargo.cdx.json` from `cargo cyclonedx`. Without `dir` they go to
+`.opi/sbom/`, a folder with a `.gitignore` of its own. An npm project with a
+`package-lock.json` is read from the lockfile alone, so `node_modules` is not needed. The
+documents are not merged, so each stays attributable to its producer. A missing producer is
+named with the command that installs it, e.g. `cargo install cargo-cyclonedx`.
+
 ## Findings
 
 Advisories are condensed to one line per package and severity, which is what decides what to
