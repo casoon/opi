@@ -9,6 +9,9 @@ minor release may change existing behaviour.
 
 ### Added
 
+- **Security:** the license line of `opi --security` also covers npm and bun projects
+  (from `npm sbom`) and Cargo projects (from `cargo metadata`), production dependencies
+  only, with the same notable licenses as for pnpm.
 - **Rust:** `cargo rustdoc` runs a second time with `--all-features` where the
   manifest has a feature to turn on. A link from an always compiled item to one
   behind a feature resolves in the one feature set and not in the other — on
