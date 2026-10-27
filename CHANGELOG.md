@@ -19,6 +19,10 @@ minor release may change existing behaviour.
   name. Every workspace flag missed `runemark`'s Node binding, so its tests ran
   in CI and nowhere else. A manifest wired to nothing stays out, like `opi`'s
   own `demo/fixtures/pulse`.
+- **SBOM:** `opi --sbom [dir]` writes a CycloneDX JSON per ecosystem —
+  `sbom-npm.cdx.json` via `npm sbom` or `pnpm sbom`, `sbom-cargo.cdx.json` via
+  `cargo cyclonedx` — to `dir` or the project root, and names the tool to
+  install where one is missing.
 - **Docs:** the pages describing the codebase — project state, architecture,
   constraints, conventions, decisions — are on the project page, under **The
   project**, instead of being linked as raw markdown on GitHub. They already

@@ -18,13 +18,14 @@ mod manifest;
 mod outdated;
 mod project;
 mod run;
+mod sbom;
 mod supply;
 mod task;
 mod workflow;
 mod workspace;
 
 use std::io::{self, IsTerminal, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use runemark::{
@@ -157,6 +158,7 @@ fn main() -> ExitCode {
             &root,
         ),
         Invocation::Hooks => hooks(&root),
+        Invocation::Sbom(out) => sbom(&project, rust_root.as_deref(), &root, out.as_deref()),
         Invocation::Run {
             name,
             args,
@@ -1307,6 +1309,61 @@ fn hooks(root: &Path) -> ExitCode {
         )
     );
     ExitCode::SUCCESS
+}
+
+/// Writes a CycloneDX SBOM per ecosystem, into `out` or the project root.
+///
+/// A relative `out` is relative to where `opi` was started, not to the project
+/// root. Each ecosystem is tried; the exit code fails if any of them did.
+fn sbom(project: &Project, rust_root: Option<&Path>, root: &Path, out: Option<&str>) -> ExitCode {
+    let console = Console::stdout(ColorMode::Auto);
+    let out = out.map_or_else(|| root.to_path_buf(), PathBuf::from);
+    let mut results = Vec::new();
+    if project.npm {
+        results.push((
+            "npm",
+            sbom::npm(project.package_manager.manager, root, &out),
+        ));
+    }
+    if let Some(rust_root) = rust_root {
+        results.push(("Cargo", sbom::cargo(rust_root, &out)));
+    }
+    if results.is_empty() {
+        let block = ErrorBlock::new("Nothing to describe")
+            .with_remedy("An SBOM needs a package.json or a Cargo.toml.");
+        write_block(&block, Console::stderr(ColorMode::Auto));
+        return ExitCode::FAILURE;
+    }
+    let mut ok = true;
+    for (ecosystem, result) in results {
+        match result {
+            Ok(path) => println!(
+                "{} {}  {}",
+                console.paint(Tone::Success, "✓"),
+                ecosystem,
+                console.paint(Tone::Muted, path.display().to_string())
+            ),
+            Err(error) => {
+                ok = false;
+                let block = match error {
+                    sbom::SbomError::Missing { tool, install } => {
+                        ErrorBlock::new(format!("{ecosystem}: {tool} is not installed"))
+                            .with_remedy(format!("Install it with {install}."))
+                    }
+                    sbom::SbomError::Failed(reason) => {
+                        ErrorBlock::new(format!("{ecosystem}: no SBOM written"))
+                            .with_explanation(reason)
+                    }
+                };
+                write_block(&block, Console::stderr(ColorMode::Auto));
+            }
+        }
+    }
+    if ok {
+        ExitCode::SUCCESS
+    } else {
+        ExitCode::FAILURE
+    }
 }
 
 /// Shows which dependencies have moved on, separated by how far.
