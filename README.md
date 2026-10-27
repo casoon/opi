@@ -266,6 +266,16 @@ another directory, `OPI_VERSION` another version. Binaries exist for macOS on
 Apple silicon and Intel, and for Linux on x86-64 and arm64; the Linux ones are
 static musl builds, so the distribution does not matter.
 
+Official binaries come only from the
+[GitHub releases of `casoon/opi`](https://github.com/casoon/opi/releases) —
+built there by the release workflow, never on a developer machine. To verify a
+download by hand, check the hash and the signed build provenance:
+
+```bash
+shasum -a 256 -c opi-<version>-<target>.tar.gz.sha256
+gh attestation verify opi-<version>-<target>.tar.gz --repo casoon/opi
+```
+
 From the registry instead, which builds it here:
 
 ```bash
