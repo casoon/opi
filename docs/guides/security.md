@@ -32,7 +32,7 @@ Nothing to act on.
 ## Supply chain
 
 A `package.json` project gets up to three more lines, each answered by the package manager
-itself — pnpm all three, npm two, bun and yarn only the signatures:
+itself — pnpm all three, npm and bun two (licenses from `npm sbom`), yarn only the signatures:
 
 - **Signatures** — `npm audit signatures`: whether every installed package carries a valid
   registry signature. It reads `node_modules`, so it works under pnpm and bun too; under
@@ -41,9 +41,10 @@ itself — pnpm all three, npm two, bun and yarn only the signatures:
 - **Release age** — whether freshly published versions are held back:
   `minimumReleaseAge` for pnpm, `min-release-age` for npm. Asked with `config get`, so a
   global setting counts as well as the workspace file. yarn and bun are not asked.
-- **Licenses** — pnpm only, from `pnpm licenses list --prod`: the most common licenses with
-  their counts, and by name every package under a copyleft, source-available, missing or
-  `UNLICENSED` license. npm, bun and Cargo have no license report of their own.
+- **Licenses** — the most common licenses with their counts, and by name every package under
+  a copyleft, source-available, missing or `UNLICENSED` license. Production dependencies only:
+  from `pnpm licenses list --prod`, from `npm sbom --omit dev` for npm and bun, from
+  `cargo metadata` for Cargo.
 
 ```
 ✓ Signatures — every installed package verified
@@ -53,6 +54,20 @@ itself — pnpm all three, npm two, bun and yarn only the signatures:
   @img/sharp-libvips-darwin-arm64  LGPL-3.0-or-later
   lightningcss  MPL-2.0
 ```
+
+Four more lines appear where there is something to say:
+
+- **Install scripts** — dependencies that declare `preinstall`, `install` or `postinstall`,
+  and whether the project allows them (`onlyBuiltDependencies` / `ignoredBuiltDependencies`
+  for pnpm, `trustedDependencies` for bun, `ignore-scripts` for npm). Scripts nothing has
+  decided on are named.
+- **Sources** — dependencies resolved from git, a tarball URL or a path outside the
+  workspace, read from `package-lock.json`, `pnpm-lock.yaml`, `yarn.lock`, `bun.lock` and
+  `Cargo.lock`.
+- **GitHub Actions** — `uses:` references in `.github/workflows` that name a tag or branch
+  instead of a 40-character commit SHA, with file and line.
+- **Dependencies (osv)** — `osv-scanner` over all lockfiles, shown beside the native audits
+  and only for what they did not report. Without `osv-scanner` the section says so.
 
 An unset release age and a copyleft dependency are reported, not judged: both can be a
 deliberate choice, so neither changes the exit code.

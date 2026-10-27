@@ -71,7 +71,7 @@ Knip, vulnerabilities from the package manager's own audit. `opi` detects which
 tool a project uses, invokes it, and relays the result.
 
 Output is parsed only where the format is documented — `audit --json`,
-`outdated --json`, `audit signatures --json`, `licenses list --json`. Everything else is relayed whole and capped, because a
+`osv-scanner --format json`, `outdated --json`, `audit signatures --json`, `licenses list --json`. Everything else is relayed whole and capped, because a
 parser that guesses at a tool's output breaks on that tool's next release.
 
 Consequence: adapters must be swappable. The "Lint" check exists independently

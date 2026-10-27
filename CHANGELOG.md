@@ -7,6 +7,8 @@ minor release may change existing behaviour.
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-10-27
+
 ### Added
 
 - **Releases:** the binaries are built with `cargo auditable`, so `cargo audit bin`
@@ -433,7 +435,8 @@ minor release may change existing behaviour.
   establishing the repository skeleton. The binary prints its version and a
   development notice; no functionality is implemented.
 
-[Unreleased]: https://github.com/casoon/opi/compare/v0.11.0...HEAD
+[Unreleased]: https://github.com/casoon/opi/compare/v0.12.0...HEAD
+[0.12.0]: https://github.com/casoon/opi/releases/tag/v0.12.0
 [0.11.0]: https://github.com/casoon/opi/releases/tag/v0.11.0
 [0.10.0]: https://github.com/casoon/opi/releases/tag/v0.10.0
 [0.9.0]: https://github.com/casoon/opi/releases/tag/v0.9.0
