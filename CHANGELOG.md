@@ -7,6 +7,11 @@ minor release may change existing behaviour.
 
 ## [Unreleased]
 
+### Changed
+
+- **Site:** "What each area checks" gives Health, Security, Updates, Clean and Scripts an
+  icon-tile summary before the interactive demo.
+
 ## [0.12.1] - 2026-10-27
 
 ### Changed

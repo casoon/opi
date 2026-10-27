@@ -118,6 +118,38 @@ opi --hooks         # checks before every push`;
     ]}
   />
 
+  <Features
+    layout="grid"
+    heading="What each area checks"
+    items={[
+      {
+        icon: 'H',
+        title: 'Health',
+        body: 'Biome, ESLint, tsc, astro check, Vitest and cargo, run concurrently — their own output relayed, not reinvented.',
+      },
+      {
+        icon: 'S',
+        title: 'Security',
+        body: 'Secret scanning, known vulnerabilities, package-signature verification and a minimum release age, in one pass.',
+      },
+      {
+        icon: 'U',
+        title: 'Updates',
+        body: 'Flags which updates are safe to take and which cross a major version, per ecosystem.',
+      },
+      {
+        icon: '×',
+        title: 'Clean',
+        body: 'Removes what you choose. opi itself never rewrites package.json or a lockfile.',
+      },
+      {
+        icon: '⌘',
+        title: 'Scripts',
+        body: 'Every script grouped and labelled, with the package manager already detected.',
+      },
+    ]}
+  />
+
   <section class="block" aria-labelledby="areas-heading">
     <h2 id="areas-heading">One key away</h2>
     <p class="lead">
