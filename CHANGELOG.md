@@ -22,7 +22,6 @@ minor release may change existing behaviour.
   allows them — pnpm's `onlyBuiltDependencies` / `ignoredBuiltDependencies`,
   bun's `trustedDependencies`, npm's `ignore-scripts`. Scripts nothing has
   decided on are named.
-
 - **Security:** `--security` lists dependencies that come from git, a tarball URL or a
   path outside the workspace, read from `package-lock.json`, `pnpm-lock.yaml`,
   `yarn.lock`, `bun.lock` and `Cargo.lock`, with the source each was resolved from.
