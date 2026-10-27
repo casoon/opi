@@ -295,6 +295,17 @@ shasum -a 256 -c opi-<version>-<target>.tar.gz.sha256
 gh attestation verify opi-<version>-<target>.tar.gz --repo casoon/opi
 ```
 
+Each release also carries a CycloneDX SBOM, `opi-v<version>.cdx.json`, attested
+against every archive. The binaries are built with `cargo auditable`, so the
+dependency list sits inside them and a downloaded binary can be checked for
+known vulnerabilities:
+
+```bash
+gh attestation verify opi-<version>-<target>.tar.gz --repo casoon/opi \
+  --predicate-type https://cyclonedx.org/bom
+cargo audit bin opi
+```
+
 From the registry instead, which builds it here:
 
 ```bash

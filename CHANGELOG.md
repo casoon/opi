@@ -9,6 +9,10 @@ minor release may change existing behaviour.
 
 ### Added
 
+- **Releases:** the binaries are built with `cargo auditable`, so `cargo audit bin`
+  can check a downloaded one, and each release carries a CycloneDX SBOM,
+  `opi-v<version>.cdx.json`, with an attestation against every archive. The
+  README says how to verify both.
 - **Security:** the license line of `opi --security` also covers npm and bun projects
   (from `npm sbom`) and Cargo projects (from `cargo metadata`), production dependencies
   only, with the same notable licenses as for pnpm.
