@@ -28,6 +28,10 @@ minor release may change existing behaviour.
 - **Security:** `opi --security` lists the `uses:` references in
   `.github/workflows` that name a tag or branch instead of a 40-character commit
   SHA, with file and line. Local and Docker references are left out.
+- **Releases:** every release archive carries a signed build provenance
+  attestation, and the release has a combined `SHA256SUMS`. The README says how
+  to verify a download with `gh attestation verify`.
+
 - **Rust:** `cargo rustdoc` runs a second time with `--all-features` where the
   manifest has a feature to turn on. A link from an always compiled item to one
   behind a feature resolves in the one feature set and not in the other — on
