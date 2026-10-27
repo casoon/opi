@@ -7,6 +7,12 @@ minor release may change existing behaviour.
 
 ## [Unreleased]
 
+## [0.12.1] - 2026-10-27
+
+### Changed
+
+- **Dependencies:** `runemark` 0.9.1 and `serde_json` 1.0.154.
+
 ## [0.12.0] - 2026-10-27
 
 ### Added
@@ -435,7 +441,8 @@ minor release may change existing behaviour.
   establishing the repository skeleton. The binary prints its version and a
   development notice; no functionality is implemented.
 
-[Unreleased]: https://github.com/casoon/opi/compare/v0.12.0...HEAD
+[Unreleased]: https://github.com/casoon/opi/compare/v0.12.1...HEAD
+[0.12.1]: https://github.com/casoon/opi/releases/tag/v0.12.1
 [0.12.0]: https://github.com/casoon/opi/releases/tag/v0.12.0
 [0.11.0]: https://github.com/casoon/opi/releases/tag/v0.11.0
 [0.10.0]: https://github.com/casoon/opi/releases/tag/v0.10.0
