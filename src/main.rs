@@ -21,6 +21,7 @@ mod project;
 mod run;
 mod sbom;
 mod scripts;
+mod sources;
 mod supply;
 mod task;
 mod workflow;
@@ -1012,6 +1013,7 @@ fn security(
     }
 
     println!();
+    non_registry_sources(console, &[Some(root), rust_root]);
     if clean {
         println!("{}", console.paint(Tone::Success, "Nothing to act on."));
         ExitCode::SUCCESS
@@ -1091,6 +1093,42 @@ fn osv_audit(console: Console, root: &Path, known: &[(&str, String)]) -> bool {
             !audit_failed(&error)
         }
     }
+}
+
+/// Lists dependencies resolved from git, a tarball or a path outside the
+/// workspace. Reported, not judged: a fork is often a deliberate choice.
+fn non_registry_sources(console: Console, dirs: &[Option<&Path>]) {
+    let mut found: Vec<sources::Foreign> = dirs
+        .iter()
+        .flatten()
+        .flat_map(|dir| sources::scan(dir))
+        .collect();
+    found.dedup();
+    if found.is_empty() {
+        return;
+    }
+    println!(
+        "{} {}",
+        console.paint(Tone::Warning, "!"),
+        console.paint(
+            Tone::Warning,
+            format!(
+                "Sources — {} from outside the registry",
+                plural(found.len(), "dependency", "dependencies")
+            )
+        )
+    );
+    for item in found.iter().take(OUTPUT_LINES) {
+        println!(
+            "  {}  {}",
+            item.name,
+            console.paint(Tone::Muted, &item.source)
+        );
+    }
+    if let Some(rest) = found.len().checked_sub(OUTPUT_LINES).filter(|n| *n > 0) {
+        println!("  {}", console.paint(Tone::Muted, format!("… {rest} more")));
+    }
+    println!();
 }
 
 /// Whether an audit error leaves the question unanswered rather than

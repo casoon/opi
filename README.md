@@ -178,7 +178,7 @@ word stays theirs.
 | | | |
 | --- | --- | --- |
 | `H` | `opi --health` | Runs every check the project's tools can answer, concurrently |
-| `S` | `opi --security` | Secret scan, a parsed dependency audit per ecosystem, signatures, release age and dependencies with install scripts and licenses (pnpm, npm, bun and Cargo; production dependencies only) |
+| `S` | `opi --security` | Secret scan, a parsed dependency audit per ecosystem, signatures, release age and dependencies with install scripts, licenses and dependencies from outside the registry (pnpm, npm, bun and Cargo; production dependencies only) |
 | `U` | `opi --updates` | What is outdated, split into safe and major — and the offer to take it |
 | `C` | `opi --clean` | Removable artefacts, with what each one costs |
 | | `opi --check commit` | The fast checks, before you commit |
@@ -210,5 +210,121 @@ checks run per member, in the member, because that is where the tools and their
 config live.
 
 Output is parsed only where the format is documented (`audit --json`,
-Output is parsed only where the format is documented (`audit --json`,
 `osv-scanner --format json`, `outdated --json`, `audit signatures --json`, `licenses list --json`, `sbom --sbom-format cyclonedx`, `cargo metadata`). Everything else is relayed whole and capped at twenty lines,
+with the command to see the rest: a parser that guesses at a tool's output
+breaks on that tool's next release.
+
+The one thing `--security` reads itself is the lockfile: `package-lock.json`,
+`pnpm-lock.yaml`, `yarn.lock`, `bun.lock` and `Cargo.lock` name every dependency
+resolved from git, a tarball URL or a path outside the workspace, with its
+source. `bun.lockb`, bun's binary lockfile, is not read.
+
+![opi --security finding a vulnerable lodash through npm audit, while cargo audit finds nothing](https://raw.githubusercontent.com/casoon/opi/main/assets/security.svg)
+
+![opi --updates listing lodash 4.17.20 → 4.18.1 as safe to take, with the Rust side current](https://raw.githubusercontent.com/casoon/opi/main/assets/updates.svg)
+
+There is no health score. A composite number stops meaning anything within
+weeks; what a failing tool actually said does not.
+
+### Taking the updates
+
+`--updates` can apply what it found, and then runs the commit checks on what
+comes back — update, install, check, what is red now. That chain is the reason
+the action exists; saving you from typing `pnpm update` would not have been.
+
+The choice offered is **not** safe against major. That is how the list is
+ordered, and it is the wrong question for an action: in a project whose ranges
+are exact or `~`, `pnpm update` moves none of what the list calls safe. The
+real choice is staying inside the declared ranges against raising them, and
+each line carries its own count and disappears when that count is zero.
+
+`opi` writes nothing itself. It calls the package manager with a list of names
+— no `package.json`, no lockfile, no `pnpm-workspace.yaml`. Majors are never in
+that list. Raising ranges is offered for pnpm only, because npm has no command
+that keeps the operator: `npm install x@1.1.1` turns an exact `2.1.2` into
+`^2.1.3`, and an exact pin is a statement. Where two lockfiles disagree and no
+`packageManager` field settles it, the offer is withheld and the finding named
+instead.
+
+### Before every push
+
+For a repository without CI, `opi --hooks` makes the push workflow the
+pre-push hook: every check, then the build, and a push that fails any of them
+does not leave the machine. `git push --no-verify` is the way past it.
+
+![opi --hooks installing the pre-push hook, then git push running every check and the build and refusing the push because rustfmt found a diff](https://raw.githubusercontent.com/casoon/opi/main/assets/push.svg)
+
+## Design rules
+
+- **Zero configuration.** `opi` must be useful in an unmodified repository. A
+  tool you have to configure first never gets started in someone else's project.
+- **The project's own files are the only interface.** `package.json` and
+  `Cargo.toml` — no `opi.toml`, no second source of truth of `opi`'s own
+  making. `scripts`, optionally `scripts-info`, optionally an `opi` key for
+  refinement.
+- **No task system of its own.** `opi` does not define tasks with their own
+  commands — that would put it in competition with npm scripts, `just`, `make`
+  and Taskfile for no gain.
+- **Orchestration, not reimplementation.** `opi` is a UX layer over proven
+  tooling.
+- **`opi` writes nothing.** Clean removes what you pick, updates are applied
+  by the package manager, and `opi --hooks` adds one line to the pre-push hook
+  without touching the rest. No manifest or lockfile is ever rewritten by
+  `opi` itself, and where a tool cannot do something cleanly it is not offered rather than
+  offered badly.
+
+## Install
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/casoon/opi/main/install.sh | sh
+```
+
+That downloads the release binary for your platform, checks it against the
+published SHA-256 and puts it in `~/.local/bin` — `OPI_INSTALL_DIR` picks
+another directory, `OPI_VERSION` another version. Binaries exist for macOS on
+Apple silicon and Intel, and for Linux on x86-64 and arm64; the Linux ones are
+static musl builds, so the distribution does not matter.
+
+From the registry instead, which builds it here:
+
+```bash
+cargo install opi
+```
+
+**Unix only.** `opi` runs a script by replacing its own process with `exec`, so
+`Ctrl-C` reaches the dev server rather than killing a wrapper, and its
+interactive list drives termios directly. Windows offers neither, and a second
+execution model that nothing exercises would be worse than an honest boundary.
+Building on Windows fails with that message rather than producing a degraded
+binary.
+
+## Documentation
+
+**[casoon.github.io/opi](https://casoon.github.io/opi/)** — installation, a
+guide per area, the command line reference and the changelog, with the terminal
+output captured from the binary.
+
+The files below are the same documentation as it sits in the repository:
+
+- [docs/project-state.md](docs/project-state.md) — what this is and where it stands
+- [Architecture](https://casoon.github.io/opi/docs/architecture/) — the modules and how they fit
+- [docs/constraints.md](docs/constraints.md) — the boundaries the implementation respects
+- [docs/conventions.md](docs/conventions.md) — the rules future changes follow
+- [docs/decisions.md](docs/decisions.md) — the decisions in force, and why
+
+[demo/](demo/) holds the fixtures and the scripted scenes the recordings above
+are made from, and says what has to be true for a recording to show `opi` rather
+than the repository it was recorded in.
+
+Terminal presentation comes from [runemark](https://github.com/casoon/runemark),
+the shared presentation layer for these CLI tools.
+
+## Name
+
+`opi` is unrelated to [OdradekAI/opi](https://github.com/OdradekAI/opi), which
+owns the `opi-*` crate namespace on crates.io. Installing both puts two `opi`
+binaries in `~/.cargo/bin`.
+
+## License
+
+MIT ([LICENSE](LICENSE)).
