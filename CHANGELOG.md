@@ -40,8 +40,10 @@ minor release may change existing behaviour.
   own `demo/fixtures/pulse`.
 - **SBOM:** `opi --sbom [dir]` writes a CycloneDX JSON per ecosystem —
   `sbom-npm.cdx.json` via `npm sbom` or `pnpm sbom`, `sbom-cargo.cdx.json` via
-  `cargo cyclonedx` — to `dir` or the project root, and names the tool to
-  install where one is missing.
+  `cargo cyclonedx` — to `dir` or to `.opi/sbom/` in the project (which carries its own
+  `.gitignore`), and names the tool to install where one is missing. With a
+  `package-lock.json` the npm document is read from the lockfile alone, so it
+  needs no `node_modules`.
 - **Docs:** the pages describing the codebase — project state, architecture,
   constraints, conventions, decisions — are on the project page, under **The
   project**, instead of being linked as raw markdown on GitHub. They already

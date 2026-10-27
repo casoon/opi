@@ -1549,7 +1549,18 @@ fn hooks(root: &Path) -> ExitCode {
 /// root. Each ecosystem is tried; the exit code fails if any of them did.
 fn sbom(project: &Project, rust_root: Option<&Path>, root: &Path, out: Option<&str>) -> ExitCode {
     let console = Console::stdout(ColorMode::Auto);
-    let out = out.map_or_else(|| root.to_path_buf(), PathBuf::from);
+    let out = match out {
+        Some(dir) => PathBuf::from(dir),
+        None => match sbom::default_dir(root) {
+            Ok(dir) => dir,
+            Err(error) => {
+                let block =
+                    ErrorBlock::new("No place for the SBOM").with_explanation(format!("{error:?}"));
+                write_block(&block, Console::stderr(ColorMode::Auto));
+                return ExitCode::FAILURE;
+            }
+        },
+    };
     let mut results = Vec::new();
     if project.npm {
         results.push((

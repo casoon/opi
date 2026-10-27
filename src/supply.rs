@@ -95,7 +95,19 @@ pub fn licenses(manager: PackageManager, root: &Path) -> Option<Result<Licenses,
             &["licenses", "list", "--json", "--prod"],
             parse_licenses,
         ),
-        PackageManager::Npm | PackageManager::Bun => (
+        PackageManager::Npm => (
+            "npm",
+            &[
+                "sbom",
+                "--sbom-format",
+                "cyclonedx",
+                "--omit",
+                "dev",
+                "--package-lock-only",
+            ],
+            parse_sbom_licenses,
+        ),
+        PackageManager::Bun => (
             "npm",
             &["sbom", "--sbom-format", "cyclonedx", "--omit", "dev"],
             parse_sbom_licenses,
