@@ -275,15 +275,15 @@ opi --hooks         # checks before every push`;
     items={[
       {
         q: 'How do I know a downloaded binary is the one GitHub built?',
-        a: 'Every release archive carries a signed build provenance attestation, and the release has a CycloneDX SBOM attested against each archive. <code>gh attestation verify</code> checks both; the installation page has the commands.',
+        a: 'Every release archive carries a signed build provenance attestation, and the release has a CycloneDX SBOM attested against each archive. gh attestation verify checks both; the installation page has the commands.',
       },
       {
         q: 'Can I check a downloaded binary for known vulnerabilities?',
-        a: 'Yes. The release binaries are built with <code>cargo auditable</code>, which embeds the dependency list, so <code>cargo audit bin opi</code> works on the file itself.',
+        a: 'Yes. The release binaries are built with cargo auditable, which embeds the dependency list, so cargo audit bin opi works on the file itself.',
       },
       {
         q: 'Does opi write anything into my project?',
-        a: 'Only what you ask for. <code>opi --sbom</code> writes into <code>.opi/sbom/</code>, a folder with a <code>.gitignore</code> of its own, so it never shows up as an untracked file.',
+        a: 'Only what you ask for. opi --sbom writes into .opi/sbom/, a folder with a .gitignore of its own, so it never shows up as an untracked file.',
       },
     ]}
   />
