@@ -178,7 +178,7 @@ word stays theirs.
 | | | |
 | --- | --- | --- |
 | `H` | `opi --health` | Runs every check the project's tools can answer, concurrently |
-| `S` | `opi --security` | Secret scan, a parsed dependency audit per ecosystem, signatures, release age and licenses (pnpm, npm, bun and Cargo; production dependencies only) |
+| `S` | `opi --security` | Secret scan, a parsed dependency audit per ecosystem, signatures, release age and dependencies with install scripts and licenses (pnpm, npm, bun and Cargo; production dependencies only) |
 | `U` | `opi --updates` | What is outdated, split into safe and major — and the offer to take it |
 | `C` | `opi --clean` | Removable artefacts, with what each one costs |
 | | `opi --check commit` | The fast checks, before you commit |
