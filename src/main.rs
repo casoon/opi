@@ -9,6 +9,7 @@ compile_error!(
      and its interactive list drives termios directly."
 );
 
+mod actions;
 mod audit;
 mod cargo;
 mod check;
@@ -1012,6 +1013,8 @@ fn security(
         clean &= osv_audit(console, root, &known);
     }
 
+    unpinned_actions(console, root);
+
     println!();
     non_registry_sources(console, &[Some(root), rust_root]);
     if clean {
@@ -1140,6 +1143,34 @@ fn non_registry_sources(console: Console, dirs: &[Option<&Path>]) {
 /// same split `--updates` makes.
 fn audit_failed(error: &audit::AuditError) -> bool {
     matches!(error, audit::AuditError::Failed(_))
+}
+
+/// Workflow `uses:` references a tag or branch can move.
+///
+/// Reported, not judged: pinning is a policy, so it does not fail the run.
+fn unpinned_actions(console: Console, root: &Path) {
+    let found = actions::unpinned(root);
+    if found.is_empty() {
+        return;
+    }
+    println!();
+    println!(
+        "{} {}",
+        console.paint(Tone::Warning, "!"),
+        console.paint(
+            Tone::Warning,
+            format!(
+                "GitHub Actions — {} not pinned to a commit SHA",
+                plural(found.len(), "reference", "references")
+            )
+        )
+    );
+    for item in found.iter().take(OUTPUT_LINES) {
+        println!("  {}:{}  {}", item.file, item.line, item.reference);
+    }
+    if let Some(rest) = found.len().checked_sub(OUTPUT_LINES).filter(|n| *n > 0) {
+        println!("  {}", console.paint(Tone::Muted, format!("… {rest} more")));
+    }
 }
 
 /// Signatures, release age and licenses, beside the vulnerability audit.
