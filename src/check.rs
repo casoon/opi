@@ -91,8 +91,13 @@ pub struct Report {
 }
 
 impl Report {
+    /// Whether nothing failed. A warning passes: it is shown, never blocking.
     pub fn passed(&self) -> bool {
-        self.verdict == Verdict::Passed
+        matches!(self.verdict, Verdict::Passed | Verdict::Warning)
+    }
+
+    pub fn warned(&self) -> bool {
+        self.verdict == Verdict::Warning
     }
 
     /// Whether the tool itself could not be started.
@@ -108,6 +113,9 @@ struct Candidate {
     tool: &'static str,
     /// Package that has to be a dependency for this tool to apply.
     package: &'static str,
+    /// File the tool needs in the package directory, where it has nothing to
+    /// check without one.
+    requires: Option<&'static str>,
     args: &'static [&'static str],
 }
 
@@ -122,12 +130,15 @@ const CANDIDATES: &[Candidate] = &[
         name: "TypeScript",
         tool: "astro",
         package: "@astrojs/check",
+        requires: None,
         args: &["check"],
     },
     Candidate {
         name: "TypeScript",
         tool: "tsc",
         package: "typescript",
+        // Without a tsconfig.json, `tsc --noEmit` prints its help and fails.
+        requires: Some("tsconfig.json"),
         args: &["--noEmit"],
     },
     // Biome checks lint and formatting in one pass.
@@ -135,18 +146,21 @@ const CANDIDATES: &[Candidate] = &[
         name: "Lint & format",
         tool: "biome",
         package: "@biomejs/biome",
+        requires: None,
         args: &["check", "."],
     },
     Candidate {
         name: "Lint",
         tool: "eslint",
         package: "eslint",
+        requires: None,
         args: &["."],
     },
     Candidate {
         name: "Format",
         tool: "prettier",
         package: "prettier",
+        requires: None,
         args: &["--check", "."],
     },
     // A bare `vitest` watches; health has to terminate.
@@ -154,42 +168,49 @@ const CANDIDATES: &[Candidate] = &[
         name: "Tests",
         tool: "vitest",
         package: "vitest",
+        requires: None,
         args: &["run"],
     },
     Candidate {
         name: "Tests",
         tool: "jest",
         package: "jest",
+        requires: None,
         args: &[],
     },
     Candidate {
         name: "Dead code",
         tool: "fallow",
         package: "fallow",
+        requires: None,
         args: &["dead-code"],
     },
     Candidate {
         name: "Dead code",
         tool: "knip",
         package: "knip",
+        requires: None,
         args: &[],
     },
     Candidate {
         name: "Secrets",
         tool: "nosecrets",
         package: "@casoon/nosecrets",
+        requires: None,
         args: &["scan", "."],
     },
     Candidate {
         name: "Secrets",
         tool: "nosecrets",
         package: "nosecrets",
+        requires: None,
         args: &["scan", "."],
     },
     Candidate {
         name: "Secrets",
         tool: "secretlint",
         package: "secretlint",
+        requires: None,
         args: &["**/*"],
     },
 ];
@@ -302,29 +323,45 @@ impl Check {
         // `cargo rustdoc` cannot start at a virtual manifest, so Docs there is
         // one run per member instead; see `cargo::virtual_members`.
         let members = crate::cargo::virtual_members(root);
-        let per_member = members.iter().map(|member| Self {
-            name: "Docs",
-            tool: "cargo",
-            scope: Some(member.clone()),
-            program: Program::External(PathBuf::from("cargo")),
-            // Leaked: arguments are `&'static str`, and the few member names
-            // live as long as the process anyway.
-            args: vec![
+        // A package with a library and a binary needs its target named; see
+        // `cargo::library_packages`.
+        let libraries = crate::cargo::library_packages(root);
+        let root_library = crate::cargo::discover(root)
+            .and_then(|(project, _)| project.name)
+            .is_some_and(|name| libraries.contains(&name));
+        let rustdoc = |args: &[&'static str], library: bool| {
+            let mut args = args.to_vec();
+            if library && args.first() == Some(&"rustdoc") {
+                args.insert(1, "--lib");
+            }
+            args
+        };
+        let per_member = members.iter().map(|member| {
+            let mut args = vec![
                 "rustdoc",
                 "-p",
+                // Leaked: arguments are `&'static str`, and the few member
+                // names live as long as the process anyway.
                 Box::leak(member.clone().into_boxed_str()),
-                "--all-features",
-                "--",
-                "-D",
-                "warnings",
-            ],
-            dir: root.to_path_buf(),
+            ];
+            if libraries.contains(member) {
+                args.push("--lib");
+            }
+            args.extend(["--all-features", "--", "-D", "warnings"]);
+            Self {
+                name: "Docs",
+                tool: "cargo",
+                scope: Some(member.clone()),
+                program: Program::External(PathBuf::from("cargo")),
+                args,
+                dir: root.to_path_buf(),
+            }
         });
 
         crate::cargo::CHECKS
             .iter()
             .filter(|(name, _)| members.is_empty() || *name != "Docs")
-            .map(|(name, args)| build(name, args.to_vec()))
+            .map(|(name, args)| build(name, rustdoc(args, root_library)))
             // Feature-dependent: a second documentation run, offered where the
             // manifest has a feature to turn on and absent where both runs
             // would compile the same crate.
@@ -332,7 +369,7 @@ impl Check {
                 crate::cargo::FEATURE_CHECKS
                     .iter()
                     .filter(|_| crate::cargo::has_optional_features(root))
-                    .map(|(name, args)| build(name, args.to_vec())),
+                    .map(|(name, args)| build(name, rustdoc(args, root_library))),
             )
             .chain(per_member)
             .chain(lockfile)
@@ -486,6 +523,12 @@ impl Check {
                 continue;
             }
             if !manifest.depends_on(candidate.package) {
+                continue;
+            }
+            if candidate
+                .requires
+                .is_some_and(|file| !dir.join(file).exists())
+            {
                 continue;
             }
             let Some((program, prefix)) = resolve(dir, candidate.tool, manager) else {
@@ -743,6 +786,31 @@ mod tests {
             .find(|check| check.name == "Lint")
             .expect("eslint check is offered under Yarn PnP");
         assert_eq!(lint.command_line(), "yarn run eslint .");
+    }
+
+    #[test]
+    fn tsc_needs_a_tsconfig_to_check_anything() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        fs::write(
+            dir.path().join("package.json"),
+            r#"{"name":"t","devDependencies":{"typescript":"6.0.3"}}"#,
+        )
+        .expect("write");
+        fs::create_dir_all(dir.path().join("node_modules/.bin")).expect("mkdir");
+        fs::write(dir.path().join("node_modules/.bin/tsc"), "").expect("write");
+        let manifest = Manifest::load(dir.path()).expect("manifest");
+        let typescript = |dir: &Path| {
+            Check::detect_in(&manifest, dir, None, PackageManager::Npm)
+                .into_iter()
+                .any(|check| check.name == "TypeScript")
+        };
+
+        assert!(
+            !typescript(dir.path()),
+            "tsc without a tsconfig prints its help"
+        );
+        fs::write(dir.path().join("tsconfig.json"), "{}").expect("write");
+        assert!(typescript(dir.path()));
     }
 
     #[test]

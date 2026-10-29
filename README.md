@@ -207,7 +207,9 @@ astro-v7-workspace  health
 
 `opi` bundles nosecrets as its default secret scanner, including in Rust-only projects.
 A detected project scanner takes precedence. `.nosecrets.toml` and `.nosecretsignore`
-are respected; no separate scanner installation is needed for the default.
+are respected; no separate scanner installation is needed for the default. It scans
+the files Git does not ignore, and a high-entropy string, a guess rather than a known
+credential format, is a warning rather than a failure.
 
 `opi` reimplements none of the detection rules. It detects which tool a project depends on —
 Biome, ESLint, Prettier, `tsc`, `astro check`, Vitest, Jest, fallow, Knip, a

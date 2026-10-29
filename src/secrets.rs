@@ -1,6 +1,9 @@
 //! Adapter over nosecrets' scanning engine; no detection rules live in opi.
 
-use std::path::Path;
+use std::ffi::OsStr;
+use std::os::unix::ffi::OsStrExt;
+use std::path::{Path, PathBuf};
+use std::process::Command;
 
 use nosecrets_core::{Detector, collect_files};
 use nosecrets_filter::{Config, Filter, load_ignore_file};
@@ -28,7 +31,11 @@ fn scan_inner(dir: &Path, staged: bool) -> Result<(Verdict, String), Box<dyn std
     let files = if staged {
         Vec::new()
     } else {
-        collect_files(root, &[dir.to_path_buf()])?
+        let candidates = match &repository {
+            Some(_) => unignored_files(root, dir)?,
+            None => collect_files(root, &[dir.to_path_buf()])?,
+        };
+        candidates
             .into_iter()
             .filter(|path| !filter.is_path_ignored(path.strip_prefix(root).unwrap_or(path)))
             .collect()
@@ -45,10 +52,18 @@ fn scan_inner(dir: &Path, staged: bool) -> Result<(Verdict, String), Box<dyn std
     findings.sort_by(|a, b| {
         (&a.path, a.line, a.column, &a.rule_id).cmp(&(&b.path, b.line, b.column, &b.rule_id))
     });
-    let verdict = if findings.iter().any(|finding| finding.severity.blocks()) {
+    // A high-entropy string is a guess: across 13 real repositories nearly all
+    // of them were hashes, source maps, inline SVG and minified bundles. It is
+    // shown, but only a rule that recognises a credential's format fails.
+    let verdict = if findings
+        .iter()
+        .any(|finding| finding.severity.blocks() && finding.rule_id != ENTROPY_RULE)
+    {
         Verdict::Failed
-    } else {
+    } else if findings.is_empty() {
         Verdict::Passed
+    } else {
+        Verdict::Warning
     };
     // Do not include previews: findings should never copy credentials into logs.
     let output = findings
@@ -68,6 +83,37 @@ fn scan_inner(dir: &Path, staged: bool) -> Result<(Verdict, String), Box<dyn std
         .collect::<Vec<_>>()
         .join("\n");
     Ok((verdict, output))
+}
+
+const ENTROPY_RULE: &str = "high-entropy-string";
+
+/// Files under `dir` that Git tracks or would track: ignored files such as a
+/// local `.env`, build output and nested worktrees are not what a commit can
+/// leak, and scanning them buried every real finding in noise.
+fn unignored_files(root: &Path, dir: &Path) -> Result<Vec<PathBuf>, Box<dyn std::error::Error>> {
+    let output = Command::new("git")
+        .current_dir(dir)
+        .args([
+            "ls-files",
+            "-z",
+            "--cached",
+            "--others",
+            "--exclude-standard",
+            "--full-name",
+        ])
+        .output()?;
+    if !output.status.success() {
+        return Err("git ls-files failed".into());
+    }
+    Ok(output
+        .stdout
+        .split(|byte| *byte == 0)
+        .filter(|path| !path.is_empty())
+        .map(|path| root.join(OsStr::from_bytes(path)))
+        // A file deleted from the working tree is still in the index; a
+        // symlink is not followed, as the directory walk does not follow one.
+        .filter(|path| path.symlink_metadata().is_ok_and(|meta| meta.is_file()))
+        .collect())
 }
 
 #[cfg(test)]
@@ -116,6 +162,40 @@ mod tests {
         fs::write(root.join("key.pem"), private_key()).unwrap();
         assert_eq!(scan(root, true).0, Verdict::Passed);
         assert_eq!(scan(root, false).0, Verdict::Failed);
+    }
+
+    #[test]
+    fn files_git_ignores_are_not_scanned() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        git(root, &["init", "-q"]);
+        fs::write(root.join(".gitignore"), ".env\n").unwrap();
+        fs::write(root.join(".env"), private_key()).unwrap();
+        assert_eq!(scan(root, false).0, Verdict::Passed);
+        fs::write(root.join("untracked.pem"), private_key()).unwrap();
+        let (verdict, output) = scan(root, false);
+        assert_eq!(verdict, Verdict::Failed);
+        assert!(output.contains("untracked.pem:1:"), "{output}");
+    }
+
+    #[test]
+    fn an_entropy_guess_warns_rather_than_fails() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        fs::write(
+            root.join("hash.txt"),
+            // Split, so this file does not warn about itself.
+            [
+                "integrity_key: \"",
+                "Zk3qT8vXw2LmPa9RbYc7HdN4sJu6EfGo1KiVt5Qz0WxUyBn",
+                "\"\n",
+            ]
+            .concat(),
+        )
+        .unwrap();
+        let (verdict, output) = scan(root, false);
+        assert!(output.contains("high-entropy-string"), "{output}");
+        assert_eq!(verdict, Verdict::Warning);
     }
 
     #[test]

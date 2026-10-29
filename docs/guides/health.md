@@ -31,7 +31,7 @@ opi  health
 
 | Check | Tools, first match wins |
 | --- | --- |
-| TypeScript | `astro check` (with `@astrojs/check`), `tsc --noEmit` |
+| TypeScript | `astro check` (with `@astrojs/check`), `tsc --noEmit` (where a `tsconfig.json` exists) |
 | Lint & format | Biome |
 | Lint | ESLint |
 | Format | Prettier |

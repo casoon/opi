@@ -579,6 +579,7 @@ fn health(
         .unwrap_or(0);
     let reports = check::run_all(checks, |report| {
         let (tone, mark) = match report {
+            report if report.warned() => (Tone::Warning, "!"),
             report if report.passed() => (Tone::Success, "✓"),
             report if report.unusable() => (Tone::Warning, "!"),
             _ => (Tone::Error, "✗"),
@@ -597,12 +598,16 @@ fn health(
 
     let failed: Vec<&check::Report> = reports.iter().filter(|report| !report.passed()).collect();
     let unusable = failed.iter().filter(|report| report.unusable()).count();
+    let warned = reports.iter().filter(|report| report.warned()).count();
 
     // No score. A composite number stops meaning anything within weeks; what a
     // failing tool actually said does not.
-    for report in &failed {
+    for report in reports
+        .iter()
+        .filter(|report| !report.passed() || report.warned())
+    {
         println!();
-        let tone = if report.unusable() {
+        let tone = if report.unusable() || report.warned() {
             Tone::Warning
         } else {
             Tone::Error
@@ -637,10 +642,12 @@ fn health(
 
     println!();
     if failed.is_empty() {
-        println!(
-            "{}",
-            console.paint(Tone::Success, format!("{} checks passed.", reports.len()))
-        );
+        let note = if warned > 0 {
+            format!("{} checks passed, {warned} with warnings.", reports.len())
+        } else {
+            format!("{} checks passed.", reports.len())
+        };
+        println!("{}", console.paint(Tone::Success, note));
         ExitCode::SUCCESS
     } else {
         let note = if unusable > 0 {
@@ -839,18 +846,23 @@ fn security(
     } else {
         let reports = check::run_all(scans, |_| {});
         for report in &reports {
-            if report.passed() {
+            if report.passed() && !report.warned() {
                 println!(
                     "{} {}",
                     console.paint(Tone::Success, "✓"),
                     console.paint(Tone::Success, format!("Secrets — {}", report.check.tool))
                 );
             } else {
-                clean = false;
+                let (tone, mark) = if report.warned() {
+                    (Tone::Warning, "!")
+                } else {
+                    clean = false;
+                    (Tone::Error, "✗")
+                };
                 println!(
                     "{} {}",
-                    console.paint(Tone::Error, "✗"),
-                    console.paint(Tone::Error, format!("Secrets — {}", report.check.tool))
+                    console.paint(tone, mark),
+                    console.paint(tone, format!("Secrets — {}", report.check.tool))
                 );
                 // Locations, not values: this output lands in scrollback, CI
                 // logs and screenshots.
@@ -1642,6 +1654,7 @@ fn run_workflow(
         .unwrap_or(0);
     let print = |report: &check::Report| {
         let (tone, mark) = match report {
+            report if report.warned() => (Tone::Warning, "!"),
             report if report.passed() => (Tone::Success, "✓"),
             report if report.unusable() => (Tone::Warning, "!"),
             _ => (Tone::Error, "✗"),

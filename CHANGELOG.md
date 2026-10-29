@@ -7,13 +7,27 @@ minor release may change existing behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **Docs:** [Hooks and CI](https://casoon.github.io/opi/docs/guides/integrations/) has a
+  script that runs Health and Security across a folder of repositories.
+
 ### Changed
 
+- **Security:** the bundled secret scan skips files Git ignores, and a high-entropy string
+  is a warning instead of a failure.
 - **Site:** the start page leads with two equal entry points, running scripts and checking
   the project, followed by what opi reads per ecosystem, the four areas and the workflows;
   the recordings are from 0.13.0.
 - **Docs:** [Hooks and CI](https://casoon.github.io/opi/docs/guides/integrations/) loads its
   recordings from the site instead of raw.githubusercontent.com.
+
+### Fixed
+
+- **Health:** `tsc` runs only where the package has a `tsconfig.json`, instead of failing
+  with its help text.
+- **Health:** the Rust documentation check names the library in a package with a library and
+  a binary, where `cargo rustdoc` refused to start.
 
 ## [0.13.0] - 2026-10-29
 

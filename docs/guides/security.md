@@ -15,8 +15,11 @@ Two questions, answered by focused security tools:
 - **Secrets** — a detected project scanner (nosecrets or secretlint), otherwise the bundled
   nosecrets engine. This also covers Rust-only projects without an installed scanner.
   The default reads `.nosecrets.toml` and `.nosecretsignore` at the repository root,
-  scans working-tree files and reports locations and fingerprints without secret values.
-  Invalid configuration or scan errors fail the check; this is not a history scan.
+  scans the working-tree files Git does not ignore — tracked and untracked, but not a local
+  `.env`, build output or a nested worktree — and reports locations and fingerprints
+  without secret values. A high-entropy string is a guess rather than a known credential
+  format: it is listed as a warning and does not fail the check. Invalid configuration or
+  scan errors fail the check; this is not a history scan.
 - **Dependencies** — the package manager's audit, parsed from its JSON: `npm audit` and
   `pnpm audit` share npm's format, bun and yarn each have their own.
 

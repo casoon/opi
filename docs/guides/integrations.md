@@ -211,6 +211,45 @@ never runs a deploy script itself. The second command runs the project's own `de
 script. `--yes` answers its confirmation when the script asks for one, which a pipeline
 has to say explicitly.
 
+## Across many repositories
+
+Without a terminal `opi` changes nothing and asks nothing, so it can walk a whole folder of
+checkouts. This script runs Health and Security in every repository below `~/GitHub` (or the
+directory you pass), writes one report per repository and prints a line each. It is plain
+`sh`, for macOS and Linux alike:
+
+```sh
+#!/bin/sh
+# Health and security for every repository below one directory, a report each.
+root="${1:-$HOME/GitHub}"
+out="${2:-${TMPDIR:-/tmp}/opi-report}"
+mkdir -p "$out"
+for repo in "$root"/*/; do
+  [ -d "$repo.git" ] || continue
+  [ -f "$repo/package.json" ] || [ -f "$repo/Cargo.toml" ] || continue
+  name=$(basename "$repo")
+  (
+    cd "$repo" || exit 1
+    opi --health; health=$?
+    opi --security; security=$?
+    [ "$health" -eq 0 ] && [ "$security" -eq 0 ]
+  ) > "$out/$name.txt" 2>&1 < /dev/null
+  if [ $? -eq 0 ]; then echo "ok     $name"; else echo "check  $name"; fi
+done
+```
+
+```
+check  castwright
+ok     chartlet
+check  judge
+```
+
+Health runs each project's tests, so a folder of Rust workspaces takes a while; the
+repositories run one after another on purpose, since cargo serialises builds anyway. Add
+`opi --updates` inside the subshell for a list of what is outdated: without a terminal it
+lists and never offers to update. A repository whose dependencies are not installed reports
+the checks that could not run rather than skipping them.
+
 ## Anything else
 
 Everything above is a command with an exit code, so the same calls fit wherever one is

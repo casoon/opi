@@ -284,29 +284,46 @@ pub fn virtual_members(root: &Path) -> Vec<String> {
     if !virtual_root {
         return Vec::new();
     }
+    metadata(root)
+        .map(|json| documentable_members(&json))
+        .unwrap_or_default()
+}
+
+/// Packages with a library target, by name.
+///
+/// `cargo rustdoc` hands its extra arguments to one target only, so a package
+/// with both a library and a binary fails before documenting anything unless
+/// `--lib` names the target. The library is the documentation a crate
+/// publishes; a binary's is rarely read.
+pub fn library_packages(root: &Path) -> Vec<String> {
+    metadata(root)
+        .map(|json| libraries(&json))
+        .unwrap_or_default()
+}
+
+fn metadata(root: &Path) -> Option<String> {
     std::process::Command::new("cargo")
         .args(["metadata", "--no-deps", "--format-version", "1"])
         .current_dir(root)
         .output()
         .ok()
         .filter(|output| output.status.success())
-        .map(|output| documentable_members(&String::from_utf8_lossy(&output.stdout)))
-        .unwrap_or_default()
+        .map(|output| String::from_utf8_lossy(&output.stdout).into_owned())
 }
 
-/// Workspace members with a library or binary target, out of `cargo metadata
-/// --no-deps` output.
-fn documentable_members(json: &str) -> Vec<String> {
+/// Packages out of `cargo metadata --no-deps` output with a target of one of
+/// `kinds`.
+fn packages_with(json: &str, kinds: &[&str]) -> Vec<String> {
     let Ok(metadata) = serde_json::from_str::<serde_json::Value>(json) else {
         return Vec::new();
     };
-    let documentable = |package: &serde_json::Value| {
+    let matches = |package: &serde_json::Value| {
         package["targets"].as_array().is_some_and(|targets| {
             targets.iter().any(|target| {
-                target["kind"].as_array().is_some_and(|kinds| {
-                    kinds.iter().any(|kind| {
-                        matches!(kind.as_str(), Some("lib" | "rlib" | "proc-macro" | "bin"))
-                    })
+                target["kind"].as_array().is_some_and(|found| {
+                    found
+                        .iter()
+                        .any(|kind| kind.as_str().is_some_and(|kind| kinds.contains(&kind)))
                 })
             })
         })
@@ -315,9 +332,21 @@ fn documentable_members(json: &str) -> Vec<String> {
         .as_array()
         .into_iter()
         .flatten()
-        .filter(|package| documentable(package))
+        .filter(|package| matches(package))
         .filter_map(|package| package["name"].as_str().map(str::to_owned))
         .collect()
+}
+
+const LIBRARY_KINDS: &[&str] = &["lib", "rlib", "dylib", "cdylib", "staticlib", "proc-macro"];
+
+fn libraries(json: &str) -> Vec<String> {
+    packages_with(json, LIBRARY_KINDS)
+}
+
+/// Workspace members with a library or binary target, out of `cargo metadata
+/// --no-deps` output.
+fn documentable_members(json: &str) -> Vec<String> {
+    packages_with(json, &["lib", "rlib", "proc-macro", "bin"])
 }
 
 /// Whether `--all-features` would compile anything the default set does not.
@@ -525,6 +554,16 @@ mod tests {
             {"name":"bench","targets":[{"kind":["bench"]}]}]}"#;
         assert_eq!(documentable_members(json), ["core", "app", "macros"]);
         assert!(documentable_members("not json").is_empty());
+    }
+
+    #[test]
+    fn packages_with_a_library_are_the_ones_rustdoc_needs_lib_for() {
+        let json = r#"{"packages":[
+            {"name":"both","targets":[{"kind":["lib"]},{"kind":["bin"]}]},
+            {"name":"app","targets":[{"kind":["bin"]}]},
+            {"name":"wasm","targets":[{"kind":["cdylib","rlib"]}]},
+            {"name":"macros","targets":[{"kind":["proc-macro"]}]}]}"#;
+        assert_eq!(libraries(json), ["both", "wasm", "macros"]);
     }
 
     #[test]
