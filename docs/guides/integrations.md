@@ -89,7 +89,7 @@ chmod +x .git/hooks/pre-commit
 
 That hook lives only in your clone. To share it, use one of the hook managers below.
 
-![A plain pre-commit hook running opi --check commit: git commit is refused because a staged 800 KB export exceeds the 500 KiB limit for new files and rustfmt found a diff](https://raw.githubusercontent.com/casoon/opi/main/assets/commit.svg)
+![A plain pre-commit hook running opi --check commit: git commit is refused because a staged 800 KB export exceeds the 500 KiB limit for new files and rustfmt found a diff](../../assets/commit.svg)
 
 ### Husky
 
@@ -145,7 +145,7 @@ the repository has a `.husky` directory, so every clone gets it, and into Git's 
 directory otherwise. Existing lines in the hook are kept. The
 [Workflows](../workflows/#the-pre-push-hook) guide describes the gates.
 
-![opi --hooks installing the pre-push hook, then git push running every check and the build and refusing the push because rustfmt found a diff](https://raw.githubusercontent.com/casoon/opi/main/assets/push.svg)
+![opi --hooks installing the pre-push hook, then git push running every check and the build and refusing the push because rustfmt found a diff](../../assets/push.svg)
 
 Push is the workflow for a repository without CI. It runs every check and the build, so
 a red state cannot leave the machine by accident. With CI it shortens the loop:

@@ -7,6 +7,14 @@ minor release may change existing behaviour.
 
 ## [Unreleased]
 
+### Changed
+
+- **Site:** the start page leads with two equal entry points, running scripts and checking
+  the project, followed by what opi reads per ecosystem, the four areas and the workflows;
+  the recordings are from 0.13.0.
+- **Docs:** [Hooks and CI](https://casoon.github.io/opi/docs/guides/integrations/) loads its
+  recordings from the site instead of raw.githubusercontent.com.
+
 ## [0.13.0] - 2026-10-29
 
 ### Added

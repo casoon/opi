@@ -1,18 +1,19 @@
 ---
 import { readFile } from 'node:fs/promises';
 import {
+  AnchorGrid,
   Badge,
   Badges,
   Button,
   CodeBlock,
-  Facts,
   Faq,
   Features,
   Hero,
   Install,
-  Keymap,
+  Integrations,
   Quickstart,
   ReleaseHighlights,
+  Spotlight,
   Tabs,
 } from '@casoon/pages-theme/components';
 import Base from '@casoon/pages-theme/layouts/Base.astro';
@@ -26,6 +27,7 @@ import { url } from '@casoon/pages-theme/url';
 // opi's real output (demo/record.sh).
 import heroColumn from '../../../assets/opi-column.gif';
 import heroPhone from '../../../assets/opi-phone.gif';
+import directSvg from '../../../assets/direct.svg?url';
 import healthSvg from '../../../assets/health.svg?url';
 import pushSvg from '../../../assets/push.svg?url';
 import securitySvg from '../../../assets/security.svg?url';
@@ -35,7 +37,6 @@ import healthNarrowSvg from '../../../assets/health-narrow.svg?url';
 import pushNarrowSvg from '../../../assets/push-narrow.svg?url';
 import securityNarrowSvg from '../../../assets/security-narrow.svg?url';
 import updatesNarrowSvg from '../../../assets/updates-narrow.svg?url';
-import Diagram from '../components/Diagram.astro';
 
 // Skip "Unreleased": it has no version to show as "New in v…" yet.
 const latestRelease = config.changelog
@@ -52,8 +53,8 @@ opi --hooks         # checks before every push`;
 
 <Base>
   <Hero
-    title="A control center for your repository."
-    lead="opi turns a project's scripts into a keyboard-driven list — grouped, labelled, with the package manager detected — and puts health, security, updates and clean one key away. npm, pnpm, bun and Cargo, without configuring anything first."
+    title="Run a repository. Check it before it ships."
+    lead="opi gives every project the same terminal interface: its scripts in one keyboard-driven list, and the checks its own tools can answer — before a commit, a push, a release or a deployment. npm, pnpm, Yarn, bun and Cargo, without configuring anything first."
   >
     <Install
       commands={[
@@ -68,7 +69,6 @@ opi --hooks         # checks before every push`;
     <Badges>
       <Badge>MIT</Badge>
       <Badge>crates.io {config.version}</Badge>
-      <Badge>Rust 1.85+</Badge>
       <Badge>macOS · Linux</Badge>
     </Badges>
     <picture slot="output">
@@ -88,83 +88,107 @@ opi --hooks         # checks before every push`;
     </picture>
   </Hero>
 
-  <Features
-    heading="Who it is for"
+  <AnchorGrid
     items={[
       {
-        title: 'You switch between projects',
-        body: 'Every repository has its own scripts, package manager and checks. opi shows what this one can do the moment you type it — no README to dig through, no npm run without arguments.',
+        label: 'Run',
+        title: 'Every script in one list',
+        body: 'Grouped, labelled from scripts-info, with the package manager detected. package.json and Cargo.toml side by side, workspace members included.',
+        href: '#scripts',
+        tone: 'accent',
       },
       {
-        title: 'Scripts first',
-        body: 'Enter runs the highlighted script, / filters across every group, and the script replaces the opi process — Ctrl-C reaches your dev server and its exit code reaches your shell.',
-      },
-      {
-        title: 'Your tools, not new ones',
-        body: 'Health runs what the project already depends on — Biome, ESLint, tsc, astro check, Vitest, cargo — concurrently, and relays what they said.',
-      },
-      {
-        title: 'Your manifests stay yours',
-        body: 'Clean removes what you choose; updates are applied by the package manager. Optional workflow selections live in .opi/checks.json; opi rewrites no manifest or lockfile.',
+        label: 'Check',
+        title: 'The project’s own tools, run together',
+        body: 'Health, security, updates and clean, one key each — and the same checks before a commit, a push, a release or a deployment.',
+        href: '#checks',
+        tone: 'brand',
       },
     ]}
   />
 
-  <Facts
+  <div id="scripts" class="anchor">
+    <Spotlight
+      eyebrow="Run"
+      title="A better npm run, for every kind of project"
+      lead="The start screen is the project's scripts. Enter runs the highlighted one, `/` filters across every group, and `opi dev` skips the list entirely."
+      points={[
+        'Grouped by prefix, labelled from `scripts-info`; past 15 entries or 5 groups the groups become tabs',
+        'Workspace members appear under their own name: `opi blog/dev` runs the member’s script',
+        '`cargo run`, `cargo build` and `cargo clippy` in the same list as the npm scripts',
+        'The script replaces the opi process, so `Ctrl-C` and the exit code belong to it',
+      ]}
+      links={[
+        { label: 'Scripts', href: url('docs/guides/scripts/') },
+        { label: 'Rust projects', href: url('docs/guides/rust/') },
+        { label: 'Configuration', href: url('docs/guides/configuration/') },
+      ]}
+    >
+      <img
+        class="spot"
+        src={directSvg}
+        width="796.8"
+        height="476"
+        loading="lazy"
+        alt="opi dev starting the dev server directly, then opi api/db:migrate running a workspace member's script by path"
+      />
+    </Spotlight>
+  </div>
+
+  <Integrations
+    heading="What opi reads, per ecosystem"
     items={[
-      { value: '0', label: 'configuration files needed' },
-      { value: '4', label: 'ecosystems read: npm, pnpm, bun, Cargo' },
-      { value: '5', label: 'areas beside the scripts, one key or flag each' },
-      { value: '4', label: 'prebuilt targets for macOS and Linux' },
+      { icon: 'npm', name: 'npm', category: 'Scripts · health · security · updates' },
+      { icon: 'pn', name: 'pnpm', category: 'Scripts · health · security · updates' },
+      { icon: 'yn', name: 'Yarn', category: 'Scripts · health · security' },
+      { icon: 'bun', name: 'bun', category: 'Scripts · health · security · updates' },
+      { icon: 'rs', name: 'Cargo', category: 'Tasks · health · security · updates' },
     ]}
   />
+
+  <section id="checks" class="block intro anchor" aria-labelledby="checks-heading">
+    <p class="eyebrow">Check</p>
+    <h2 id="checks-heading">Four areas, one key each</h2>
+    <p class="lead">
+      opi detects the tools a project already depends on, runs them concurrently and relays what
+      they said. It reimplements no rules and keeps no score.
+    </p>
+  </section>
 
   <Features
     layout="grid"
-    heading="What each area checks"
+    heading="What each area runs"
     items={[
       {
         icon: 'H',
         title: 'Health',
-        body: 'Biome, ESLint, tsc, astro check, Vitest and cargo, run concurrently — their own output relayed, not reinvented.',
+        body: 'Biome, ESLint, Prettier, tsc, astro check, Vitest, Jest, Knip, fallow and cargo fmt, clippy, doc and test — per workspace member, in the member.',
       },
       {
         icon: 'S',
         title: 'Security',
-        body: 'Secret scanning, known vulnerabilities, package-signature verification and a minimum release age, in one pass.',
+        body: 'Bundled secret scan, each package manager’s audit, cargo audit and osv-scanner, signatures, release age, install scripts, licenses, unpinned workflow actions.',
       },
       {
         icon: 'U',
         title: 'Updates',
-        body: 'Flags which updates are safe to take and which cross a major version, per ecosystem.',
+        body: 'What is outdated, split into safe and major, with the offer to take it — applied by the package manager, not by opi.',
       },
       {
-        icon: '×',
+        icon: 'C',
         title: 'Clean',
-        body: 'Removes what you choose. opi itself never rewrites package.json or a lockfile.',
-      },
-      {
-        icon: '⌘',
-        title: 'Scripts',
-        body: 'Every script grouped and labelled, with the package manager already detected.',
+        body: 'Build output such as dist, .astro, coverage and target/, each with its size; node_modules only if you pick everything. Nothing goes without your choice.',
       },
     ]}
   />
 
-  <section class="block" aria-labelledby="areas-heading">
-    <h2 id="areas-heading">One key away</h2>
-    <p class="lead">
-      Recorded with opi 0.11.0 in a small demo project that has <code>package.json</code> and{' '}
-      <code>Cargo.toml</code>, an unformatted Rust file and an old lodash — so every scene has a
-      real finding.
-    </p>
+  <section class="block" aria-label="Recorded output">
     <Tabs
       label="opi areas"
       tabs={[
         { id: 'health', label: 'Health' },
         { id: 'security', label: 'Security' },
         { id: 'updates', label: 'Updates' },
-        { id: 'push', label: 'Before a push' },
       ]}
     >
       <div slot="health">
@@ -181,7 +205,7 @@ opi --hooks         # checks before every push`;
             width="796.8"
             height="404"
             loading="lazy"
-            alt="opi --health running five checks in a project with package.json and Cargo.toml: Lockfile (npm), Docs, Lint and Tests (rust) pass, Format (rust) fails and rustfmt's diff of src/report.rs is shown under it, ending with '1 of 5 checks failed.'"
+            alt="opi --health running six checks in a project with package.json and Cargo.toml: Docs, Secrets, Lockfile, Lint and Tests pass, Format (rust) fails and rustfmt's diff of src/report.rs is shown under it, ending with '1 of 6 checks failed.'"
           />
         </picture>
       </div>
@@ -199,13 +223,9 @@ opi --hooks         # checks before every push`;
             width="796.8"
             height="368"
             loading="lazy"
-            alt="opi --security: no secret scanner in this project, one high vulnerability in lodash with the remedy to update, every installed package's signature verified, a note that no minimum release age is set, and no known vulnerabilities on the Rust side"
+            alt="opi --security: no secrets found by the bundled nosecrets scanner, one high vulnerability in lodash, every installed package's signature verified, a note that no minimum release age is set, no dependencies with install scripts, and the license overview"
           />
         </picture>
-        <p>
-          This recording predates the bundled nosecrets scanner. Current runs scan secrets
-          without a separate installation when no project scanner is detected.
-        </p>
       </div>
       <div slot="updates">
         <picture>
@@ -225,80 +245,56 @@ opi --hooks         # checks before every push`;
           />
         </picture>
       </div>
-      <div slot="push">
-        <picture>
-          <source
-            media="(max-width: 640px)"
-            srcset={pushNarrowSvg}
-            width="444"
-            height="692"
-          />
-          <img
-            class="scene"
-            src={pushSvg}
-            width="796.8"
-            height="548"
-            loading="lazy"
-            alt="opi --hooks installing the pre-push hook, then git push running opi --check push: working tree clean, not behind upstream, the checks and both builds, with Format (rust) failing, so the push is refused"
-          />
-        </picture>
-      </div>
     </Tabs>
+    <p class="note">
+      Recorded with opi {config.version} in a demo project with <code>package.json</code> and{' '}
+      <code>Cargo.toml</code>, an unformatted Rust file and an old lodash.
+    </p>
     <div class="links">
       <Button href={url('docs/guides/health/')} variant="secondary">Health</Button>
       <Button href={url('docs/guides/security/')} variant="secondary">Security</Button>
       <Button href={url('docs/guides/updates/')} variant="secondary">Updates</Button>
-      <Button href={url('showcase/')} variant="secondary">More output in the showcase</Button>
+      <Button href={url('docs/guides/clean/')} variant="secondary">Clean</Button>
     </div>
   </section>
 
-  <Keymap
-    heading="Keys in the list"
-    groups={[
-      {
-        heading: 'Scripts',
-        items: [
-          { label: 'Run the highlighted script', keys: ['Enter'] },
-          { label: 'Move', keys: ['↑', '↓'] },
-          { label: 'Filter across every group', keys: ['/'] },
-        ],
-      },
-      {
-        heading: 'Areas',
-        items: [
-          { label: 'Health', keys: ['H'] },
-          { label: 'Security', keys: ['S'] },
-          { label: 'Updates', keys: ['U'] },
-          { label: 'Clean', keys: ['C'] },
-        ],
-      },
-    ]}
-  />
-
   <section class="block" aria-labelledby="flow-heading">
-    <h2 id="flow-heading">Before a commit, before a push</h2>
+    <p class="eyebrow">Check</p>
+    <h2 id="flow-heading">Before a commit, a push, a release, a deployment</h2>
     <div class="text">
       <p>
-        <code>opi --check commit</code> runs project checks except tests and dead-code analysis,
-        plus staged secrets, whitespace, conflict markers and oversized additions. Its duration
-        depends on the project. <code>opi --check push</code> adds two questions about the
-        repository, the tests and the build.
+        <code>opi --check commit</code> runs the project checks except tests and dead-code
+        analysis, and looks at what is staged: secrets in the index, whitespace errors, conflict
+        markers and new files over 500 KiB. It writes and stages nothing.
       </p>
       <p>
-        <code>opi --checks push</code> and <code>opi --checks deploy</code> let you select
-        checks and the build, saved in <code>.opi/checks.json</code>.
-        <code>opi --check deploy</code> runs the deployment checks; your deploy script
-        remains a separate command.
+        <code>--check push</code>, <code>--check release</code> and <code>--check deploy</code>{' '}
+        add the tests and the build on a clean tree — push also checks it is not behind upstream,
+        release that the version is not tagged yet. The deploy check never runs your deploy
+        script.
       </p>
       <p>
-        <code>opi --hooks</code> installs the push check as git's pre-push hook. A repository
-        without CI then cannot push a red state by accident; <code>git push --no-verify</code>{' '}
-        remains the way around it.
+        <code>opi --checks push</code> picks which checks a workflow runs, saved in{' '}
+        <code>.opi/checks.json</code> to share in Git. <code>opi --hooks</code> installs the push
+        check as git's pre-push hook, so a repository without CI cannot push a red state by
+        accident.
       </p>
     </div>
-    <Diagram name="push-flow" format="svg" narrow={{ width: 560, height: 880 }} />
+    <picture>
+      <source media="(max-width: 640px)" srcset={pushNarrowSvg} width="444" height="692" />
+      <img
+        class="scene"
+        src={pushSvg}
+        width="796.8"
+        height="548"
+        loading="lazy"
+        alt="opi --hooks installing the pre-push hook, then git push running opi --check push: working tree clean, not behind upstream, the checks and both builds, with Format (rust) failing, so the push is refused"
+      />
+    </picture>
     <div class="links">
-      <Button href={url('docs/guides/workflows/')} variant="secondary">Workflows in detail</Button>
+      <Button href={url('docs/guides/workflows/')} variant="secondary">Workflows</Button>
+      <Button href={url('docs/guides/integrations/')} variant="secondary">Hooks and CI</Button>
+      <Button href={url('showcase/')} variant="secondary">More output in the showcase</Button>
     </div>
   </section>
 
@@ -307,7 +303,7 @@ opi --hooks         # checks before every push`;
   <Quickstart
     lead="Install, change into a project, type opi. Grouping and confirmations can be refined in package.json — see Configuration in the documentation."
     steps={[
-      'Install the release binary with the install script, or build it with <code>cargo install opi</code>.',
+      'Install the release binary with the install script or <code>cargo binstall opi</code>, or build it with <code>cargo install opi</code>.',
       'Change into any directory of a project with a <code>package.json</code> or <code>Cargo.toml</code>.',
       'Run <code>opi</code> and pick a script — or name it: <code>opi dev</code>.',
     ]}
@@ -327,7 +323,7 @@ opi --hooks         # checks before every push`;
       },
       {
         q: 'Does opi write anything into my project?',
-        a: 'Only what you ask for. opi --sbom writes into .opi/sbom/, a folder with a .gitignore of its own, so it never shows up as an untracked file.',
+        a: 'Only what you ask for: the hook from opi --hooks, workflow selections from opi --checks in .opi/checks.json, and SBOMs from opi --sbom in .opi/sbom/, which stays ignored. No manifest, lockfile or script is rewritten.',
       },
     ]}
   />
@@ -351,6 +347,38 @@ opi --hooks         # checks before every push`;
     font-size: 30px;
     font-weight: 600;
     letter-spacing: -0.02em;
+  }
+  .anchor {
+    scroll-margin-top: 80px;
+  }
+  /* Links inside changelog entries need more than colour to stand out from the text. */
+  :global(.release-highlights li a) {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  .intro {
+    padding-bottom: 32px;
+  }
+  .eyebrow {
+    margin: 0 0 16px;
+    color: var(--muted);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+  }
+  .text code {
+    white-space: nowrap;
+  }
+  .spot {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+  .note {
+    max-width: 72ch;
+    margin: 12px 0 0;
+    font-size: 14px;
   }
   .lead {
     max-width: 72ch;
