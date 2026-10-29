@@ -112,6 +112,7 @@ pub enum Workflow {
     Commit,
     Push,
     Release,
+    Deploy,
 }
 
 impl Workflow {
@@ -120,6 +121,7 @@ impl Workflow {
             "commit" => Some(Self::Commit),
             "push" => Some(Self::Push),
             "release" => Some(Self::Release),
+            "deploy" => Some(Self::Deploy),
             _ => None,
         }
     }
@@ -129,6 +131,7 @@ impl Workflow {
             Self::Commit => "before commit",
             Self::Push => "before push",
             Self::Release => "before release",
+            Self::Deploy => "before deploy",
         }
     }
 
@@ -143,6 +146,7 @@ impl Workflow {
             // Clean, because the checks run on the working tree and only what
             // is committed gets pushed.
             Self::Push => &[Gate::WorkingTreeClean, Gate::NotBehindUpstream],
+            Self::Deploy => &[Gate::WorkingTreeClean],
             Self::Release => &[Gate::WorkingTreeClean, Gate::VersionUnreleased],
         }
     }
@@ -162,7 +166,7 @@ impl Workflow {
     /// running.
     pub fn includes(self, check: &str) -> bool {
         match self {
-            Self::Push | Self::Release => true,
+            Self::Push | Self::Release | Self::Deploy => true,
             Self::Commit => !matches!(check, "Tests" | "Dead code"),
         }
     }
@@ -274,7 +278,7 @@ mod tests {
         assert_eq!(Workflow::parse("commit"), Some(Workflow::Commit));
         assert_eq!(Workflow::parse("push"), Some(Workflow::Push));
         assert_eq!(Workflow::parse("release"), Some(Workflow::Release));
-        assert_eq!(Workflow::parse("deploy"), None);
+        assert_eq!(Workflow::parse("deploy"), Some(Workflow::Deploy));
     }
 
     #[test]

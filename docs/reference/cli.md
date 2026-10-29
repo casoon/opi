@@ -8,7 +8,7 @@ order: 1
 anything built in, so every built-in area is a flag or a hotkey, never a bare word.
 
 ```
-opi 0.12.1 — Operations Interface
+opi 0.13.0 — Operations Interface
 
 Usage:
   opi                     List what this project can do
@@ -24,9 +24,10 @@ Options:
       --clean             Show and remove build artefacts
       --security          Scan for secrets and vulnerable dependencies
       --updates           Show dependencies with newer versions
-      --check <workflow>  Run a workflow: commit, push or release
+      --check <workflow>  Run a workflow: commit, push, release or deploy
       --sbom [dir]        Write CycloneDX SBOMs, one file per ecosystem
       --hooks             Install the push workflow as the pre-push hook
+      --checks [workflow] Select checks for a workflow
   -h, --help              Show this help
   -V, --version           Show the version
 
@@ -36,6 +37,22 @@ called "clean" keeps working — every built-in area is a flag or a
 hotkey instead.
 ```
 
+`--checks [workflow]` opens the check selector and saves `.opi/checks.json` at the
+project root. It needs a terminal. Without a workflow name it first asks which
+workflow to configure. [Configuration](../../guides/configuration/#workflow-checks)
+describes the selections and defaults.
+
+## Check scope
+
+`--health` and `--security` use the bundled nosecrets scanner when the root has
+no detected project scanner. No separate scanner installation is required;
+`.nosecrets.toml` and `.nosecretsignore` at the repository root are respected.
+
+In Git repositories, `--check commit` switches bundled or detected nosecrets to
+staged contents and checks whitespace errors, conflict markers and new files
+larger than 500 KiB. Other project tools retain their usual scope. It does not modify or stage files.
+`--hooks` installs only the pre-push hook. Details: [Workflows](../../guides/workflows/).
+
 ## Parsing rules
 
 - The first bare word is the script. Everything after it belongs to the script, including
@@ -43,7 +60,7 @@ hotkey instead.
 - A literal `--` directly after the script name is dropped; a second one is passed on.
 - `--yes` (`-y`) is the only flag that may precede a script. After the script name it
   belongs to the script.
-- `--check` needs a workflow name: `commit`, `push` or `release`.
+- `--check` needs a workflow name: `commit`, `push`, `release` or `deploy`.
 - An unknown flag before the script is an error, and so is an unknown script name — with
   a suggestion where one is close, matched by optimal string alignment, so a transposition
   counts as one edit rather than two.
@@ -69,6 +86,7 @@ hotkey instead.
 | `opi --health` | Non-zero when a check fails |
 | `opi --check <workflow>` | Non-zero when not ready |
 | `opi --hooks` | Non-zero outside a git repository or when the hook cannot be written |
+| `opi --checks [workflow]` | Non-zero without a terminal or when configuration cannot be read or saved |
 | `opi --security` | Non-zero when something needs acting on |
 | Unknown flag or script | `1` |
 

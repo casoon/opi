@@ -22,8 +22,9 @@ opi  health
 ✓ Docs (rust)         0.1s  cargo
 ✓ Lockfile (rust)     0.0s  cargo
 ✓ Tests (rust)        0.3s  cargo
+✓ Secrets             0.2s  nosecrets
 
-5 checks passed.
+6 checks passed.
 ```
 
 ## What is detected
@@ -36,11 +37,11 @@ opi  health
 | Format | Prettier |
 | Tests | Vitest, Jest |
 | Dead code | fallow, Knip |
-| Secrets | nosecrets, secretlint |
+| Secrets | Project nosecrets or secretlint, otherwise bundled nosecrets |
 | Lockfile | the package manager's own frozen install, changing nothing — pnpm, npm and bun |
 | Rust | `cargo fmt --check`, `cargo clippy` and `cargo rustdoc` with warnings denied, `cargo test --all-features`, and `cargo metadata --locked` where `Cargo.lock` is committed. `cargo rustdoc` runs twice where the manifest has features, once per feature set; a package below the root that no `--workspace` reaches gets a test run of its own, listed under its name |
 
-A tool applies when the package declares it as a dependency; its binary is taken from a
+Except for the bundled nosecrets fallback and standard Rust checks, a tool applies when the package declares it as a dependency; its binary is taken from a
 `node_modules/.bin` at or above the package. A yarn project using Plug'n'Play has no
 `node_modules`, so there the tool is started through `yarn run` instead. Where several tools
 answer for the same concern, only the first detected one runs, and its name is shown next to

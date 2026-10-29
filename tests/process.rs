@@ -330,6 +330,151 @@ fn the_commit_workflow_asks_about_the_lockfile() {
 // --- Security ---
 
 #[test]
+fn a_saved_push_selection_skips_unselected_checks_and_builds() {
+    let fixture = Fixture::new();
+    fixture
+        .file(
+            "package.json",
+            r#"{"name":"app","scripts":{"build":"build"},"devDependencies":{"eslint":"9"}}"#,
+        )
+        .file(
+            ".opi/checks.json",
+            r#"{"workflows":{"push":{"checks":["Secrets"],"build":false}}}"#,
+        )
+        .tool("node_modules/.bin/eslint", "exit 1")
+        .shim("npm", "exit 1");
+    let output = fixture.opi(".", &["--check", "push"]);
+    assert!(output.status.success(), "{}", stdout(&output));
+    assert!(stdout(&output).contains("Secrets"));
+    assert!(fixture.calls("eslint").is_none());
+    assert!(fixture.calls("npm").is_none());
+}
+
+#[test]
+fn an_invalid_or_unavailable_selection_fails_before_running_checks() {
+    let fixture = Fixture::new();
+    fixture
+        .file(
+            "package.json",
+            r#"{"name":"app","devDependencies":{"eslint":"9"}}"#,
+        )
+        .tool("node_modules/.bin/eslint", "exit 0");
+    for contents in [
+        r#"{"workflows":{"push":{"checks":["Typo"],"build":false}}}"#,
+        r#"{"workflows":{"push":{"checks":["TypeScript"],"build":false}}}"#,
+    ] {
+        fixture.file(".opi/checks.json", contents);
+        let output = fixture.opi(".", &["--check", "push"]);
+        assert_eq!(output.status.code(), Some(1), "{}", stdout(&output));
+        assert!(fixture.calls("eslint").is_none());
+    }
+}
+
+#[test]
+fn a_selected_build_without_a_build_script_is_reported_as_unavailable() {
+    let fixture = Fixture::new();
+    fixture
+        .file(
+            "package.json",
+            r#"{"name":"app","devDependencies":{"eslint":"9"}}"#,
+        )
+        .file(
+            ".opi/checks.json",
+            r#"{"workflows":{"deploy":{"checks":["Lint", "TypeScript"],"build":true}}}"#,
+        )
+        .tool("node_modules/.bin/eslint", "exit 0");
+    let output = fixture.opi(".", &["--check", "deploy"]);
+    assert_eq!(output.status.code(), Some(1), "{}", stdout(&output));
+    assert!(
+        stderr(&output).contains("TypeScript, Build"),
+        "{}",
+        stderr(&output)
+    );
+    assert!(fixture.calls("eslint").is_none());
+}
+
+#[test]
+fn deploy_checks_build_but_never_run_the_deploy_script() {
+    let fixture = Fixture::new();
+    fixture
+        .file(
+            "package.json",
+            r#"{"name":"app","scripts":{"build":"build","deploy":"publish"}}"#,
+        )
+        .shim("npm", "exit 0");
+    let output = fixture.opi(".", &["--check", "deploy"]);
+    assert!(output.status.success(), "{}", stdout(&output));
+    assert_eq!(fixture.calls("npm").unwrap()[1..], ["run", "build"]);
+    assert!(stdout(&output).contains("Ready to deploy"));
+}
+
+#[test]
+fn choosing_checks_without_a_terminal_never_writes_configuration() {
+    let fixture = Fixture::new();
+    fixture.file("package.json", r#"{"name":"app"}"#);
+    let output = fixture.opi(".", &["--checks", "push"]);
+    assert_eq!(output.status.code(), Some(1));
+    assert!(stderr(&output).contains("needs a terminal"));
+    assert!(!fixture.project().join(".opi").exists());
+}
+
+#[test]
+fn bundled_secrets_need_no_installed_scanner_or_git() {
+    let fixture = Fixture::new();
+    fixture.file("package.json", r#"{"name":"app"}"#).file(
+        "key.pem",
+        &["-----BEGIN RSA ", "PRIVATE KEY-----\nexample\n"].concat(),
+    );
+    let output = fixture.opi(".", &["--health"]);
+    let printed = stdout(&output);
+    assert_eq!(output.status.code(), Some(1), "{printed}");
+    assert!(printed.contains("nosecrets"), "{printed}");
+    assert!(printed.contains("key.pem:1:"), "{printed}");
+    assert!(!printed.contains("-----BEGIN"), "{printed}");
+}
+
+#[test]
+fn commit_wiring_checks_the_index_instead_of_an_unstaged_fix() {
+    let fixture = Fixture::new();
+    fixture.file("package.json", r#"{"name":"app"}"#).file(
+        "key.pem",
+        &["-----BEGIN RSA ", "PRIVATE KEY-----\nexample\n"].concat(),
+    );
+    let git = std::env::split_paths(&std::env::var_os("PATH").unwrap())
+        .map(|dir| dir.join("git"))
+        .find(|path| path.is_file())
+        .unwrap();
+    std::os::unix::fs::symlink(git, fixture.root.path().join("bin/git")).unwrap();
+    for args in [vec!["init", "-q"], vec!["add", "."]] {
+        assert!(
+            Command::new("git")
+                .current_dir(fixture.project())
+                .args(args)
+                .output()
+                .unwrap()
+                .status
+                .success()
+        );
+    }
+    fixture.file("key.pem", "clean\n");
+    let output = fixture.opi(".", &["--check", "commit"]);
+    let printed = stdout(&output);
+    assert_eq!(output.status.code(), Some(1), "{printed}");
+    assert!(printed.contains("key.pem:1:"), "{printed}");
+    assert!(printed.contains("Staged files"), "{printed}");
+
+    // A saved selection applies to the commit-only checks as well.
+    fixture.file(
+        ".opi/checks.json",
+        r#"{"workflows":{"commit":{"checks":["Secrets"],"build":false}}}"#,
+    );
+    let output = fixture.opi(".", &["--check", "commit"]);
+    let printed = stdout(&output);
+    assert!(printed.contains("key.pem:1:"), "{printed}");
+    assert!(!printed.contains("Staged files"), "{printed}");
+}
+
+#[test]
 fn a_failed_audit_is_not_reported_as_clean() {
     // The false acquittal: no report on stdout, the reason on stderr. Read as
     // "no findings", this said "Nothing to act on." and exited 0.

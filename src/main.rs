@@ -13,6 +13,7 @@ mod actions;
 mod audit;
 mod cargo;
 mod check;
+mod check_config;
 mod clean;
 mod cli;
 mod manifest;
@@ -22,7 +23,9 @@ mod project;
 mod run;
 mod sbom;
 mod scripts;
+mod secrets;
 mod sources;
+mod staged;
 mod supply;
 mod task;
 mod workflow;
@@ -162,6 +165,14 @@ fn main() -> ExitCode {
             &root,
         ),
         Invocation::Hooks => hooks(&root),
+        Invocation::Checks(name) => configure_checks(
+            name.as_deref(),
+            &manifest,
+            &members,
+            rust_root.as_deref(),
+            &project,
+            &root,
+        ),
         Invocation::Sbom(out) => sbom(&project, rust_root.as_deref(), &root, out.as_deref()),
         Invocation::Run {
             name,
@@ -1365,6 +1376,148 @@ fn install_scripts(console: Console, manager: project::PackageManager, root: &Pa
     println!("  {}", console.paint(Tone::Muted, remedy));
 }
 
+/// Configures a named workflow without running any checks.
+fn configure_checks(
+    name: Option<&str>,
+    manifest: &Manifest,
+    members: &[workspace::Member],
+    rust_root: Option<&Path>,
+    project: &Project,
+    root: &Path,
+) -> ExitCode {
+    let mut config = match check_config::Config::load(root) {
+        Ok(config) => config,
+        Err(error) => return check_config_error(error),
+    };
+    if !io::stdin().is_terminal() || !io::stderr().is_terminal() {
+        write_block(
+            &ErrorBlock::new("Selecting checks needs a terminal")
+                .with_remedy("Run opi --checks in a terminal, or edit .opi/checks.json."),
+            Console::stderr(ColorMode::Auto),
+        );
+        return ExitCode::FAILURE;
+    }
+    let name = match name {
+        Some(name) => name.to_owned(),
+        None => {
+            let group = ["commit", "push", "release", "deploy"]
+                .into_iter()
+                .fold(Group::new("Workflow"), |group, name| {
+                    group.add_item(Item::new(name, name))
+                });
+            match Menu::new()
+                .with_heading("Configure checks")
+                .add_group(group)
+                .run(Console::stderr(ColorMode::Auto), SelectMode::Auto, true)
+            {
+                Ok(Outcome::Selected(name)) => name,
+                Ok(_) => return ExitCode::SUCCESS,
+                Err(error) => return check_config_error(error.to_string()),
+            }
+        }
+    };
+    let Some(workflow) = workflow::Workflow::parse(&name) else {
+        return check_config_error(format!(
+            "Unknown workflow {name:?}; use commit, push, release or deploy."
+        ));
+    };
+    let mut checks = check::Check::detect_all(
+        manifest,
+        members,
+        rust_root,
+        root,
+        project.package_manager.manager,
+    );
+    if workflow == workflow::Workflow::Commit {
+        checks = check::Check::for_commit(checks, root);
+    }
+    let available: std::collections::BTreeSet<&str> =
+        checks.iter().map(|check| check.name).collect();
+    let previous = config.workflows.get(&name);
+    let mut ticked: Vec<String> = match previous {
+        Some(previous) => previous.checks.clone(),
+        None => available
+            .iter()
+            .filter(|name| workflow.includes(name))
+            .map(|name| (*name).to_owned())
+            .collect(),
+    };
+    let has_build = !check::Check::builds(
+        manifest,
+        members,
+        rust_root,
+        root,
+        project.package_manager.manager,
+    )
+    .is_empty();
+    let build = previous.map_or_else(
+        || workflow.builds() && has_build,
+        |selection| selection.build,
+    );
+    if build {
+        ticked.push("@build".to_owned());
+    }
+    let mut group = Group::new("Checks — all detected tools and workspace members");
+    for name in &available {
+        group = group.add_item(Item::new(*name, *name));
+    }
+    if let Some(previous) = previous {
+        for name in previous
+            .checks
+            .iter()
+            .filter(|name| !available.contains(name.as_str()))
+        {
+            group = group.add_item(
+                Item::new(name, name).with_description("Unavailable here; deselect to remove"),
+            );
+        }
+    }
+    if has_build || build {
+        group =
+            group.add_item(Item::new("@build", "Build").with_description("Run after the checks"));
+    }
+    let menu = Menu::new()
+        .with_heading(format!("Checks before {name}"))
+        .with_ticked(ticked)
+        .add_group(group);
+    let chosen = match menu.run_multi(Console::stderr(ColorMode::Auto), SelectMode::Auto, true) {
+        Ok(Picked::Chosen(chosen)) => chosen,
+        Ok(_) => return ExitCode::SUCCESS,
+        Err(error) => return check_config_error(error.to_string()),
+    };
+    let selection = check_config::Selection {
+        build: chosen.iter().any(|name| name == "@build"),
+        checks: chosen.into_iter().filter(|name| name != "@build").collect(),
+    };
+    config.workflows.insert(name.clone(), selection);
+    match config.save(root) {
+        Ok(_) => {
+            println!(
+                "{}",
+                Console::stdout(ColorMode::Auto).paint(
+                    Tone::Success,
+                    format!(
+                        "Saved {name} checks in {}. Run opi --check {name} to use them.",
+                        check_config::FILE
+                    )
+                )
+            );
+            ExitCode::SUCCESS
+        }
+        Err(error) => check_config_error(error),
+    }
+}
+
+fn check_config_error(error: impl Into<String>) -> ExitCode {
+    write_block(
+        &ErrorBlock::new("Cannot use the workflow check selection")
+            .with_explanation(error.into())
+            .with_remedy("Review .opi/checks.json or run opi --checks in a terminal."),
+        Console::stderr(ColorMode::Auto),
+    );
+    ExitCode::FAILURE
+}
+
 /// Runs a named workflow: the repository questions, then the checks.
 fn run_workflow(
     name: &str,
@@ -1378,10 +1531,16 @@ fn run_workflow(
 
     let Some(workflow) = workflow::Workflow::parse(name) else {
         let block = ErrorBlock::new(format!("No workflow named {name}"))
-            .with_remedy("Known workflows: commit, push, release.");
+            .with_remedy("Known workflows: commit, push, release, deploy.");
         write_block(&block, Console::stderr(ColorMode::Auto));
         return ExitCode::FAILURE;
     };
+
+    let config = match check_config::Config::load(root) {
+        Ok(config) => config,
+        Err(error) => return check_config_error(error),
+    };
+    let selection = config.workflows.get(name);
 
     println!(
         "{}  {}",
@@ -1423,10 +1582,24 @@ fn run_workflow(
         project.package_manager.manager,
     )
     .into_iter()
-    .filter(|check| workflow.includes(check.name))
+    .filter(|check| {
+        selection.map_or_else(
+            || workflow.includes(check.name),
+            |selected| selected.includes(check.name),
+        )
+    })
     .collect();
 
-    let builds = if workflow.builds() {
+    let checks = if workflow == workflow::Workflow::Commit {
+        check::Check::for_commit(checks, root)
+            .into_iter()
+            .filter(|check| selection.is_none_or(|selected| selected.includes(check.name)))
+            .collect()
+    } else {
+        checks
+    };
+
+    let builds = if selection.map_or_else(|| workflow.builds(), |selected| selected.build) {
         check::Check::builds(
             manifest,
             members,
@@ -1437,6 +1610,23 @@ fn run_workflow(
     } else {
         Vec::new()
     };
+    if let Some(selection) = selection {
+        let mut missing: Vec<_> = selection
+            .checks
+            .iter()
+            .filter(|name| !checks.iter().any(|check| check.name == name.as_str()))
+            .map(String::as_str)
+            .collect();
+        if selection.build && builds.is_empty() {
+            missing.push("Build");
+        }
+        if !missing.is_empty() {
+            return check_config_error(format!(
+                "Selected checks unavailable in this project: {}",
+                missing.join(", "),
+            ));
+        }
+    }
     if checks.is_empty() && builds.is_empty() {
         println!(
             "{}",

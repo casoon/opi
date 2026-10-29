@@ -165,8 +165,9 @@ state — it is not a history.
 
 > **A `Report` where the data is parsed, raw output where it is not**
 >
-> The dependency audit and the update list render as runemark `Report`s. Health,
-> the workflows and the secret scan print the tool's own output instead.
+> The dependency audit and the update list render as runemark `Report`s. Health
+> and workflows relay external tool output; the bundled secret scanner returns
+> locations and fingerprints without secret previews.
 >
 > *Reason:* a `Finding` is a message. Relayed output is not one — putting it in
 > a single finding collapses its structure, and splitting it per line flattens
@@ -175,7 +176,8 @@ state — it is not a history.
 >
 > *Consequence:* `opi` uses roughly half of runemark's surface, and that is the
 > intended answer rather than a gap. The half it does not use is for
-> applications that own their finding types; `opi` deliberately does not.
+> applications that own their finding types. opi keeps secret detection and its
+> finding types in nosecrets, adapting only the display text.
 
 > **No health score**
 >
@@ -200,3 +202,16 @@ state — it is not a history.
 > The push workflow is meant to be binding, which is why it blocks rather than
 > warns, and why its gates stay offline — a hook that waits on the network is a
 > hook people disable.
+
+> **Optional workflow policy, without command definitions**
+>
+> `opi --checks` saves selected concerns and the build choice for commit, push,
+> release and deploy in `.opi/checks.json`. Missing entries retain the defaults;
+> Git gates are not disabled by the selection. Deploy checks are an explicit
+> `opi --check deploy`, separate from running a project's deploy script.
+>
+> *Reason:* projects need different checks before pushing and deploying, including
+> Rust projects with no `package.json`. Commands remain in the existing manifests.
+>
+> *Consequence:* the policy is optional and shareable in Git; malformed or stale
+> selections fail visibly, and configuration never runs checks or deploys.

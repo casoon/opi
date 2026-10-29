@@ -10,19 +10,22 @@ order: 5
 opi --security
 ```
 
-Two questions, answered by tools the project already uses:
+Two questions, answered by focused security tools:
 
-- **Secrets** — the secret scanner the project depends on (nosecrets or secretlint). Where
-  there is none, `opi` says so rather than reporting a clean result.
+- **Secrets** — a detected project scanner (nosecrets or secretlint), otherwise the bundled
+  nosecrets engine. This also covers Rust-only projects without an installed scanner.
+  The default reads `.nosecrets.toml` and `.nosecretsignore` at the repository root,
+  scans working-tree files and reports locations and fingerprints without secret values.
+  Invalid configuration or scan errors fail the check; this is not a history scan.
 - **Dependencies** — the package manager's audit, parsed from its JSON: `npm audit` and
   `pnpm audit` share npm's format, bun and yarn each have their own.
 
-Run on `opi`'s own repository, which has no secret scanner and no `package.json`:
+Example for a Rust project without `package.json`:
 
 ```
 opi  security
 
-No secret scanner: this project depends on none that opi knows.
+✓ Secrets — nosecrets
 
 ✓ Dependencies (rust) — no known vulnerabilities
 

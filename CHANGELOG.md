@@ -7,10 +7,31 @@ minor release may change existing behaviour.
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-10-29
+
+### Added
+
+- **Security:** bundled nosecrets scanning covers projects without an installed scanner,
+  respecting repository configuration and fingerprint ignores.
+- **Workflows:** `--checks` selects checks and builds per workflow in `.opi/checks.json`;
+  `--check deploy` runs deployment checks without executing the deploy script.
+- **Workflows:** commit checks inspect staged secrets, whitespace, conflict markers and
+  oversized new files without changing the working tree.
+
 ### Changed
 
+- **Docs:** [Hooks and CI](https://casoon.github.io/opi/docs/guides/integrations/) shows
+  `opi` in pre-commit and pre-push hooks, CI jobs and deploy steps, with a recording of
+  the commit workflow as a pre-commit hook.
+- **Docs:** [Installation](https://casoon.github.io/opi/docs/getting-started/installation/)
+  names `cargo binstall opi`, which fetches the release binary instead of building it.
 - **Site:** "What each area checks" gives Health, Security, Updates, Clean and Scripts an
   icon-tile summary before the interactive demo.
+
+### Security
+
+- **Site:** Astro 7.4.4 brings patched vite, zod, sharp, undici, source-map-js, smol-toml
+  and fast-uri into the project page's build.
 
 ## [0.12.1] - 2026-10-27
 
@@ -446,7 +467,8 @@ minor release may change existing behaviour.
   establishing the repository skeleton. The binary prints its version and a
   development notice; no functionality is implemented.
 
-[Unreleased]: https://github.com/casoon/opi/compare/v0.12.1...HEAD
+[Unreleased]: https://github.com/casoon/opi/compare/v0.13.0...HEAD
+[0.13.0]: https://github.com/casoon/opi/releases/tag/v0.13.0
 [0.12.1]: https://github.com/casoon/opi/releases/tag/v0.12.1
 [0.12.0]: https://github.com/casoon/opi/releases/tag/v0.12.0
 [0.11.0]: https://github.com/casoon/opi/releases/tag/v0.11.0

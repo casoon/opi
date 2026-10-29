@@ -75,6 +75,7 @@ faked — only the projects are.
 | `casts/updates.terminal.yaml` | The same lodash as an update that is safe to take |
 | `casts/direct.terminal.yaml` | The command line, without the interface |
 | `casts/push.terminal.yaml` | `opi --hooks`, then a `git push` the hook refuses |
+| `casts/commit.terminal.yaml` | `opi --check commit` as a plain pre-commit hook, refusing a large staged file and the unformatted source |
 | `casts/*-narrow.terminal.yaml` | Health, security, updates and push at 50 columns, for the project page on a phone |
 | `tapes/hero.tape` | The start screen, the tab row, one search across every group, running a script |
 | `tapes/hero-column.tape`, `tapes/hero-phone.tape` | The same run at about 55 and 43 columns, for the project page's hero column and for phones |

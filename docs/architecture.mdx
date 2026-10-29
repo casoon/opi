@@ -20,7 +20,10 @@ src/
 ├── project.rs   Manifest + directory → Project (name, package manager)
 ├── task.rs      Manifest + members → Vec<Task>, grouped and ordered
 ├── run.rs       Task → the running script
-├── check.rs     detect a project's tools, run them concurrently
+├── check.rs     detect project tools and adapters, run checks concurrently
+├── check_config.rs optional workflow selections and persistence
+├── secrets.rs   nosecrets engine → secret locations and fingerprints
+├── staged.rs    Git index → whitespace, conflict and new-file size checks
 ├── audit.rs     package manager audit → parsed advisories
 ├── supply.rs    signatures, release age, licenses — asked of the package manager
 ├── outdated.rs  package manager and cargo outdated → updates by semver jump
@@ -205,7 +208,7 @@ projects, and the bare word stays theirs.
 | Security | `S` | `--security` | Secret scan, a parsed dependency audit, signatures, release age, licenses |
 | Updates | `U` | `--updates` | Outdated dependencies, split by semver jump, and the offer to take them |
 | Clean | `C` | `--clean` | Removable artefacts, with sizes |
-| Workflows | — | `--check commit`/`push`/`release`, `--hooks` | A named subset, the build, git gates; `push` as the pre-push hook |
+| Workflows | — | `--check commit`/`push`/`release`/`deploy`, `--checks`, `--hooks` | A named subset, the build, git gates; `push` as the pre-push hook |
 
 **Security and updates ask whether there is an npm project at all.**
 `Project::package_manager` always holds a value — the absence of every signal
@@ -366,10 +369,30 @@ and `--yes` is how to say it out loud in a script.
 
 ### Checks
 
-`check.rs` implements none of them. It detects which tool a package depends on,
-finds its binary in a `node_modules/.bin` at or above that package, runs it, and
+`check.rs` delegates checks to external tools or focused adapters. For a project tool,
+it checks whether the package declares the dependency, finds its binary in a `node_modules/.bin` at or above that package, runs it, and
 relays the result. Which tools to support was measured across 133 real projects
 rather than taken from the plan — Knip, prominent there, was present in one.
+
+If the root has no detected secret scanner, `check.rs` adds one backed by
+`nosecrets-core`, `nosecrets-filter` and `nosecrets-rules`. `secrets.rs` loads
+built-in rules, `.nosecrets.toml` and `.nosecretsignore`; it returns locations
+and fingerprints without secret previews. Scanner configuration and read errors
+produce an action-required result rather than a clean scan.
+
+Health, security, push, release and deploy use the default scanner against working-tree
+files. In a Git repository, the commit workflow switches nosecrets to staged
+contents and adds `staged.rs`: Git checks whitespace and conflict markers in
+added lines, and opi checks the index sizes of newly added files against 500 KiB.
+Gitlinks are skipped; no files are rewritten. Other project tools keep their
+normal scope. See [Workflows](../guides/workflows/) for the precise boundaries.
+
+`check_config.rs` loads optional selections from `.opi/checks.json` before a
+workflow runs. A saved entry replaces that workflow's check and build defaults,
+while Git gates retain their normal behaviour. Selections use check concern names
+across tools and members. Invalid configuration or unavailable selected checks
+fail the run. `opi --checks` uses runemark's multi-select and writes only this
+selection plus Git ignore exceptions; Health and Security remain independent.
 
 yarn's Plug'n'Play linker writes no `node_modules`, so for yarn a tool not found
 on disk is started through `yarn run <tool>`, which resolves a dependency's

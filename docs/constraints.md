@@ -31,11 +31,12 @@ Consequence: every screen needs sensible defaults without configuration. If a
 screen is useless without the optional `opi` key in `package.json`, the default
 is wrong, not the configuration missing.
 
-## The project's own files are the only interface
+## Project files define commands
 
 `opi` reads `package.json` and `Cargo.toml` — the files a project already has.
-There is no `opi.toml`, no `.opirc`, no second source of truth of `opi`'s own
-making.
+Optional `.opi/checks.json` selects detected checks and the build per workflow.
+It defines no commands and duplicates no manifest data. Without it, workflow
+defaults apply. `opi --checks` edits this selection without running checks.
 
 Three levels, each optional:
 
@@ -60,12 +61,14 @@ It does name them. A `Makefile`, `justfile`, `Taskfile.yml` or a `mise.toml` wit
 the manifest shows up in the line under the heading — `also Makefile` — so the list does not
 pass for everything the project can do. Named only: their targets are never read and never run.
 
-Workflows (`commit`, `push`, `release`) are named subsets of the existing checks, plus the
+Workflows (`commit`, `push`, `release`, `deploy`) are named subsets of the existing checks, plus the
 build and repository gates — not a new task type.
 
 ## Orchestration, not reimplementation
 
-No check is implemented inside `opi`. TypeScript errors come from `tsc` or
+Secret detection is delegated to the bundled nosecrets engine (or a detected project scanner).
+Staged whitespace and conflict checks are delegated to Git; opi additionally compares
+new staged object sizes with its 500 KiB limit. Other checks are external tools. TypeScript errors come from `tsc` or
 `astro check`, lint findings from Biome or ESLint, dead code from fallow or
 Knip, vulnerabilities from the package manager's own audit. `opi` detects which
 tool a project uses, invokes it, and relays the result.
@@ -110,8 +113,9 @@ inside the project directory, does not follow symlinks, and rejects paths from
 the `opi` key that escape the project (`..`, absolute paths). `node_modules/` is
 never preselected.
 
-***opi* itself writes nothing else** — save the one line `opi --hooks` adds
-to the pre-push hook, appended, never replacing what is there. `--updates` can
+`opi --hooks` appends a line to the pre-push hook, preserving existing contents.
+`opi --checks` writes `.opi/checks.json` and updates `.opi/.gitignore` so the
+selection can be shared while generated SBOMs stay ignored. `--updates` can
 apply what it found, but only by calling the package manager with a list of
 names. No `package.json`, no lockfile, no `pnpm-workspace.yaml` is written by
 `opi`.

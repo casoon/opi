@@ -5,8 +5,8 @@
 Go into any repository, type `opi`, and get a usable interface for that
 project — without configuring anything first.
 
-> **Status: `0.12.1`.** Scripts are the main thing; health, security, updates,
-> clean and the commit/push/release workflows are built on top of them. npm, pnpm,
+> **Status: `0.13.0`.** Scripts are the main thing; health, security, updates,
+> clean and the commit/push/release/deploy workflows are built on top of them. npm, pnpm,
 > bun and Cargo projects are covered; yarn's scripts, health and security
 > audit are too — its update listing is not read yet.
 
@@ -181,8 +181,10 @@ word stays theirs.
 | `S` | `opi --security` | Secret scan, a parsed dependency audit per ecosystem, signatures, release age and dependencies with install scripts, licenses and dependencies from outside the registry, workflow actions not pinned to a commit SHA (pnpm, npm, bun and Cargo; production dependencies only) |
 | `U` | `opi --updates` | What is outdated, split into safe and major — and the offer to take it |
 | `C` | `opi --clean` | Removable artefacts, with what each one costs |
-| | `opi --check commit` | The fast checks, before you commit |
+| | `opi --check commit` | Project checks plus staged secrets, whitespace, conflict markers and large additions |
 | | `opi --check push` | Everything plus the build, on a clean tree that is not behind upstream |
+| | `opi --check deploy` | Selected checks and build before deployment, with a clean working tree |
+| | `opi --checks [workflow]` | Choose checks and build for commit, push, release or deploy |
 | | `opi --check release` | Everything plus the build, a clean tree and an untagged version |
 | | `opi --hooks` | Installs `opi --check push` as the pre-push hook |
 | | `opi --sbom [dir]` | CycloneDX SBOMs, one file per ecosystem, written to `dir` or `.opi/sbom/` |
@@ -203,7 +205,11 @@ astro-v7-workspace  health
 ✓ TypeScript (@astro-v7/blog)       5.4s  astro
 ```
 
-`opi` reimplements none of this. It detects which tool a project depends on —
+`opi` bundles nosecrets as its default secret scanner, including in Rust-only projects.
+A detected project scanner takes precedence. `.nosecrets.toml` and `.nosecretsignore`
+are respected; no separate scanner installation is needed for the default.
+
+`opi` reimplements none of the detection rules. It detects which tool a project depends on —
 Biome, ESLint, Prettier, `tsc`, `astro check`, Vitest, Jest, fallow, Knip, a
 secret scanner, `cargo` — runs it, and relays what came back. In a workspace the
 checks run per member, in the member, because that is where the tools and their
@@ -214,7 +220,7 @@ Output is parsed only where the format is documented (`audit --json`,
 with the command to see the rest: a parser that guesses at a tool's output
 breaks on that tool's next release.
 
-The one thing `--security` reads itself is the lockfile: `package-lock.json`,
+In addition to the bundled secret scanner, `--security` reads the lockfile: `package-lock.json`,
 `pnpm-lock.yaml`, `yarn.lock`, `bun.lock` and `Cargo.lock` name every dependency
 resolved from git, a tarball URL or a path outside the workspace, with its
 source. `bun.lockb`, bun's binary lockfile, is not read.
@@ -246,30 +252,49 @@ that keeps the operator: `npm install x@1.1.1` turns an exact `2.1.2` into
 `packageManager` field settles it, the offer is withheld and the finding named
 instead.
 
+### Choosing workflow checks
+
+Run `opi --checks push` or `opi --checks deploy` to select detected checks and
+whether to build. Without a workflow name, `opi --checks` asks which one to edit.
+The selection is saved in `.opi/checks.json` and can be committed with the project.
+Without a saved selection, the existing defaults apply. Git gates remain in force.
+
+`opi --check deploy` runs the selected checks and build; deploy scripts are still
+run explicitly with `opi deploy`. See [Configuration](https://casoon.github.io/opi/docs/guides/configuration/).
+
 ### Before every push
 
 For a repository without CI, `opi --hooks` makes the push workflow the
-pre-push hook: every check, then the build, and a push that fails any of them
+pre-push hook: the selected checks, then the build if enabled, and a push that fails any of them
 does not leave the machine. `git push --no-verify` is the way past it.
 
 ![opi --hooks installing the pre-push hook, then git push running every check and the build and refusing the push because rustfmt found a diff](https://raw.githubusercontent.com/casoon/opi/main/assets/push.svg)
+
+### In hooks and CI
+
+Every area is also a plain command with an exit code, so the same checks run
+outside the terminal: `opi --check commit` as a pre-commit hook (Husky,
+Lefthook, pre-commit or plain Git), `opi --health` or `opi --check push` in a
+CI job, `opi --check deploy && opi --yes deploy` before a deployment. Without a
+terminal there is no menu, no colour and no implicit confirmation. A committed
+`.opi/checks.json` keeps hooks and CI on the same selection. Setup examples are
+in [Hooks and CI](https://casoon.github.io/opi/docs/guides/integrations/).
 
 ## Design rules
 
 - **Zero configuration.** `opi` must be useful in an unmodified repository. A
   tool you have to configure first never gets started in someone else's project.
-- **The project's own files are the only interface.** `package.json` and
-  `Cargo.toml` — no `opi.toml`, no second source of truth of `opi`'s own
-  making. `scripts`, optionally `scripts-info`, optionally an `opi` key for
-  refinement.
+- **Project files define commands.** `package.json` and `Cargo.toml` remain
+  the source of commands. Optional `.opi/checks.json` selects which detected
+  checks and builds belong to a workflow; it defines no commands.
 - **No task system of its own.** `opi` does not define tasks with their own
   commands — that would put it in competition with npm scripts, `just`, `make`
   and Taskfile for no gain.
 - **Orchestration, not reimplementation.** `opi` is a UX layer over proven
   tooling.
-- **`opi` writes nothing.** Clean removes what you pick, updates are applied
-  by the package manager, and `opi --hooks` adds one line to the pre-push hook
-  without touching the rest. No manifest or lockfile is ever rewritten by
+- **No manifest rewriting.** Clean removes what you pick, updates are applied
+  by the package manager, and `opi --hooks` adds one line to the pre-push hook.
+  `opi --checks` saves the workflow selection and Git ignore rules under `.opi`. No manifest or lockfile is ever rewritten by
   `opi` itself, and where a tool cannot do something cleanly it is not offered rather than
   offered badly.
 
@@ -304,6 +329,13 @@ known vulnerabilities:
 gh attestation verify opi-<version>-<target>.tar.gz --repo casoon/opi \
   --predicate-type https://cyclonedx.org/bom
 cargo audit bin opi
+```
+
+With [cargo-binstall](https://github.com/cargo-bins/cargo-binstall), which
+fetches the same release binary into `~/.cargo/bin` (without the hash check):
+
+```bash
+cargo binstall opi
 ```
 
 From the registry instead, which builds it here:

@@ -33,6 +33,8 @@ pub enum Invocation {
     Updates,
     /// Install the push workflow as the pre-push hook.
     Hooks,
+    /// Select checks and builds for a workflow.
+    Checks(Option<String>),
     /// Write CycloneDX SBOMs, into the given directory or the project root.
     Sbom(Option<String>),
     /// A flag `opi` does not know, before any script name.
@@ -77,6 +79,7 @@ where
         "--security" => Invocation::Security,
         "--updates" => Invocation::Updates,
         "--hooks" => Invocation::Hooks,
+        "--checks" => Invocation::Checks(args.next()),
         // The directory is optional, and a following flag is not a directory.
         "--sbom" => Invocation::Sbom(args.next().filter(|dir| !dir.starts_with('-'))),
         // The name follows the flag rather than standing alone, so a project
@@ -120,9 +123,10 @@ Options:
       --clean             Show and remove build artefacts
       --security          Scan for secrets and vulnerable dependencies
       --updates           Show dependencies with newer versions
-      --check <workflow>  Run a workflow: commit, push or release
+      --check <workflow>  Run a workflow: commit, push, release or deploy
       --sbom [dir]        Write CycloneDX SBOMs, one file per ecosystem
       --hooks             Install the push workflow as the pre-push hook
+      --checks [workflow] Select checks for a workflow
   -h, --help              Show this help
   -V, --version           Show the version
 
@@ -151,6 +155,19 @@ mod tests {
             args: Vec::new(),
             confirmed: true,
         }
+    }
+
+    #[test]
+    fn workflow_selection_accepts_an_optional_name() {
+        assert_eq!(parse(["--checks"]), Invocation::Checks(None));
+        assert_eq!(
+            parse(["--checks", "push"]),
+            Invocation::Checks(Some("push".to_owned()))
+        );
+        assert_eq!(
+            parse(["--check", "deploy"]),
+            Invocation::Workflow("deploy".to_owned())
+        );
     }
 
     #[test]

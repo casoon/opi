@@ -61,6 +61,7 @@ opi --hooks         # checks before every push`;
           label: 'install.sh',
           command: 'curl -fsSL https://raw.githubusercontent.com/casoon/opi/main/install.sh | sh',
         },
+        { label: 'binstall', command: 'cargo binstall opi' },
         { label: 'cargo', command: 'cargo install opi' },
       ]}
     />
@@ -103,8 +104,8 @@ opi --hooks         # checks before every push`;
         body: 'Health runs what the project already depends on — Biome, ESLint, tsc, astro check, Vitest, cargo — concurrently, and relays what they said.',
       },
       {
-        title: 'opi writes nothing',
-        body: 'Clean removes what you choose; updates are applied by the package manager. No package.json and no lockfile is ever rewritten by opi itself.',
+        title: 'Your manifests stay yours',
+        body: 'Clean removes what you choose; updates are applied by the package manager. Optional workflow selections live in .opi/checks.json; opi rewrites no manifest or lockfile.',
       },
     ]}
   />
@@ -201,6 +202,10 @@ opi --hooks         # checks before every push`;
             alt="opi --security: no secret scanner in this project, one high vulnerability in lodash with the remedy to update, every installed package's signature verified, a note that no minimum release age is set, and no known vulnerabilities on the Rust side"
           />
         </picture>
+        <p>
+          This recording predates the bundled nosecrets scanner. Current runs scan secrets
+          without a separate installation when no project scanner is detected.
+        </p>
       </div>
       <div slot="updates">
         <picture>
@@ -274,9 +279,16 @@ opi --hooks         # checks before every push`;
     <h2 id="flow-heading">Before a commit, before a push</h2>
     <div class="text">
       <p>
-        <code>opi --check commit</code> runs the fast checks — everything except tests and dead
-        code — so it stays quick enough to run every time. <code>opi --check push</code> adds two
-        questions about the repository, the tests and the build.
+        <code>opi --check commit</code> runs project checks except tests and dead-code analysis,
+        plus staged secrets, whitespace, conflict markers and oversized additions. Its duration
+        depends on the project. <code>opi --check push</code> adds two questions about the
+        repository, the tests and the build.
+      </p>
+      <p>
+        <code>opi --checks push</code> and <code>opi --checks deploy</code> let you select
+        checks and the build, saved in <code>.opi/checks.json</code>.
+        <code>opi --check deploy</code> runs the deployment checks; your deploy script
+        remains a separate command.
       </p>
       <p>
         <code>opi --hooks</code> installs the push check as git's pre-push hook. A repository

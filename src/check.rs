@@ -1,9 +1,8 @@
 //! Project checks.
 //!
-//! `opi` implements none of these. It detects which tool a project uses, runs
-//! it, and reports what came back. TypeScript errors come from `tsc`, lint
-//! findings from Biome or ESLint, secrets from the scanner the project already
-//! depends on.
+//! Detects project tools and reports their results. TypeScript errors come
+//! from `tsc`, lint findings from Biome or ESLint. Secrets use a project scanner
+//! or the bundled nosecrets engine; commit workflows also inspect Git's index.
 //!
 //! Which tools exist here was measured rather than assumed: across 133 real
 //! projects Biome appeared in 51%, `tsc` in 41% and the secret scanner in 22%,
@@ -31,13 +30,19 @@ pub struct Check {
     pub tool: &'static str,
     /// Which package it belongs to, in a workspace. `None` is the root.
     pub scope: Option<String>,
-    /// The executable in `node_modules/.bin`, or `yarn` when resolved through
-    /// it instead — see [`resolve`].
-    program: PathBuf,
+    /// The external executable or a focused library/Git adapter.
+    program: Program,
     args: Vec<&'static str>,
     /// Where the tool runs. A member's checks run in the member, which is the
     /// only place its config and its sources make sense.
     dir: PathBuf,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum Program {
+    External(PathBuf),
+    Secrets { staged: bool },
+    StagedFiles,
 }
 
 impl Check {
@@ -46,7 +51,14 @@ impl Check {
     /// Health shows an excerpt; this is how to get the rest without having to
     /// work out which tool ran and with what.
     pub fn command_line(&self) -> String {
-        let program = self.program.file_name().map_or_else(
+        let program = match &self.program {
+            Program::External(program) => program,
+            Program::Secrets { staged: true } | Program::StagedFiles => {
+                return "opi --check commit".to_owned();
+            }
+            Program::Secrets { staged: false } => return "opi --security".to_owned(),
+        };
+        let program = program.file_name().map_or_else(
             || self.tool.to_owned(),
             |name| name.to_string_lossy().into_owned(),
         );
@@ -183,6 +195,21 @@ const CANDIDATES: &[Candidate] = &[
 ];
 
 impl Check {
+    pub fn known_names() -> std::collections::BTreeSet<&'static str> {
+        CANDIDATES
+            .iter()
+            .map(|candidate| candidate.name)
+            .chain(crate::cargo::CHECKS.iter().map(|(name, _)| *name))
+            .chain(crate::cargo::FEATURE_CHECKS.iter().map(|(name, _)| *name))
+            .chain(
+                crate::cargo::OPTIONAL_CHECKS
+                    .iter()
+                    .map(|(name, _, _)| *name),
+            )
+            .chain(["Lockfile", "Staged files"])
+            .collect()
+    }
+
     /// Every check that applies, for the project and its workspace members.
     ///
     /// Members are checked in place. A monorepo keeps its TypeScript and its
@@ -210,6 +237,43 @@ impl Check {
         if let Some(rust_root) = rust_root {
             checks.extend(Self::cargo(rust_root));
         }
+        if !checks
+            .iter()
+            .any(|check| check.name == "Secrets" && check.scope.is_none())
+        {
+            checks.push(Self {
+                name: "Secrets",
+                tool: "nosecrets",
+                scope: None,
+                program: Program::Secrets { staged: false },
+                args: Vec::new(),
+                dir: root.to_path_buf(),
+            });
+        }
+        checks
+    }
+
+    /// Commit-only checks read the index, including partially staged files.
+    pub fn for_commit(mut checks: Vec<Self>, root: &Path) -> Vec<Self> {
+        if crate::staged::repository(root).is_none() {
+            return checks;
+        }
+        for check in &mut checks {
+            if let Program::Secrets { staged } = &mut check.program {
+                *staged = true;
+            } else if check.name == "Secrets" && check.tool == "nosecrets" {
+                check.args.retain(|arg| *arg != ".");
+                check.args.push("--staged");
+            }
+        }
+        checks.push(Self {
+            name: "Staged files",
+            tool: "git",
+            scope: None,
+            program: Program::StagedFiles,
+            args: Vec::new(),
+            dir: root.to_path_buf(),
+        });
         checks
     }
 
@@ -223,7 +287,7 @@ impl Check {
             name,
             tool: "cargo",
             scope: Some("rust".to_owned()),
-            program: PathBuf::from("cargo"),
+            program: Program::External(PathBuf::from("cargo")),
             args,
             dir: root.to_path_buf(),
         };
@@ -242,7 +306,7 @@ impl Check {
             name: "Docs",
             tool: "cargo",
             scope: Some(member.clone()),
-            program: PathBuf::from("cargo"),
+            program: Program::External(PathBuf::from("cargo")),
             // Leaked: arguments are `&'static str`, and the few member names
             // live as long as the process anyway.
             args: vec![
@@ -284,7 +348,7 @@ impl Check {
                     name,
                     tool: "cargo",
                     scope: Some(sibling.name),
-                    program: PathBuf::from("cargo"),
+                    program: Program::External(PathBuf::from("cargo")),
                     args: args.to_vec(),
                     dir: sibling.path,
                 }
@@ -340,7 +404,7 @@ impl Check {
                 name: "Lockfile",
                 tool: manager.program(),
                 scope: None,
-                program: PathBuf::from(manager.program()),
+                program: Program::External(PathBuf::from(manager.program())),
                 args: args.to_vec(),
                 dir: root.to_path_buf(),
             })
@@ -366,7 +430,7 @@ impl Check {
             name: "Build",
             tool: manager.program(),
             scope,
-            program: PathBuf::from(manager.program()),
+            program: Program::External(PathBuf::from(manager.program())),
             args: vec!["run", "build"],
             dir: dir.to_path_buf(),
         };
@@ -394,7 +458,7 @@ impl Check {
                 name: "Build",
                 tool: "cargo",
                 scope: Some("rust".to_owned()),
-                program: PathBuf::from("cargo"),
+                program: Program::External(PathBuf::from("cargo")),
                 args,
                 dir: rust_root.to_path_buf(),
             });
@@ -431,7 +495,7 @@ impl Check {
                 name: candidate.name,
                 tool: candidate.tool,
                 scope: scope.clone(),
-                program,
+                program: Program::External(program),
                 args: prefix
                     .into_iter()
                     .chain(candidate.args.iter().copied())
@@ -446,12 +510,24 @@ impl Check {
     /// Runs the tool and reports what it said.
     pub fn run(self) -> Report {
         let started = Instant::now();
-        let result = Command::new(&self.program)
-            .args(&self.args)
-            .current_dir(&self.dir)
-            .output();
+        let (verdict, output) = match &self.program {
+            Program::Secrets { staged } => crate::secrets::scan(&self.dir, *staged),
+            Program::StagedFiles => crate::staged::check(&self.dir),
+            Program::External(program) => {
+                Self::run_external(program, &self.args, &self.dir, self.tool)
+            }
+        };
+        Report {
+            check: self,
+            verdict,
+            duration: started.elapsed(),
+            output: output.trim_end().to_owned(),
+        }
+    }
 
-        let (verdict, output) = match result {
+    fn run_external(program: &Path, args: &[&str], dir: &Path, tool: &str) -> (Verdict, String) {
+        let result = Command::new(program).args(args).current_dir(dir).output();
+        match result {
             Ok(output) => {
                 let mut text = String::from_utf8_lossy(&output.stdout).into_owned();
                 text.push_str(&String::from_utf8_lossy(&output.stderr));
@@ -468,15 +544,8 @@ impl Check {
             // with findings; the remedy is different and so is the mark.
             Err(error) => (
                 Verdict::ActionRequired,
-                format!("could not run {}: {error}", self.tool),
+                format!("could not run {tool}: {error}"),
             ),
-        };
-
-        Report {
-            check: self,
-            verdict,
-            duration: started.elapsed(),
-            output: output.trim_end().to_owned(),
         }
     }
 }
@@ -560,6 +629,61 @@ pub fn run_all(checks: Vec<Check>, mut on_report: impl FnMut(&Report)) -> Vec<Re
 mod tests {
     use super::*;
     use std::fs;
+
+    #[test]
+    fn projects_without_a_scanner_get_the_bundled_engine() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let checks = Check::detect_all(
+            &Manifest::default(),
+            &[],
+            None,
+            dir.path(),
+            PackageManager::Npm,
+        );
+        let secrets = checks
+            .iter()
+            .find(|check| check.name == "Secrets")
+            .expect("default scanner");
+        assert_eq!(secrets.program, Program::Secrets { staged: false });
+        assert_eq!(secrets.command_line(), "opi --security");
+    }
+
+    #[test]
+    fn every_detected_check_can_be_saved_in_a_selection() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        fs::write(dir.path().join("package-lock.json"), "{}").unwrap();
+        fs::write(dir.path().join("Cargo.toml"), "[package]\nname = \"app\"\n").unwrap();
+        fs::write(dir.path().join("Cargo.lock"), "").unwrap();
+        let checks = Check::detect_all(
+            &Manifest::default(),
+            &[],
+            Some(dir.path()),
+            dir.path(),
+            PackageManager::Npm,
+        );
+        let known = Check::known_names();
+        for check in Check::for_commit(checks, dir.path()) {
+            assert!(
+                known.contains(check.name),
+                "{} is not selectable",
+                check.name
+            );
+        }
+    }
+
+    #[test]
+    fn a_project_scanner_takes_precedence_over_the_bundled_engine() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let manifest: Manifest =
+            serde_json::from_str(r#"{"devDependencies":{"secretlint":"10"}}"#).unwrap();
+        let checks = Check::detect_all(&manifest, &[], None, dir.path(), PackageManager::Yarn);
+        let scanners: Vec<_> = checks
+            .iter()
+            .filter(|check| check.name == "Secrets")
+            .collect();
+        assert_eq!(scanners.len(), 1);
+        assert_eq!(scanners[0].tool, "secretlint");
+    }
 
     #[test]
     fn resolve_prefers_a_filesystem_binary_over_yarn() {

@@ -58,6 +58,9 @@ One module per layer, named for what it produces:
 | `task` | manifests → the one list everything operates on |
 | `run` | a task → the running process |
 | `check` | a project's tools → concurrent results |
+| `check_config` | optional .opi/checks.json → workflow selections |
+| `secrets` | nosecrets engine → locations and fingerprints |
+| `staged` | Git index → whitespace, conflict and large-file checks |
 | `audit` | a package manager's audit → parsed advisories |
 | `supply` | signatures, release age, licenses → asked of the package manager |
 | `outdated` | a package manager's `outdated` → updates by semver jump |
@@ -136,10 +139,11 @@ fact the text does not is a fact nobody can read aloud.
 
 ## Dependencies
 
-Four, each with a stated reason: `runemark` for all presentation, `serde` and
-`serde_json` for `package.json` and the JSON the package managers emit, `glob`
-for workspace patterns. A fifth needs an argument that a small adapter over an
-existing focused crate cannot be avoided.
+`runemark` handles presentation, `serde` and `serde_json` handle manifests and tool
+output, and `glob` handles workspace patterns. `nosecrets-core`, `nosecrets-filter`
+and `nosecrets-rules` provide the default secret scanner, repository configuration
+and built-in rules without a separate executable. Detection rules stay in nosecrets.
+Additional dependencies need a concrete reason.
 
 `Cargo.toml` is read without a TOML parser for that reason: two facts are
 wanted, and a dependency to learn them would cost more than they are worth.

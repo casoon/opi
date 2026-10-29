@@ -1,12 +1,12 @@
 ---
 title: Configuration
-description: Optional refinements in package.json — descriptions, groups, favourites, confirmation and clean paths.
+description: Optional script refinements in package.json and workflow check selections in .opi/checks.json.
 order: 2
 ---
 
 None of this is required. A project with neither `scripts-info` nor an `opi` key still gets a
-usable list — that is the point. Everything here refines what `package.json` already says;
-there is no `opi.toml`.
+usable list — that is the point. Script metadata refines what `package.json` already says.
+Workflow check selections are optional and live in `.opi/checks.json`.
 
 ```json
 {
@@ -62,3 +62,58 @@ opi --yes deploy
 ```
 
 A path that escapes the project is refused rather than corrected.
+
+## Workflow checks
+
+```sh
+opi --checks          # choose a workflow first
+opi --checks push
+opi --checks deploy
+```
+
+Select checks with Space, confirm with Enter, or leave with Escape without saving.
+The menu starts with the current selection, or the workflow defaults. A check name
+selects that concern across all detected tools and workspace members. Build is a
+separate choice and runs after the checks. Configuration requires a terminal and
+never runs the checks itself.
+
+The project root's `.opi/checks.json` stores one selection per workflow:
+
+```json
+{
+  "workflows": {
+    "push": {
+      "checks": ["Secrets"],
+      "build": false
+    },
+    "deploy": {
+      "checks": ["Secrets", "Tests"],
+      "build": true
+    }
+  }
+}
+```
+
+Names must match the menu exactly: for example Biome supplies `Lint & format`,
+whereas Rust supplies `Lint` and `Format`. The example deploy selection requires
+an available test runner and build. Unknown names, malformed configuration and
+selected checks or builds that are unavailable fail the workflow. They are never
+silently skipped. Unavailable saved checks remain visible in the menu so they can
+be deselected.
+
+An absent workflow entry uses its defaults. Remove an entry to reset it; removing
+`.opi/checks.json` resets every workflow. An explicit empty `checks` array with
+`build: false` runs only the workflow's Git gates. Selecting checks does not change
+Health or Security. The Git gates themselves retain their workflow defaults.
+
+The configuration is shareable in Git. Opi preserves `.opi/.gitignore` and adds
+exceptions for `checks.json` and `.gitignore`; generated SBOMs remain ignored.
+No manifest, lockfile, script or command is rewritten.
+
+Run the selection with `opi --check push` or `opi --check deploy`. The deploy
+workflow requires a clean tree, defaults to all detected checks plus the build,
+and does not execute a deploy script. To check and then deploy:
+
+```sh
+opi --check deploy && opi deploy
+```

@@ -1,0 +1,35 @@
+# The commit workflow as a pre-commit hook: a generated export staged by
+# accident is stopped by its size in the index, beside the fixture's
+# unformatted report.rs.
+version: 1
+
+terminal:
+  title: git commit
+  cols: 118
+  rows: 24
+  theme: catppuccin-mocha
+  prompt: "{magenta}❯{/} "
+
+defaults:
+  speed: 55
+
+steps:
+  - wait: 800
+  - exec: printf '#!/bin/sh\nexec opi --check commit\n' > .git/hooks/pre-commit
+    cwd: /tmp/opi-demo/pulse
+    idle: 600
+    pause: 400
+  - exec: chmod +x .git/hooks/pre-commit
+    cwd: /tmp/opi-demo/pulse
+    idle: 600
+    pause: 800
+  - exec: head -c 800000 /dev/urandom > export.bin && git add export.bin
+    cwd: /tmp/opi-demo/pulse
+    idle: 600
+    pause: 800
+  - exec: git commit -m "Add the export"
+    cwd: /tmp/opi-demo/pulse
+    # git speaks the recording machine's language otherwise.
+    env: { LC_ALL: C }
+    timeout: 180000
+    idle: 2500

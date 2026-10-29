@@ -41,7 +41,7 @@ const catalogue = [
     file: 'commit.ansi',
     command: 'opi --check commit',
     tags: ['workflow', 'cargo'],
-    description: 'The commit workflow: the fast checks, without tests and dead-code analysis.',
+    description: 'The commit workflow skips tests and dead-code analysis. Current runs also check staged secrets, whitespace, conflict markers and oversized additions.',
   },
   {
     slug: 'security',
@@ -50,7 +50,7 @@ const catalogue = [
     command: 'opi --security',
     tags: ['security', 'cargo audit'],
     description:
-      'No secret scanner in this project, and opi says so instead of reporting a clean scan. The crates are audited with cargo audit.',
+      'This recording predates the bundled nosecrets scanner. Current runs scan secrets without a separate installation; cargo audit checks the crates.',
   },
   {
     slug: 'updates',

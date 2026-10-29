@@ -15,7 +15,9 @@ grouped, labelled, keyboard-driven, with the package manager detected rather
 than typed. Everything else sits behind a hotkey, deliberately secondary.
 
 `opi` reimplements none of the tools it surfaces. It detects which one a
-project depends on, runs it, and relays the result.
+project depends on, runs it, and relays the result. A bundled nosecrets engine supplies
+secret scanning when the project root has no detected scanner. The commit workflow also
+checks Git's staged changes for whitespace errors, conflict markers and oversized additions.
 
 ## What it does
 
@@ -47,7 +49,7 @@ Five areas sit beside the list:
 | Security | `S` | `--security` |
 | Updates | `U` | `--updates` |
 | Clean | `C` | `--clean` |
-| Workflows | — | `--check commit`, `--check push`, `--check release`, `--hooks` |
+| Workflows | — | `--check commit`, `--check push`, `--check release`, `--check deploy`, `--checks`, `--hooks` |
 
 A project can say more about a script through the `opi` key in `package.json`:
 a description that wins over `scripts-info`, an explicit group, a favourite, a
@@ -59,8 +61,8 @@ gets a usable list, which is the point of the whole arrangement.
 - **Write a project's files.** Clean removes what it is told to and
   `--updates` calls the package manager with a list of names; `opi` itself
   writes no manifest, no lockfile and no catalog, and no check runs in a
-  fixing mode. The one exception is the line `opi --hooks` appends to the
-  pre-push hook. See [Constraints](../constraints/).
+  fixing mode. Exceptions are hook installation and optional workflow selections:
+  `opi --checks` saves `.opi/checks.json` and its Git ignore exceptions. See [Constraints](../constraints/).
 - **.NET.** No standalone marker appeared in the 231 directories measured.
 - **Windows.** See [Decisions](../decisions/).
 
@@ -69,11 +71,11 @@ gets a usable list, which is the point of the whole arrangement.
 | | |
 | --- | --- |
 | Language | Rust, edition 2024, MSRV `1.85` |
-| Distribution | `install.sh` fetches the release binary and checks its SHA-256; crates.io as `opi` via `cargo install opi` for those with a toolchain |
+| Distribution | `install.sh` fetches the release binary and checks its SHA-256; `cargo binstall opi` fetches the same release binary; crates.io as `opi` via `cargo install opi` for those with a toolchain |
 | Terminal presentation | [runemark](https://github.com/casoon/runemark) `0.9` with its `select` feature — the only presentation dependency |
-| Project input | `package.json` and `Cargo.toml` — no config file of `opi`'s own |
+| Project input | `package.json` and `Cargo.toml` for commands; optional `.opi/checks.json` for workflow selections |
 | Platforms | Unix only; building on Windows fails with an explicit message |
-| Dependencies | four: `runemark`, `serde`, `serde_json`, `glob` |
+| Dependencies | `runemark`, `serde`, `serde_json`, `glob`, and the nosecrets core, filter and rules crates |
 
 ## Documentation in this directory
 

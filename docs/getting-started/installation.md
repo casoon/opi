@@ -45,6 +45,16 @@ binaries are built with `cargo auditable`, so the dependency list sits inside th
 cargo audit bin opi
 ```
 
+## With cargo-binstall
+
+```sh
+cargo binstall opi
+```
+
+[cargo-binstall](https://github.com/cargo-bins/cargo-binstall) finds the same release binary
+on GitHub and puts it in `~/.cargo/bin`, without building anything. It does not check the
+published SHA-256 — the install script does, or verify the download by hand as above.
+
 ## From crates.io
 
 ```sh
