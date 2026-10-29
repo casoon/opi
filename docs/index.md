@@ -13,7 +13,7 @@ grouped and labelled, with the package manager detected rather than typed. Healt
 updates and clean sit one hotkey away, and four workflows run the right checks before a
 commit, a push, a release or a deployment — the push one as a pre-push hook if you want it binding.
 
-**Status:** `0.13.0`. npm, pnpm, bun and Cargo projects are covered; yarn's scripts, health and
+**Status:** `0.13.1`. npm, pnpm, bun and Cargo projects are covered; yarn's scripts, health and
 security audit are too — its update listing is not read yet. `opi` runs on macOS and Linux
 only.
 

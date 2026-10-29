@@ -7,6 +7,8 @@ minor release may change existing behaviour.
 
 ## [Unreleased]
 
+## [0.13.1] - 2026-10-29
+
 ### Added
 
 - **Docs:** [Hooks and CI](https://casoon.github.io/opi/docs/guides/integrations/) has a
@@ -489,7 +491,8 @@ minor release may change existing behaviour.
   establishing the repository skeleton. The binary prints its version and a
   development notice; no functionality is implemented.
 
-[Unreleased]: https://github.com/casoon/opi/compare/v0.13.0...HEAD
+[Unreleased]: https://github.com/casoon/opi/compare/v0.13.1...HEAD
+[0.13.1]: https://github.com/casoon/opi/releases/tag/v0.13.1
 [0.13.0]: https://github.com/casoon/opi/releases/tag/v0.13.0
 [0.12.1]: https://github.com/casoon/opi/releases/tag/v0.12.1
 [0.12.0]: https://github.com/casoon/opi/releases/tag/v0.12.0
