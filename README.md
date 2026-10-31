@@ -5,7 +5,7 @@
 Go into any repository, type `opi`, and get a usable interface for that
 project — without configuring anything first.
 
-> **Status: `0.13.1`.** Scripts are the main thing; health, security, updates,
+> **Status: `0.13.2`.** Scripts are the main thing; health, security, updates,
 > clean and the commit/push/release/deploy workflows are built on top of them. npm, pnpm,
 > bun and Cargo projects are covered; yarn's scripts, health and security
 > audit are too — its update listing is not read yet.

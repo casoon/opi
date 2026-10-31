@@ -8,7 +8,7 @@ order: 1
 anything built in, so every built-in area is a flag or a hotkey, never a bare word.
 
 ```
-opi 0.13.1 — Operations Interface
+opi 0.13.2 — Operations Interface
 
 Usage:
   opi                     List what this project can do

@@ -7,6 +7,8 @@ minor release may change existing behaviour.
 
 ## [Unreleased]
 
+## [0.13.2] - 2026-10-31
+
 ### Fixed
 
 - **Security:** the secret scan lists the findings that fail it before high-entropy guesses, so a long list of guesses no longer hides them behind the twenty-line cap.
@@ -495,7 +497,8 @@ minor release may change existing behaviour.
   establishing the repository skeleton. The binary prints its version and a
   development notice; no functionality is implemented.
 
-[Unreleased]: https://github.com/casoon/opi/compare/v0.13.1...HEAD
+[Unreleased]: https://github.com/casoon/opi/compare/v0.13.2...HEAD
+[0.13.2]: https://github.com/casoon/opi/releases/tag/v0.13.2
 [0.13.1]: https://github.com/casoon/opi/releases/tag/v0.13.1
 [0.13.0]: https://github.com/casoon/opi/releases/tag/v0.13.0
 [0.12.1]: https://github.com/casoon/opi/releases/tag/v0.12.1
