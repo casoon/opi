@@ -7,6 +7,10 @@ minor release may change existing behaviour.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Security:** the secret scan lists the findings that fail it before high-entropy guesses, so a long list of guesses no longer hides them behind the twenty-line cap.
+
 ## [0.13.1] - 2026-10-29
 
 ### Added

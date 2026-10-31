@@ -49,8 +49,23 @@ fn scan_inner(dir: &Path, staged: bool) -> Result<(Verdict, String), Box<dyn std
     } else {
         detector.scan_files(root, &files)?
     };
+    // Entropy guesses last: the output is capped, and a long list of them
+    // must not push the finding that fails the scan out of view.
     findings.sort_by(|a, b| {
-        (&a.path, a.line, a.column, &a.rule_id).cmp(&(&b.path, b.line, b.column, &b.rule_id))
+        (
+            a.rule_id == ENTROPY_RULE,
+            &a.path,
+            a.line,
+            a.column,
+            &a.rule_id,
+        )
+            .cmp(&(
+                b.rule_id == ENTROPY_RULE,
+                &b.path,
+                b.line,
+                b.column,
+                &b.rule_id,
+            ))
     });
     // A high-entropy string is a guess: across 13 real repositories nearly all
     // of them were hashes, source maps, inline SVG and minified bundles. It is
@@ -196,6 +211,11 @@ mod tests {
         let (verdict, output) = scan(root, false);
         assert!(output.contains("high-entropy-string"), "{output}");
         assert_eq!(verdict, Verdict::Warning);
+        // A real finding in a later file is still listed first.
+        fs::write(root.join("z.pem"), private_key()).unwrap();
+        let (verdict, output) = scan(root, false);
+        assert_eq!(verdict, Verdict::Failed);
+        assert!(output.starts_with("z.pem:1:"), "{output}");
     }
 
     #[test]
