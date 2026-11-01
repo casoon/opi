@@ -1296,6 +1296,14 @@ fn license_report(console: Console, found: Result<supply::Licenses, String>) {
             return;
         }
     };
+    if found.counts.is_empty() {
+        println!(
+            "{} {}",
+            console.paint(Tone::Success, "✓"),
+            console.paint(Tone::Success, "Licenses — no dependencies")
+        );
+        return;
+    }
     const SHOWN: usize = 4;
     let mut parts: Vec<String> = found
         .counts

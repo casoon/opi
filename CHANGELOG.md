@@ -7,6 +7,17 @@ minor release may change existing behaviour.
 
 ## [Unreleased]
 
+## [0.13.3] - 2026-11-01
+
+### Fixed
+
+- **Security:** the remedy for an npm finding names the version `npm audit fix` would install,
+  instead of the vulnerable range (`update to <=4.17.23` for lodash, now `update to 4.18.1`).
+- **Security:** the license line of an npm project is read from `package-lock.json`, so it no
+  longer fails where `package.json` has no `version` and `npm sbom` refuses the project.
+- **Security:** a project without dependencies shows `Licenses — no dependencies` instead of an
+  empty line.
+
 ## [0.13.2] - 2026-10-31
 
 ### Fixed
@@ -497,7 +508,8 @@ minor release may change existing behaviour.
   establishing the repository skeleton. The binary prints its version and a
   development notice; no functionality is implemented.
 
-[Unreleased]: https://github.com/casoon/opi/compare/v0.13.2...HEAD
+[Unreleased]: https://github.com/casoon/opi/compare/v0.13.3...HEAD
+[0.13.3]: https://github.com/casoon/opi/compare/v0.13.2...v0.13.3
 [0.13.2]: https://github.com/casoon/opi/releases/tag/v0.13.2
 [0.13.1]: https://github.com/casoon/opi/releases/tag/v0.13.1
 [0.13.0]: https://github.com/casoon/opi/releases/tag/v0.13.0

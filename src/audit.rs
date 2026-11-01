@@ -138,8 +138,20 @@ struct RawVulnerability {
     name: String,
     #[serde(default)]
     severity: String,
-    #[serde(default)]
-    range: Option<String>,
+    /// What `npm audit fix` would install. `range` beside it is the
+    /// *vulnerable* range, so it is not read: "update to <=4.17.23" names the
+    /// versions to leave, not the one to reach.
+    #[serde(default, rename = "fixAvailable")]
+    fix_available: Option<FixAvailable>,
+}
+
+/// npm's `fixAvailable`: `false`, `true` (a fix exists but npm names no
+/// version, e.g. through a dependent), or the package and version to install.
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+enum FixAvailable {
+    Known { name: String, version: String },
+    Unnamed(serde::de::IgnoredAny),
 }
 
 /// The shape bun's own `audit` produces.
@@ -284,10 +296,16 @@ fn read_npm(text: &str) -> Result<Vec<Advisory>, serde_json::Error> {
             })
         })
         .chain(report.vulnerabilities.into_values().filter_map(|raw| {
+            let patched = match raw.fix_available {
+                Some(FixAvailable::Known { name, version }) if name == raw.name => Some(version),
+                // The fix is a newer version of the package that pulls it in.
+                Some(FixAvailable::Known { name, version }) => Some(format!("{name}@{version}")),
+                _ => None,
+            };
             Some(Advisory {
                 module: raw.name,
                 severity: Severity::parse(&raw.severity)?,
-                patched: raw.range,
+                patched,
             })
         }))
         .collect())
@@ -586,6 +604,28 @@ mod tests {
         assert_eq!(found[0].module, "trim-newlines");
         assert_eq!(found[0].severity, Severity::High);
         assert_eq!(found[0].patched.as_deref(), Some(">=3.0.1"));
+    }
+
+    #[test]
+    fn npm_names_the_fixed_version_not_the_vulnerable_range() {
+        // Trimmed from a real `npm audit --json` run (npm 11) against lodash@4.17.20.
+        let json = r#"{"vulnerabilities":{
+            "lodash":{"name":"lodash","severity":"high","range":"<=4.17.23",
+              "fixAvailable":{"name":"lodash","version":"4.18.1","isSemVerMajor":false}},
+            "minimist":{"name":"minimist","severity":"critical","range":"<0.2.4",
+              "fixAvailable":{"name":"mkdirp","version":"1.0.4","isSemVerMajor":true}},
+            "tar":{"name":"tar","severity":"high","range":"<6.2.1","fixAvailable":true},
+            "ip":{"name":"ip","severity":"high","range":"*","fixAvailable":false}}}"#;
+        let patched = |module: &str| {
+            parse(json)
+                .into_iter()
+                .find(|a| a.module == module)
+                .and_then(|a| a.patched)
+        };
+        assert_eq!(patched("lodash").as_deref(), Some("4.18.1"));
+        assert_eq!(patched("minimist").as_deref(), Some("mkdirp@1.0.4"));
+        assert_eq!(patched("tar"), None, "true names no version to show");
+        assert_eq!(patched("ip"), None);
     }
 
     /// Trimmed from a real `bun audit --json` run (bun 1.3.3) against

@@ -85,9 +85,12 @@ type LicenseParser = fn(&str) -> Result<Licenses, String>;
 /// Lists the production dependencies' licenses, where the package manager can.
 ///
 /// pnpm reports them itself and answers offline in well under a second. npm
-/// and bun are asked for npm's CycloneDX SBOM, which reads `node_modules` as
-/// `audit signatures` does. Yarn has no source and returns `None`. Development
-/// dependencies are left out: they do not ship.
+/// writes each package's license into `package-lock.json`, which is read
+/// directly: `npm sbom` reads the same file but refuses a project whose
+/// `package.json` has no `version` (`EINVALIDPURLTYPE`, npm 11.19), which is
+/// most private apps. bun is asked for npm's CycloneDX SBOM, which reads
+/// `node_modules` as `audit signatures` does. Yarn has no source and returns
+/// `None`. Development dependencies are left out: they do not ship.
 pub fn licenses(manager: PackageManager, root: &Path) -> Option<Result<Licenses, String>> {
     let (program, args, parse): (_, &[&str], LicenseParser) = match manager {
         PackageManager::Pnpm => (
@@ -95,18 +98,13 @@ pub fn licenses(manager: PackageManager, root: &Path) -> Option<Result<Licenses,
             &["licenses", "list", "--json", "--prod"],
             parse_licenses,
         ),
-        PackageManager::Npm => (
-            "npm",
-            &[
-                "sbom",
-                "--sbom-format",
-                "cyclonedx",
-                "--omit",
-                "dev",
-                "--package-lock-only",
-            ],
-            parse_sbom_licenses,
-        ),
+        PackageManager::Npm => {
+            return Some(
+                std::fs::read_to_string(root.join("package-lock.json"))
+                    .map_err(|_| "no package-lock.json to read".to_owned())
+                    .and_then(|text| parse_lockfile_licenses(&text)),
+            );
+        }
         PackageManager::Bun => (
             "npm",
             &["sbom", "--sbom-format", "cyclonedx", "--omit", "dev"],
@@ -156,6 +154,36 @@ fn tally(found: Vec<(String, String)>) -> Licenses {
         .counts
         .sort_by(|(a, count_a), (b, count_b)| count_b.cmp(count_a).then_with(|| a.cmp(b)));
     licenses
+}
+
+/// `package-lock.json` (lockfile version 2 and 3): one entry per installed
+/// path, with `license` where the package declares one. Workspace members and
+/// links are the project's own packages, not dependencies; `dev` and
+/// `devOptional` entries do not ship.
+fn parse_lockfile_licenses(json: &str) -> Result<Licenses, String> {
+    const NONE: &str = "package-lock.json lists no packages";
+    let value: Value = serde_json::from_str(json).map_err(|_| NONE.to_owned())?;
+    let packages = value
+        .get("packages")
+        .and_then(Value::as_object)
+        .ok_or(NONE)?;
+    let found = packages
+        .iter()
+        .filter_map(|(path, entry)| {
+            let (_, name) = path.rsplit_once("node_modules/")?;
+            let flag = |key: &str| entry.get(key).and_then(Value::as_bool) == Some(true);
+            if flag("dev") || flag("devOptional") || flag("link") {
+                return None;
+            }
+            let license = entry
+                .get("license")
+                .and_then(Value::as_str)
+                .filter(|license| !license.trim().is_empty())
+                .unwrap_or("UNKNOWN");
+            Some((license.to_owned(), name.to_owned()))
+        })
+        .collect();
+    Ok(tally(found))
 }
 
 /// A CycloneDX SBOM as `npm sbom` writes it: one component per package, each
@@ -450,6 +478,33 @@ mod tests {
         );
         assert!(parse_sbom_licenses("not json").is_err());
         assert!(parse_sbom_licenses("{}").is_err());
+    }
+
+    #[test]
+    fn lockfile_licenses_leave_out_dev_links_and_the_project() {
+        let parsed = parse_lockfile_licenses(
+            r#"{"lockfileVersion": 3, "packages": {
+                "": {"name": "app"},
+                "packages/web": {"name": "web", "license": "GPL-3.0-only"},
+                "node_modules/web": {"resolved": "packages/web", "link": true},
+                "node_modules/lodash": {"version": "4.17.20", "license": "MIT"},
+                "node_modules/@s/b": {"version": "1.0.0", "license": "MIT"},
+                "node_modules/a/node_modules/c": {"version": "1.0.0", "license": "LGPL-3.0"},
+                "node_modules/d": {"version": "1.0.0"},
+                "node_modules/vitest": {"version": "3.0.0", "license": "MIT", "dev": true},
+                "node_modules/fsevents": {"version": "2.0.0", "license": "GPL-2.0", "devOptional": true}
+            }}"#,
+        )
+        .unwrap();
+        assert_eq!(parsed.counts[0], ("MIT".to_owned(), 2));
+        assert_eq!(
+            parsed.notable,
+            [
+                ("LGPL-3.0".to_owned(), "c".to_owned()),
+                ("UNKNOWN".to_owned(), "d".to_owned()),
+            ]
+        );
+        assert!(parse_lockfile_licenses("{}").is_err());
     }
 
     #[test]

@@ -38,7 +38,7 @@ Nothing to act on.
 ## Supply chain
 
 A `package.json` project gets up to three more lines, each answered by the package manager
-itself — pnpm all three, npm and bun two (licenses from `npm sbom`), yarn only the signatures:
+itself — pnpm all three, npm and bun two (licenses from the lockfile and `npm sbom`), yarn only the signatures:
 
 - **Signatures** — `npm audit signatures`: whether every installed package carries a valid
   registry signature. It reads `node_modules`, so it works under pnpm and bun too; under
@@ -49,8 +49,9 @@ itself — pnpm all three, npm and bun two (licenses from `npm sbom`), yarn only
   global setting counts as well as the workspace file. yarn and bun are not asked.
 - **Licenses** — the most common licenses with their counts, and by name every package under
   a copyleft, source-available, missing or `UNLICENSED` license. Production dependencies only:
-  from `pnpm licenses list --prod`, from `npm sbom --omit dev` for npm and bun, from
-  `cargo metadata` for Cargo.
+  from `pnpm licenses list --prod`, from the `license` fields in `package-lock.json` for npm,
+  from `npm sbom --omit dev` for bun, from `cargo metadata` for Cargo. A project without
+  dependencies reads `Licenses — no dependencies`.
 
 ```
 ✓ Signatures — every installed package verified
@@ -91,7 +92,9 @@ named with the command that installs it, e.g. `cargo install cargo-cyclonedx`.
 
 Advisories are condensed to one line per package and severity, which is what decides what to
 do about them — the severity counts are therefore counts of vulnerable dependencies, not of
-advisories. Where the advisory names a patched range, it becomes the remedy. bun and yarn name
+advisories. Where the advisory names a patched range, it becomes the remedy; for npm that is
+`fixAvailable`, the version `npm audit fix` would install, or the dependent to update where
+the fix comes through one. bun and yarn name
 only the vulnerable range, so their findings carry no remedy: deriving "update to 4.17.21"
 from `<4.17.21` would be inventing the one number that has to be right.
 
