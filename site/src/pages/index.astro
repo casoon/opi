@@ -5,6 +5,7 @@ import {
   Badge,
   Badges,
   Button,
+  CallToAction,
   CodeBlock,
   Faq,
   Features,
@@ -95,14 +96,12 @@ opi --hooks         # checks before every push`;
         title: 'Every script in one list',
         body: 'Grouped, labelled from scripts-info, with the package manager detected. package.json and Cargo.toml side by side, workspace members included.',
         href: '#scripts',
-        tone: 'accent',
       },
       {
         label: 'Check',
         title: 'The project’s own tools, run together',
         body: 'Health, security, updates and clean, one key each — and the same checks before a commit, a push, a release or a deployment.',
         href: '#checks',
-        tone: 'brand',
       },
     ]}
   />
@@ -326,6 +325,12 @@ opi --hooks         # checks before every push`;
         a: 'Only what you ask for: the hook from opi --hooks, workflow selections from opi --checks in .opi/checks.json, and SBOMs from opi --sbom in .opi/sbom/, which stays ignored. No manifest, lockfile or script is rewritten.',
       },
     ]}
+  />
+
+  <CallToAction
+    title="One key to run it, one key to check it."
+    href={url('docs/getting-started/quickstart/')}
+    label="Read the quickstart"
   />
 </Base>
 
