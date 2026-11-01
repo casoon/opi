@@ -7,6 +7,13 @@ minor release may change existing behaviour.
 
 ## [Unreleased]
 
+## [0.13.4] - 2026-11-01
+
+### Fixed
+
+- **SBOM:** where `npm sbom` refuses a project because `package.json` has no `version`,
+  `opi --sbom` says so instead of passing on npm's `EINVALIDPURLTYPE` line.
+
 ## [0.13.3] - 2026-11-01
 
 ### Fixed
@@ -508,7 +515,8 @@ minor release may change existing behaviour.
   establishing the repository skeleton. The binary prints its version and a
   development notice; no functionality is implemented.
 
-[Unreleased]: https://github.com/casoon/opi/compare/v0.13.3...HEAD
+[Unreleased]: https://github.com/casoon/opi/compare/v0.13.4...HEAD
+[0.13.4]: https://github.com/casoon/opi/compare/v0.13.3...v0.13.4
 [0.13.3]: https://github.com/casoon/opi/compare/v0.13.2...v0.13.3
 [0.13.2]: https://github.com/casoon/opi/releases/tag/v0.13.2
 [0.13.1]: https://github.com/casoon/opi/releases/tag/v0.13.1

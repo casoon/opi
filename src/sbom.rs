@@ -64,9 +64,23 @@ pub fn npm(manager: PackageManager, root: &Path, out: &Path) -> Result<PathBuf, 
         .output()
         .map_err(|error| spawn_error(error, tool, install))?;
     if !output.status.success() {
-        return Err(SbomError::Failed(first_line(&output.stderr, tool)));
+        return Err(SbomError::Failed(npm_reason(&output.stderr, tool)));
     }
     write(out, NPM_FILE, &output.stdout)
+}
+
+/// npm's reason, translated where its own words do not say what to change.
+///
+/// `npm sbom` refuses a project whose `package.json` has no `version`
+/// (npm 11.19): the root package's purl needs one, and npm reports that as
+/// `EINVALIDPURLTYPE` with a message about "range" types.
+fn npm_reason(stderr: &[u8], tool: &str) -> String {
+    if String::from_utf8_lossy(stderr).contains("EINVALIDPURLTYPE") {
+        return format!(
+            "{tool} sbom needs a \"version\" in package.json (npm error EINVALIDPURLTYPE)"
+        );
+    }
+    first_line(stderr, tool)
 }
 
 /// Writes the Cargo SBOM into `out` and returns its path.
@@ -219,6 +233,19 @@ mod tests {
                 tool: "pnpm",
                 install: "npm install -g pnpm"
             }
+        );
+    }
+
+    #[test]
+    fn a_missing_version_is_named() {
+        let stderr = b"npm error code EINVALIDPURLTYPE\nnpm error Invalid type \"range\" of package \"app@\"";
+        assert_eq!(
+            npm_reason(stderr, "npm"),
+            "npm sbom needs a \"version\" in package.json (npm error EINVALIDPURLTYPE)"
+        );
+        assert_eq!(
+            npm_reason(b"npm error missing lockfile", "npm"),
+            "npm error missing lockfile"
         );
     }
 
