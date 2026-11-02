@@ -9,7 +9,7 @@ minor release may change existing behaviour.
 
 ### Changed
 
-- **Pages:** the project site uses the current shared theme (0.12.5).
+- **Pages:** the project site uses the current shared theme (0.12.6).
 
 
 ## [0.13.4] - 2026-11-01
