@@ -28,7 +28,13 @@ const BASH: &str = r#"_opi() {
     if [[ "$cur" == -* ]]; then
         COMPREPLY=($(compgen -W "-y --yes --health --clean --security --updates --check --sbom --hooks --checks --completions -h --help -V --version" -- "$cur"))
     else
-        COMPREPLY=($(compgen -W "$(opi --list-names 2>/dev/null)" -- "$cur"))
+        # One name per line, each completed as a single escaped word: names
+        # may contain spaces ("cargo doc") and come from files we do not trust.
+        local name quoted
+        while IFS= read -r name; do
+            printf -v quoted '%q' "$name"
+            [[ "$quoted" == "$cur"* ]] && COMPREPLY+=("$quoted")
+        done < <(opi --list-names 2>/dev/null)
     fi
 }
 complete -F _opi opi
@@ -39,7 +45,7 @@ const ZSH: &str = r#"#compdef opi
 _opi_names() {
     local -a names
     names=(${(f)"$(opi --list-names 2>/dev/null)"})
-    compadd -a names
+    compadd -a -- names
 }
 
 _opi() {
@@ -126,6 +132,13 @@ mod tests {
                 assert!(text.contains(word), "{shell} lacks {word}");
             }
         }
+    }
+
+    #[test]
+    fn script_names_are_completed_as_whole_lines_not_split_at_spaces() {
+        assert!(!script("bash").unwrap().contains("-W \"$(opi"));
+        assert!(script("bash").unwrap().contains("printf -v quoted '%q'"));
+        assert!(script("zsh").unwrap().contains("${(f)"));
     }
 
     #[test]

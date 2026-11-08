@@ -132,6 +132,10 @@ pub fn parse_with_json(args: &[String]) -> (Invocation, bool) {
         ) {
             return (invocation, true);
         }
+        // `--check --json` lacks its name; `--json` is not that name.
+        if invocation == Invocation::UnknownFlag("--check".to_owned()) {
+            return (invocation, false);
+        }
     }
     (parse(args.iter().cloned()), false)
 }
@@ -227,6 +231,11 @@ mod tests {
         assert_eq!(
             parse_with_json(&args(&["--clean", "--json"])),
             (Invocation::Clean, false)
+        );
+        // `--json` is not swallowed as the workflow name.
+        assert_eq!(
+            parse_with_json(&args(&["--check", "--json"])),
+            (Invocation::UnknownFlag("--check".to_owned()), false)
         );
     }
 
