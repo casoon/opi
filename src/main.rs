@@ -224,7 +224,12 @@ fn main() -> ExitCode {
         }
         // Names only, for the completion scripts: no heading, no interface.
         Invocation::ListNames => {
-            for task in tasks.iter().filter(|task| !task.hidden) {
+            // A script name is the repository's text: one with a newline or an
+            // escape sequence could inject candidates or control codes.
+            for task in tasks
+                .iter()
+                .filter(|task| !task.hidden && !task.name.chars().any(char::is_control))
+            {
                 println!("{}", task.name);
             }
             ExitCode::SUCCESS

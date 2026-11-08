@@ -18,7 +18,14 @@ minor release may change existing behaviour.
 
 ### Fixed
 
+- **Updates:** package names and versions from a package manager's report that start with `-` or contain control characters are dropped or defanged before they are shown or passed on, and names are handed to `pnpm update --latest` after `--`.
+- **CLI:** `--list-names` skips script names that contain control characters.
 - **Install:** `Cargo.toml` carries `[package.metadata.binstall]` matching the release archive names, so `cargo binstall opi` fetches the release binary instead of compiling.
+
+### Security
+
+- **JSON:** the `output` of a `Secrets` check is withheld in `--json`, since a secret scanner may print the secrets it found. Schema: [JSON output](https://casoon.github.io/opi/docs/reference/cli/#json-output).
+- **Sources:** a password or token in a dependency URL is masked (`user:***@host`) in the text report and in `--json`.
 
 ## [0.13.4] - 2026-11-01
 

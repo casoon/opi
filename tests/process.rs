@@ -607,6 +607,21 @@ fn list_names_prints_only_script_names_one_per_line() {
 }
 
 #[test]
+fn list_names_skips_names_with_control_characters() {
+    let fixture = Fixture::new();
+    fixture
+        .file(
+            "package.json",
+            r#"{"scripts":{"build":"x","ev\u001bil":"y","a\nb":"z","t\tab":"w"}}"#,
+        )
+        .file("package-lock.json", "{}");
+
+    let output = fixture.opi(".", &["--list-names"]);
+    assert!(output.status.success(), "{}", stderr(&output));
+    assert_eq!(stdout(&output).lines().collect::<Vec<_>>(), ["build"]);
+}
+
+#[test]
 fn completions_print_without_a_project_and_refuse_an_unknown_shell() {
     let fixture = Fixture::new();
 
@@ -657,6 +672,27 @@ fn health_json_reports_each_check_and_keeps_the_exit_code() {
             .as_str()
             .is_some_and(|text| text.contains("ERR_PNPM_OUTDATED_LOCKFILE"))
     );
+}
+
+#[test]
+fn json_never_carries_a_secret_scanners_output() {
+    let fixture = Fixture::new();
+    fixture
+        .file(
+            "package.json",
+            r#"{"name":"app","devDependencies":{"secretlint":"10"}}"#,
+        )
+        .file("package-lock.json", "{}")
+        .shim("npm", "exit 0")
+        .tool(
+            "node_modules/.bin/secretlint",
+            "echo 'AKIAIOSFODNN7EXAMPLE found'\nexit 1",
+        );
+
+    let output = fixture.opi(".", &["--health", "--json"]);
+    let printed = stdout(&output);
+    assert!(printed.contains("Secrets"), "{printed}");
+    assert!(!printed.contains("AKIAIOSFODNN7EXAMPLE"), "{printed}");
 }
 
 #[test]

@@ -263,13 +263,15 @@ pub fn run(
 
     let mut updates: Vec<Update> = raw
         .into_iter()
-        .filter(|(_, entry)| !entry.current.is_empty() && entry.current != entry.latest)
+        .filter(|(name, entry)| {
+            !entry.current.is_empty() && entry.current != entry.latest && usable_name(name)
+        })
         .map(|(name, entry)| Update {
             jump: Jump::between(&entry.current, &entry.latest),
             in_range: !entry.wanted.is_empty() && entry.wanted != entry.current,
             name,
-            current: entry.current,
-            latest: entry.latest,
+            current: plain(&entry.current),
+            latest: plain(&entry.latest),
         })
         .collect();
 
@@ -500,6 +502,20 @@ pub fn cargo(root: &Path) -> Result<Vec<Update>, OutdatedError> {
     Ok(read_cargo(&text))
 }
 
+/// Whether a package name from a tool's report is safe to show and to pass on:
+/// not empty, not shaped like an option, and free of control characters.
+fn usable_name(name: &str) -> bool {
+    !name.is_empty() && !name.starts_with('-') && !name.chars().any(char::is_control)
+}
+
+/// `text` with control characters replaced, so a report cannot move the
+/// cursor or rewrite the screen when it is printed.
+fn plain(text: &str) -> String {
+    text.chars()
+        .map(|c| if c.is_control() { '\u{fffd}' } else { c })
+        .collect()
+}
+
 /// The most telling line of `stderr`: the first that starts with "error", or
 /// otherwise the first line at all. Empty when stderr is empty, so a caller
 /// can tell a silent failure from one that explained itself.
@@ -510,7 +526,9 @@ fn stderr_reason(stderr: &[u8]) -> String {
         .or_else(|| text.lines().next())
         .unwrap_or("")
         .trim()
-        .to_owned()
+        .chars()
+        .map(|c| if c.is_control() { '\u{fffd}' } else { c })
+        .collect()
 }
 
 /// The document inside output that may carry warnings ahead of it.
@@ -629,7 +647,11 @@ fn update_args(
         Apply::InRange => {}
         Apply::Latest => {
             args.push("--latest".to_owned());
-            args.extend_from_slice(names);
+            // The names come from the package manager's report of a foreign
+            // manifest: after `--` they cannot be read as options, and one
+            // that looks like an option is not passed at all.
+            args.push("--".to_owned());
+            args.extend(names.iter().filter(|name| !name.starts_with('-')).cloned());
         }
         Apply::Choose => args.push("--interactive".to_owned()),
     }
@@ -644,7 +666,7 @@ fn read_cargo(text: &str) -> Vec<Update> {
         .filter_map(|line| serde_json::from_str::<CargoReport>(line).ok())
         .flat_map(|report| report.dependencies)
         .filter(|entry| {
-            !entry.name.is_empty()
+            usable_name(&entry.name)
                 && !entry.project.is_empty()
                 && !entry.latest.is_empty()
                 && entry.project != entry.latest
@@ -654,8 +676,8 @@ fn read_cargo(text: &str) -> Vec<Update> {
             // Nothing is applied for Rust, so the question never arises.
             in_range: false,
             name: entry.name,
-            current: entry.project,
-            latest: entry.latest,
+            current: plain(&entry.project),
+            latest: plain(&entry.latest),
         })
         .collect();
 
@@ -825,12 +847,34 @@ mod tests {
         let names = ["ms".to_owned()];
         assert_eq!(
             update_args(PackageManager::Pnpm, true, Apply::Latest, &names),
-            ["update", "-r", "--latest", "ms"]
+            ["update", "-r", "--latest", "--", "ms"]
         );
         assert_eq!(
             update_args(PackageManager::Npm, true, Apply::InRange, &[]),
             ["update"],
             "npm walks the installed tree and needs no -r"
+        );
+    }
+
+    #[test]
+    fn option_shaped_names_are_never_passed() {
+        let names = ["--global".to_owned(), "ms".to_owned()];
+        assert_eq!(
+            update_args(PackageManager::Pnpm, false, Apply::Latest, &names),
+            ["update", "--latest", "--", "ms"]
+        );
+    }
+
+    #[test]
+    fn hostile_names_and_reasons_are_dropped_or_defanged() {
+        assert!(!usable_name("--global"));
+        assert!(!usable_name("a\u{1b}[2Jb"));
+        assert!(!usable_name("a\nb"));
+        assert!(usable_name("@scope/pkg"));
+        assert_eq!(plain("1.0\u{1b}[2J"), "1.0\u{fffd}[2J");
+        assert_eq!(
+            stderr_reason(b"error \x1b[2J boom"),
+            "error \u{fffd}[2J boom"
         );
     }
 
