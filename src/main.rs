@@ -70,7 +70,8 @@ const TABS_ABOVE_GROUPS: usize = 5;
 const PACKAGES_TAB: &str = "Packages";
 
 fn main() -> ExitCode {
-    let invocation = cli::parse(std::env::args().skip(1));
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    let (invocation, json) = cli::parse_with_json(&args);
 
     match &invocation {
         Invocation::Help => {
@@ -162,14 +163,25 @@ fn main() -> ExitCode {
             &tasks,
             &root,
         ),
-        Invocation::Health => {
-            cmd::health::health(&manifest, &members, rust_root.as_deref(), &project, &root)
-        }
+        Invocation::Health => cmd::health::health(
+            &manifest,
+            &members,
+            rust_root.as_deref(),
+            &project,
+            &root,
+            json,
+        ),
         Invocation::Clean => {
             cmd::clean::clean(&manifest, &members, rust_root.as_deref(), &project, &root)
         }
+        Invocation::Security if json => {
+            cmd::json::security(&manifest, &members, rust_root.as_deref(), &project, &root)
+        }
         Invocation::Security => {
             cmd::security::security(&manifest, &members, rust_root.as_deref(), &project, &root)
+        }
+        Invocation::Updates if json => {
+            cmd::json::updates(&manifest, &project, rust_root.as_deref(), &root)
         }
         Invocation::Updates => {
             cmd::updates::updates(&manifest, &members, &project, rust_root.as_deref(), &root)
@@ -181,6 +193,7 @@ fn main() -> ExitCode {
             rust_root.as_deref(),
             &project,
             &root,
+            json,
         ),
         Invocation::Hooks => cmd::hooks::hooks(&root),
         Invocation::Checks(name) => cmd::checks::configure_checks(
@@ -320,7 +333,7 @@ fn list(
         // Nothing was chosen; that is not a failure.
         Outcome::Cancelled => ExitCode::SUCCESS,
         Outcome::Hotkey('H') => {
-            cmd::health::health(manifest, members, rust_root, project, directory)
+            cmd::health::health(manifest, members, rust_root, project, directory, false)
         }
         Outcome::Hotkey('C') => cmd::clean::clean(manifest, members, rust_root, project, directory),
         Outcome::Hotkey('S') => {

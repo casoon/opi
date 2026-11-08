@@ -261,5 +261,7 @@ expected:
   sees the same findings you would;
 - a release script that writes `opi --sbom` next to its artefacts.
 
-When a program rather than a person reads the result, rely on the exit code. The output
-is written for people: findings name their file and line, but there is no JSON report.
+When a program rather than a person reads the result, rely on the exit code, or add
+`--json` to `--health`, `--security`, `--updates` or `--check <workflow>` for one JSON
+document with the same verdict. The keys are listed in
+[JSON output](../../reference/cli/#json-output). The other commands print text only.

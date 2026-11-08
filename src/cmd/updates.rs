@@ -213,7 +213,7 @@ fn apply_updates(
     // together. Measured at 1.4s here and 10.6s on the largest workspace, so
     // it is not a wait worth asking about first.
     println!();
-    run_workflow("commit", manifest, members, rust_root, project, root)
+    run_workflow("commit", manifest, members, rust_root, project, root, false)
 }
 
 /// Lets each update be ticked, returning the names to raise.

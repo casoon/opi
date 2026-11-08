@@ -25,6 +25,7 @@ Options:
       --security          Scan for secrets and vulnerable dependencies
       --updates           Show dependencies with newer versions
       --check <workflow>  Run a workflow: commit, push, release or deploy
+      --json              With --health, --security, --updates or --check: print JSON
       --sbom [dir]        Write CycloneDX SBOMs, one file per ecosystem
       --hooks             Install the push workflow as the pre-push hook
       --checks [workflow] Select checks for a workflow
@@ -71,6 +72,66 @@ larger than 500 KiB. Other project tools retain their usual scope. It does not m
 - An unknown flag before the script is an error, and so is an unknown script name — with
   a suggestion where one is close, matched by optimal string alignment, so a transposition
   counts as one edit rather than two.
+
+## JSON output
+
+`--json` prints one JSON document to stdout instead of the text report, for `--health`,
+`--security`, `--updates` and `--check <workflow>`. It can stand anywhere on the line
+(`opi --health --json`); after a script name it still belongs to the script, and with any
+other flag it changes nothing. Colour and progress are not printed, `--updates` lists and
+never offers to apply, and the exit codes are those in the table below. Failures before
+anything runs (unknown workflow, unreadable `.opi/checks.json`, no project) stay an error
+on stderr with a non-zero exit and print no JSON.
+
+Every document carries `schema` (currently `1`), `command`, `project` and a verdict.
+New keys may be added within a schema version; a key is removed or changes meaning only
+with a new `schema`.
+
+**`--health`** — `{schema, command: "health", project, ok, checks}`. `ok` is true when no
+check failed; a warning does not fail.
+
+**`--check <workflow>`** — `{schema, command: "check", workflow, project, ready, gates, checks}`.
+`gates` are the repository questions, `{name, status, detail}` with `status` one of
+`passed`, `skipped`, `failed`. `ready` is false when a gate or a check failed.
+
+A check, in `--health`, `--check` and as a `Secrets` section of `--security`:
+
+```json
+{ "name": "Lockfile", "tool": "pnpm", "scope": null, "status": "failed",
+  "duration_ms": 412, "output": "…the tool's full output…" }
+```
+
+`scope` is the workspace member or `null` for the root. `status` is `passed`, `warning`,
+`failed`, or `unavailable` when the tool could not be started. `output` is not truncated.
+
+**`--security`** — `{schema, command: "security", project, ok, sections}`. `ok` is false
+for a serious (critical or high) advisory, a signature that does not verify, a secret
+finding or an audit that broke. Each section has `name` and `status` (`passed`, `warning`,
+`failed`, `unavailable`, `skipped`; `message` says why for the last three) plus the
+fields of its kind. Sections appear in the order of the text report, and `GitHub Actions`
+and `Sources` only when they have something to report.
+
+| Section | Fields |
+| --- | --- |
+| `Secrets` | a check, as above |
+| `Dependencies`, `Dependencies (rust)`, `Dependencies (osv)` | `advisories`: `{package, severity, patched}`; Rust adds `version` and `id` and has no `severity`; osv adds `ecosystem` |
+| `Signatures` | `invalid`, `missing`: `name@version` lists |
+| `Release age` | `age`, `null` when not set |
+| `Install scripts` | `packages`: `{package, policy}`, policy `allowed`, `ignored` or `unreviewed` |
+| `Licenses`, `Licenses (rust)` | `counts`: `{license, count}`; `notable`: `{license, package}` |
+| `GitHub Actions` | `unpinned`: `{file, line, reference}` |
+| `Sources` | `outside_registry`: `{package, source}` |
+
+`severity` is `critical`, `high`, `moderate`, `low` or `info`.
+
+**`--updates`** — `{schema, command: "updates", project, ok, ecosystems}`. `ok` is false
+only when a listing failed. Each ecosystem (`npm`, `rust`) has `status` (`current`,
+`outdated`, `unavailable`, `failed`), `updates`, and `message` for the last two. An update is
+`{package, current, latest, jump, in_range}`, with `jump` one of `patch`, `minor`, `major`.
+
+```sh
+opi --check push --json | jq -r '.checks[] | select(.status == "failed") | .name'
+```
 
 ## Keys in the list
 

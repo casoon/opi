@@ -22,6 +22,7 @@ pub(crate) fn run_workflow(
     rust_root: Option<&Path>,
     project: &Project,
     root: &Path,
+    json: bool,
 ) -> ExitCode {
     let console = Console::stdout(ColorMode::Auto);
 
@@ -38,14 +39,17 @@ pub(crate) fn run_workflow(
     };
     let selection = config.workflows.get(name);
 
-    println!(
-        "{}  {}",
-        console.paint(Tone::Title, project.display_name(root)),
-        console.paint(Tone::Muted, workflow.label())
-    );
-    println!();
+    if !json {
+        println!(
+            "{}  {}",
+            console.paint(Tone::Title, project.display_name(root)),
+            console.paint(Tone::Muted, workflow.label())
+        );
+        println!();
+    }
 
     let mut blocked = false;
+    let mut gates = Vec::new();
 
     // The repository questions come first: a release from a dirty tree is
     // settled before spending a minute on its tests.
@@ -59,6 +63,18 @@ pub(crate) fn run_workflow(
                 (Tone::Error, "✗")
             }
         };
+        if json {
+            gates.push(serde_json::json!({
+                "name": gate.name(),
+                "status": match result.verdict {
+                    runemark::Verdict::Passed => "passed",
+                    runemark::Verdict::Skipped => "skipped",
+                    _ => "failed",
+                },
+                "detail": result.detail,
+            }));
+            continue;
+        }
         let detail = result
             .detail
             .map_or_else(String::new, |detail| format!("  {detail}"));
@@ -123,7 +139,7 @@ pub(crate) fn run_workflow(
             ));
         }
     }
-    if checks.is_empty() && builds.is_empty() {
+    if checks.is_empty() && builds.is_empty() && !json {
         println!(
             "{}",
             console.paint(Tone::Muted, "No checks apply to this project.")
@@ -137,6 +153,9 @@ pub(crate) fn run_workflow(
         .max()
         .unwrap_or(0);
     let print = |report: &check::Report| {
+        if json {
+            return;
+        }
         let (tone, mark) = match report {
             report if report.warned() => (Tone::Warning, "!"),
             report if report.passed() => (Tone::Success, "✓"),
@@ -160,6 +179,19 @@ pub(crate) fn run_workflow(
     }
 
     let failed = reports.iter().filter(|report| !report.passed()).count();
+    if json {
+        let ready = !blocked && failed == 0;
+        super::json::print(&serde_json::json!({
+            "schema": super::json::SCHEMA,
+            "command": "check",
+            "workflow": name,
+            "project": project.display_name(root),
+            "ready": ready,
+            "gates": gates,
+            "checks": reports.iter().map(super::json::check).collect::<Vec<_>>(),
+        }));
+        return super::json::exit(ready);
+    }
     println!();
 
     if blocked || failed > 0 {

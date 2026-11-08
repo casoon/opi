@@ -18,6 +18,7 @@ pub(crate) fn health(
     rust_root: Option<&Path>,
     project: &Project,
     root: &Path,
+    json: bool,
 ) -> ExitCode {
     let console = Console::stdout(ColorMode::Auto);
     let checks = check::Check::detect_all(
@@ -27,6 +28,19 @@ pub(crate) fn health(
         root,
         project.package_manager.manager,
     );
+
+    if json {
+        let reports = check::run_all(checks, |_| {});
+        let ok = reports.iter().all(check::Report::passed);
+        super::json::print(&serde_json::json!({
+            "schema": super::json::SCHEMA,
+            "command": "health",
+            "project": project.display_name(root),
+            "ok": ok,
+            "checks": reports.iter().map(super::json::check).collect::<Vec<_>>(),
+        }));
+        return super::json::exit(ok);
+    }
 
     println!(
         "{}  {}",

@@ -614,3 +614,67 @@ fn completions_print_without_a_project_and_refuse_an_unknown_shell() {
     let output = fixture.opi(".", &["--completions", "tcsh"]);
     assert!(!output.status.success());
 }
+
+// --- JSON output ---
+
+fn json(output: &Output) -> serde_json::Value {
+    serde_json::from_str(&stdout(output))
+        .unwrap_or_else(|error| panic!("stdout is one JSON document: {error}\n{}", stdout(output)))
+}
+
+#[test]
+fn health_json_reports_each_check_and_keeps_the_exit_code() {
+    let fixture = Fixture::new();
+    fixture
+        .file(
+            "package.json",
+            r#"{"name":"app","dependencies":{"ms":"2.1.3"}}"#,
+        )
+        .file("pnpm-lock.yaml", "")
+        .shim(
+            "pnpm",
+            "echo ' ERR_PNPM_OUTDATED_LOCKFILE  not up to date' >&2\nexit 1",
+        );
+
+    let output = fixture.opi(".", &["--health", "--json"]);
+    assert_eq!(output.status.code(), Some(1));
+    let document = json(&output);
+    assert_eq!(document["schema"], 1);
+    assert_eq!(document["command"], "health");
+    assert_eq!(document["ok"], false);
+    let lockfile = document["checks"]
+        .as_array()
+        .expect("checks")
+        .iter()
+        .find(|check| check["name"] == "Lockfile")
+        .expect("a lockfile check");
+    assert_eq!(lockfile["status"], "failed");
+    assert!(
+        lockfile["output"]
+            .as_str()
+            .is_some_and(|text| text.contains("ERR_PNPM_OUTDATED_LOCKFILE"))
+    );
+}
+
+#[test]
+fn a_workflow_json_gives_the_verdict_and_prints_nothing_else() {
+    let fixture = Fixture::new();
+    fixture
+        .file("package.json", r#"{"name":"app"}"#)
+        .file("package-lock.json", "{}")
+        .shim("npm", "exit 0");
+
+    let output = fixture.opi(".", &["--check", "commit", "--json"]);
+    assert!(output.status.success(), "{}", stdout(&output));
+    let document = json(&output);
+    assert_eq!(document["command"], "check");
+    assert_eq!(document["workflow"], "commit");
+    assert_eq!(document["ready"], true);
+    assert!(
+        document["checks"]
+            .as_array()
+            .expect("checks")
+            .iter()
+            .any(|check| check["name"] == "Lockfile" && check["status"] == "passed")
+    );
+}

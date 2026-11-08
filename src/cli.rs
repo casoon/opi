@@ -113,6 +113,29 @@ where
     }
 }
 
+/// Parses arguments, and whether `--json` asked for machine-readable output.
+///
+/// `--json` only means something to the four areas that have a second
+/// renderer, so it is only taken from the line when one of them is the
+/// command. Anywhere else it stays where it was: a script's own `--json`
+/// reaches the script, and `--clean --json` is `--clean` as before.
+pub fn parse_with_json(args: &[String]) -> (Invocation, bool) {
+    let without: Vec<&String> = args.iter().filter(|arg| *arg != "--json").collect();
+    if without.len() != args.len() {
+        let invocation = parse(without.into_iter().cloned());
+        if matches!(
+            invocation,
+            Invocation::Health
+                | Invocation::Security
+                | Invocation::Updates
+                | Invocation::Workflow(_)
+        ) {
+            return (invocation, true);
+        }
+    }
+    (parse(args.iter().cloned()), false)
+}
+
 /// The `--help` text.
 pub fn help(version: &str) -> String {
     format!(
@@ -133,6 +156,7 @@ Options:
       --security          Scan for secrets and vulnerable dependencies
       --updates           Show dependencies with newer versions
       --check <workflow>  Run a workflow: commit, push, release or deploy
+      --json              With --health, --security, --updates or --check: print JSON
       --sbom [dir]        Write CycloneDX SBOMs, one file per ecosystem
       --hooks             Install the push workflow as the pre-push hook
       --checks [workflow] Select checks for a workflow
@@ -177,6 +201,32 @@ mod tests {
         assert_eq!(
             parse(["--check", "deploy"]),
             Invocation::Workflow("deploy".to_owned())
+        );
+    }
+
+    #[test]
+    fn json_is_taken_from_the_line_only_for_the_areas_that_render_it() {
+        let args = |list: &[&str]| list.iter().map(|a| (*a).to_owned()).collect::<Vec<_>>();
+        assert_eq!(
+            parse_with_json(&args(&["--health", "--json"])),
+            (Invocation::Health, true)
+        );
+        assert_eq!(
+            parse_with_json(&args(&["--check", "push", "--json"])),
+            (Invocation::Workflow("push".to_owned()), true)
+        );
+        assert_eq!(
+            parse_with_json(&args(&["--json", "--updates"])),
+            (Invocation::Updates, true)
+        );
+        // A script's own flag is not opi's.
+        assert_eq!(
+            parse_with_json(&args(&["build", "--json"])),
+            (run("build", &["--json"]), false)
+        );
+        assert_eq!(
+            parse_with_json(&args(&["--clean", "--json"])),
+            (Invocation::Clean, false)
         );
     }
 
