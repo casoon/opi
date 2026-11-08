@@ -173,11 +173,10 @@ fn an_npm_audit_is_read_with_the_fix_that_npm_names() {
     let output = fixture.opi(&["--security"]);
     let printed = stdout(&output);
     assert_eq!(output.status.code(), Some(1), "{printed}");
-    assert!(printed.contains("lodash"), "{printed}");
+    assert!(printed.contains("lodash [high]"), "{printed}");
     assert!(printed.contains("update to 4.18.1"), "{printed}");
-    assert!(printed.contains("minimist"), "{printed}");
-    // The fix for minimist is a newer mkdirp, and says so.
-    assert!(printed.contains("update to mkdirp@1.0.4"), "{printed}");
+    assert!(printed.contains("minimist [critical]"), "{printed}");
+    assert!(printed.contains("update to 1.2.8"), "{printed}");
     assert!(printed.contains("critical"), "{printed}");
     assert!(!printed.contains("Nothing to act on"), "{printed}");
     assert!(fixture.calls("npm").contains(&"audit --json".to_owned()));
@@ -209,11 +208,12 @@ fn a_pnpm_audit_is_read_with_its_patched_ranges() {
 
     let output = fixture.opi(&["--security"]);
     let printed = stdout(&output);
-    // trim-newlines is high, so the run fails — and names the patched range.
+    // minimist is critical, so the run fails — and names the patched range.
     assert_eq!(output.status.code(), Some(1), "{printed}");
-    assert!(printed.contains("trim-newlines"), "{printed}");
-    assert!(printed.contains("update to >=3.0.1"), "{printed}");
-    assert!(printed.contains("minimist"), "{printed}");
+    assert!(printed.contains("minimist [critical]"), "{printed}");
+    assert!(printed.contains("update to >=1.2.6"), "{printed}");
+    assert!(printed.contains("lodash [high]"), "{printed}");
+    assert!(printed.contains("update to >=4.17.21"), "{printed}");
     assert!(printed.contains("moderate"), "{printed}");
 }
 
@@ -255,13 +255,12 @@ fn cargo_audit_reports_the_advisory_by_its_id() {
     assert_eq!(output.status.code(), Some(1), "{printed}");
     assert!(printed.contains("quick-xml 0.38.4"), "{printed}");
     assert!(printed.contains("RUSTSEC-2026-0195"), "{printed}");
-    assert!(printed.contains("update to >=0.38.5"), "{printed}");
+    assert!(printed.contains("update to >=0.41.0"), "{printed}");
 }
 
 #[test]
-fn osv_adds_only_what_the_native_audit_did_not_report() {
-    // lodash is in both reports; word-wrap only in osv-scanner's. The second
-    // is the one to show under osv, with its CVSS band.
+fn osv_stays_quiet_about_what_the_native_audit_already_reported() {
+    // Both tools see the same lodash and minimist, so osv adds nothing.
     let fixture = Fixture::new();
     npm_project(&fixture);
     fixture
@@ -275,8 +274,7 @@ fn osv_adds_only_what_the_native_audit_did_not_report() {
         .split("Dependencies (osv)")
         .nth(1)
         .unwrap_or_else(|| panic!("no osv section: {printed}"));
-    assert!(osv.contains("word-wrap 1.2.3"), "{printed}");
-    assert!(osv.contains("update to >=1.2.4"), "{printed}");
+    assert!(osv.contains("nothing beyond the audits above"), "{printed}");
     assert!(!osv.contains("lodash"), "{printed}");
     assert_eq!(
         fixture.calls("osv-scanner").len(),
@@ -303,7 +301,7 @@ fn osv_findings_stand_alone_when_the_native_audit_is_clean() {
     let printed = stdout(&output);
     assert_eq!(output.status.code(), Some(1), "{printed}");
     assert!(printed.contains("lodash 4.17.20"), "{printed}");
-    assert!(printed.contains("word-wrap 1.2.3"), "{printed}");
+    assert!(printed.contains("minimist 1.2.0"), "{printed}");
 }
 
 #[test]
@@ -332,9 +330,9 @@ fn npm_outdated_is_split_into_safe_and_major() {
     let output = fixture.opi(&["--updates"]);
     let printed = stdout(&output);
     assert!(output.status.success(), "{printed}{}", stderr(&output));
-    assert!(printed.contains("eslint 8.57.0 → 9.14.0"), "{printed}");
-    assert!(printed.contains("ms 2.1.2 → 2.1.3"), "{printed}");
-    assert!(printed.contains("typescript 5.4.5 → 5.6.3"), "{printed}");
+    assert!(printed.contains("lodash 4.17.20 → 4.18.1"), "{printed}");
+    assert!(printed.contains("ms 2.0.0 → 2.1.3"), "{printed}");
+    assert!(printed.contains("typescript 5.4.5 → 7.0.2"), "{printed}");
     assert!(printed.contains("Safe to take"), "{printed}");
     assert!(printed.contains("A decision each"), "{printed}");
     assert!(!printed.contains("everything is current"), "{printed}");
@@ -359,14 +357,14 @@ fn pnpm_outdated_survives_a_warning_ahead_of_the_json_and_covers_the_workspace()
         .file("apps/blog/package.json", r#"{"name":"blog"}"#)
         .tool(
             "pnpm",
-            &[says("outdated -r --json", "pnpm-outdated.json", 1)],
+            &[says("outdated -r --json", "pnpm-outdated-warn.json", 1)],
         );
 
     let output = fixture.opi(&["--updates"]);
     let printed = stdout(&output);
     assert!(output.status.success(), "{printed}{}", stderr(&output));
-    assert!(printed.contains("astro 4.16.0 → 5.1.2"), "{printed}");
-    assert!(printed.contains("zod 3.23.8 → 3.24.1"), "{printed}");
+    assert!(printed.contains("lodash 4.17.20 → 4.18.1"), "{printed}");
+    assert!(printed.contains("typescript 5.4.5 → 7.0.2"), "{printed}");
     assert_eq!(fixture.calls("pnpm"), ["outdated -r --json"]);
 }
 
@@ -388,9 +386,9 @@ fn cargo_outdated_is_read_per_member_and_deduplicated() {
     let output = fixture.opi(&["--updates"]);
     let printed = stdout(&output);
     assert!(output.status.success(), "{printed}{}", stderr(&output));
-    assert!(printed.contains("clap 3.2.25 → 4.5.20"), "{printed}");
+    assert!(printed.contains("clap 3.2.25 → 4.6.7"), "{printed}");
     assert_eq!(
-        printed.matches("serde 1.0.200 → 1.0.228").count(),
+        printed.matches("serde 1.0.200 → 1.0.229").count(),
         1,
         "two members, one line: {printed}"
     );

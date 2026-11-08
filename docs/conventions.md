@@ -117,6 +117,14 @@ package manager. A behaviour that depends on a terminal (the menus, bun's
 interactive update) is covered from the pipe side only: that nothing runs
 without one.
 
+The audit and outdated flows in `tests/stubs.rs` run the binary against stub
+executables that answer with output recorded from the real tools, kept in
+`tests/fixtures/`. `tests/fixtures/PROVENANCE.md` names, per fixture, whether
+it is recorded or hand-written, and the command and version it comes from.
+The recorded output currently belongs to npm 11.19.1, pnpm 10.26.0,
+cargo-audit 0.22.1, cargo-outdated 0.19.0 and osv-scanner 2.7.0. When a tool
+changes its JSON, record again and update that file and this list.
+
 ## Comments
 
 Explain why, not what. A comment that restates the line below it is noise; a
