@@ -516,19 +516,31 @@ fn plain(text: &str) -> String {
         .collect()
 }
 
+/// The `data` text of yarn classic's JSON error line
+/// (`{"type":"error","data":"..."}`), if `line` is one.
+fn yarn_error_text(line: &str) -> Option<String> {
+    let value: serde_json::Value = serde_json::from_str(line.trim()).ok()?;
+    if value.get("type")?.as_str()? != "error" {
+        return None;
+    }
+    Some(value.get("data")?.as_str()?.to_string())
+}
+
 /// The most telling line of `stderr`: the first that starts with "error", or
-/// otherwise the first line at all. Empty when stderr is empty, so a caller
-/// can tell a silent failure from one that explained itself.
+/// otherwise the first line at all. yarn classic's JSON error line is shown as
+/// its `data` text. Empty when stderr is empty, so a caller can tell a silent
+/// failure from one that explained itself.
 fn stderr_reason(stderr: &[u8]) -> String {
     let text = String::from_utf8_lossy(stderr);
-    text.lines()
+    let line = text
+        .lines()
         .find(|line| line.trim_start().starts_with("error"))
         .or_else(|| text.lines().next())
-        .unwrap_or("")
-        .trim()
-        .chars()
-        .map(|c| if c.is_control() { '\u{fffd}' } else { c })
-        .collect()
+        .unwrap_or("");
+    match yarn_error_text(line) {
+        Some(data) => plain(data.trim()),
+        None => plain(line.trim()),
+    }
 }
 
 /// The document inside output that may carry warnings ahead of it.
@@ -1059,7 +1071,20 @@ mod tests {
         let stdout = "{\"type\":\"info\",\"data\":\"Visit https://yarnpkg.com/en/docs/cli/outdated for documentation about this command.\"}\n";
         assert!(read_yarn(stdout).expect("parse").is_empty());
         let stderr = b"{\"type\":\"error\",\"data\":\"Error: connect ECONNREFUSED 127.0.0.1:9\"}\n";
-        assert!(stderr_reason(stderr).contains("ECONNREFUSED"));
+        assert_eq!(
+            stderr_reason(stderr),
+            "Error: connect ECONNREFUSED 127.0.0.1:9"
+        );
+    }
+
+    #[test]
+    fn yarn_json_error_text_is_defanged_and_broken_json_stays_raw() {
+        assert_eq!(
+            stderr_reason(b"{\"type\":\"error\",\"data\":\"boom \\u001b[2J\"}\n"),
+            "boom \u{fffd}[2J"
+        );
+        let broken = "{\"type\":\"error\",\"data\":\"cut off";
+        assert_eq!(stderr_reason(broken.as_bytes()), broken);
     }
 
     #[test]

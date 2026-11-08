@@ -20,6 +20,7 @@ minor release may change existing behaviour.
 ### Fixed
 
 - **Updates:** package names and versions from a package manager's report that start with `-` or contain control characters are dropped or defanged before they are shown or passed on, and names are handed to `pnpm update --latest` after `--`.
+- **Updates:** an unreachable registry with yarn classic shows the error text instead of yarn's raw JSON error line.
 - **CLI:** `--list-names` skips script names that contain control characters.
 - **Install:** `Cargo.toml` carries `[package.metadata.binstall]` matching the release archive names, so `cargo binstall opi` fetches the release binary instead of compiling.
 
