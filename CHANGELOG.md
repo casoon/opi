@@ -11,6 +11,9 @@ minor release may change existing behaviour.
 
 - **Pages:** the project site uses the current shared theme (0.12.6).
 
+### Fixed
+
+- **Install:** `Cargo.toml` carries `[package.metadata.binstall]` matching the release archive names, so `cargo binstall opi` fetches the release binary instead of compiling.
 
 ## [0.13.4] - 2026-11-01
 

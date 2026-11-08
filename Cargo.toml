@@ -12,6 +12,11 @@ keywords = ["cli", "package-json", "scripts", "task-runner", "terminal"]
 categories = ["command-line-utilities", "development-tools"]
 exclude = ["plan/**", "site/**", "demo/**", "assets/**", "konzept.txt", "docs/**", "install.sh"]
 
+[package.metadata.binstall]
+pkg-url = "{ repo }/releases/download/v{ version }/{ name }-{ version }-{ target }{ archive-suffix }"
+bin-dir = "{ name }-{ version }-{ target }/{ bin }{ binary-ext }"
+pkg-fmt = "tgz"
+
 [dependencies]
 nosecrets-core = "0.3.9"
 nosecrets-filter = "0.3.9"
