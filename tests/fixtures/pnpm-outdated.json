@@ -1,0 +1,17 @@
+ WARN  Request took 11084ms: https://registry.npmjs.org/astro
+{
+  "astro": {
+    "current": "4.16.0",
+    "latest": "5.1.2",
+    "wanted": "4.16.18",
+    "isDeprecated": false,
+    "dependencyType": "dependencies"
+  },
+  "zod": {
+    "current": "3.23.8",
+    "latest": "3.24.1",
+    "wanted": "3.23.8",
+    "isDeprecated": false,
+    "dependencyType": "devDependencies"
+  }
+}

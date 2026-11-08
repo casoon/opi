@@ -1,0 +1,2 @@
+{"crate_name":"app","dependencies":[{"name":"serde","project":"1.0.200","compat":"1.0.228","latest":"1.0.228","kind":"Normal","platform":null},{"name":"clap","project":"3.2.25","compat":"3.2.25","latest":"4.5.20","kind":"Normal","platform":null}]}
+{"crate_name":"lib","dependencies":[{"name":"serde","project":"1.0.200","compat":"1.0.228","latest":"1.0.228","kind":"Normal","platform":null},{"name":"regex","project":"1.11.1","compat":"---","latest":"1.11.1","kind":"Normal","platform":null}]}

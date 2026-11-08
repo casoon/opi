@@ -1,0 +1,33 @@
+{
+  "actions": [],
+  "advisories": {
+    "1095100": {
+      "id": 1095100,
+      "title": "Uncontrolled Resource Consumption in trim-newlines",
+      "module_name": "trim-newlines",
+      "severity": "high",
+      "vulnerable_versions": "<3.0.1",
+      "patched_versions": ">=3.0.1",
+      "cwe": ["CWE-400"],
+      "url": "https://github.com/advisories/GHSA-7p7h-4mm5-852v"
+    },
+    "1096466": {
+      "id": 1096466,
+      "title": "Prototype Pollution in minimist",
+      "module_name": "minimist",
+      "severity": "moderate",
+      "vulnerable_versions": "<1.2.6",
+      "patched_versions": ">=1.2.6",
+      "cwe": ["CWE-1321"],
+      "url": "https://github.com/advisories/GHSA-xvch-5gv4-984h"
+    }
+  },
+  "muted": [],
+  "metadata": {
+    "vulnerabilities": { "info": 0, "low": 0, "moderate": 1, "high": 1, "critical": 0 },
+    "dependencies": 12,
+    "devDependencies": 0,
+    "optionalDependencies": 0,
+    "totalDependencies": 12
+  }
+}

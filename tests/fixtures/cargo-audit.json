@@ -1,0 +1,24 @@
+{
+  "database": { "advisory-count": 1021, "last-commit": "0c1c4b8", "last-updated": "2026-10-30T09:12:44+01:00" },
+  "lockfile": { "dependency-count": 214 },
+  "settings": { "target_arch": [], "target_os": [], "severity": null, "ignore": [], "informational_warnings": ["unmaintained", "unsound"] },
+  "vulnerabilities": {
+    "found": true,
+    "count": 1,
+    "list": [
+      {
+        "advisory": {
+          "id": "RUSTSEC-2026-0195",
+          "package": "quick-xml",
+          "title": "Unbounded recursion in quick-xml",
+          "date": "2026-09-18",
+          "aliases": [],
+          "cvss": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+        },
+        "versions": { "patched": [">=0.38.5"], "unaffected": [] },
+        "package": { "name": "quick-xml", "version": "0.38.4", "source": "registry+https://github.com/rust-lang/crates.io-index" }
+      }
+    ]
+  },
+  "warnings": {}
+}
