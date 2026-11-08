@@ -334,10 +334,20 @@ cargo audit bin opi
 ```
 
 With [cargo-binstall](https://github.com/cargo-bins/cargo-binstall), which
-fetches the same release binary into `~/.cargo/bin` (without the hash check):
+fetches the same release binary into `~/.cargo/bin`:
 
 ```bash
 cargo binstall opi
+```
+
+binstall checks neither the hash nor the attestation (its signature support is
+minisign only). To verify, download the archive of the same version and target
+from the release, verify it as above, and compare the binary inside it with the
+installed one:
+
+```bash
+tar -xzOf opi-<version>-<target>.tar.gz opi-<version>-<target>/opi | shasum -a 256
+shasum -a 256 ~/.cargo/bin/opi
 ```
 
 From the registry instead, which builds it here:

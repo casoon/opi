@@ -52,8 +52,15 @@ cargo binstall opi
 ```
 
 [cargo-binstall](https://github.com/cargo-bins/cargo-binstall) finds the same release binary
-on GitHub and puts it in `~/.cargo/bin`, without building anything. It does not check the
-published SHA-256 — the install script does, or verify the download by hand as above.
+on GitHub and puts it in `~/.cargo/bin`, without building anything. It checks neither the
+published SHA-256 nor the attestation (its signature support is minisign only) — the install
+script checks the hash. To verify a binstall install, download the archive of the same version
+and target, verify it as above, and compare the binary inside it with the installed one:
+
+```sh
+tar -xzOf opi-<version>-<target>.tar.gz opi-<version>-<target>/opi | shasum -a 256
+shasum -a 256 ~/.cargo/bin/opi
+```
 
 ## From crates.io
 
