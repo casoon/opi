@@ -158,7 +158,8 @@ contradicted the plan:
   projects; `fallow`, absent from the plan, in 11%.
 - The plan called for a `taze` adapter for dependency updates. `taze` was
   present in **none** of the 133, while npm and pnpm both ship `outdated` and
-  emit the same JSON. bun and yarn do not, and are told so rather than parsed.
+  emit the same JSON. bun and yarn classic do not, and are read by exception (see
+  decisions); Yarn Berry has no `outdated` and is told so.
 - The `member/script` syntax, because every workspace repository measured had
   root and member scripts sharing names, and none of 382 script names contained
   a slash.

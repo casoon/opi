@@ -7,8 +7,8 @@ project — without configuring anything first.
 
 > **Status: `0.13.4`.** Scripts are the main thing; health, security, updates,
 > clean and the commit/push/release/deploy workflows are built on top of them. npm, pnpm,
-> bun and Cargo projects are covered; yarn's scripts, health and security
-> audit are too — its update listing is not read yet.
+> bun and Cargo projects are covered; so are yarn's scripts, health, security
+> audit and update listing (classic only).
 
 ![opi listing a monorepo's scripts, switching groups, searching across all of them and running one](https://raw.githubusercontent.com/casoon/opi/main/assets/opi.gif)
 
@@ -218,7 +218,7 @@ checks run per member, in the member, because that is where the tools and their
 config live.
 
 Output is parsed only where the format is documented (`audit --json`,
-`osv-scanner --format json`, `outdated --json`, `audit signatures --json`, `licenses list --json`, `sbom --sbom-format cyclonedx`, `cargo metadata`). Everything else is relayed whole and capped at twenty lines,
+`osv-scanner --format json`, `outdated --json`, bun's `outdated` table (an exception: unknown output is an error, never "current"), `audit signatures --json`, `licenses list --json`, `sbom --sbom-format cyclonedx`, `cargo metadata`). Everything else is relayed whole and capped at twenty lines,
 with the command to see the rest: a parser that guesses at a tool's output
 breaks on that tool's next release.
 

@@ -89,7 +89,11 @@ fn apply_updates(
     let manager = project.package_manager.manager;
     let workspace = workspace::declared(root, manifest);
 
-    let in_range = found.iter().filter(|update| update.in_range).count();
+    let in_range = if outdated::can_update_in_range(manager) {
+        found.iter().filter(|update| update.in_range).count()
+    } else {
+        0
+    };
     let safe: Vec<String> = found
         .iter()
         .filter(|update| !update.jump.breaking())
@@ -97,9 +101,8 @@ fn apply_updates(
         .collect();
     let raises = outdated::can_raise(manager) && !safe.is_empty();
     let decides = outdated::can_raise(manager) && !found.is_empty();
-    // Offered without a finding to justify it: `opi` could not read bun's
-    // list, so it cannot know whether anything is outdated — bun's own list
-    // can, and says so when nothing is.
+    // Offered without a finding to justify it: bun's own list is the
+    // authority on what is outdated, and says so when nothing is.
     let chooses = project.npm && outdated::can_choose(manager);
 
     if in_range == 0 && !raises && !decides && !chooses {
