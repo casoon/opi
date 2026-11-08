@@ -567,7 +567,8 @@ fn a_silent_outdated_is_everything_is_current() {
 #[test]
 fn bun_is_never_asked_to_update_without_a_terminal() {
     // The handover to `bun update --interactive` is an offer; a pipe gets the
-    // offer's absence explained, and bun is not started at all.
+    // offer's absence explained. bun is still asked what is outdated, never
+    // to update.
     let fixture = Fixture::new();
     fixture
         .file("package.json", r#"{"name":"app"}"#)
@@ -579,7 +580,9 @@ fn bun_is_never_asked_to_update_without_a_terminal() {
     assert!(output.status.success(), "{printed}");
     assert!(printed.contains("in a terminal"), "{printed}");
     assert!(
-        fixture.calls("bun").is_none(),
+        fixture
+            .calls("bun")
+            .is_none_or(|calls| calls.iter().all(|call| !call.contains("update"))),
         "bun update ran without asking"
     );
 }
