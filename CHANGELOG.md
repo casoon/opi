@@ -7,15 +7,15 @@ minor release may change existing behaviour.
 
 ## [Unreleased]
 
-### Changed
-
-- **Pages:** the project site uses the current shared theme (0.12.6).
-
 ### Added
 
 - **Updates:** `--updates` lists outdated packages for bun (from its table) and yarn classic (`yarn outdated --json`, listing only). Unreadable output is an error, never "everything current". Yarn Berry stays unsupported. Details: [Updates](https://casoon.github.io/opi/docs/guides/updates/#limits).
 - **CLI:** `opi --completions <bash|zsh|fish>` prints a completion script for flags, workflow names and the script names of the current project. Setup: [Installation](https://casoon.github.io/opi/docs/getting-started/installation/#shell-completions).
 - **JSON:** `--json` with `--health`, `--security`, `--updates` and `--check <workflow>` prints one JSON document with a versioned schema instead of the text report; exit codes are unchanged.
+
+### Changed
+
+- **Pages:** the project site uses the current shared theme (0.12.6).
 
 ### Fixed
 
