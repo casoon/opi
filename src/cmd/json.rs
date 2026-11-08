@@ -54,15 +54,24 @@ fn status(report: &Report) -> &'static str {
     }
 }
 
-/// One check's result, with the tool's output kept whole.
+/// What a withheld output reads as in place of the tool's text.
+const WITHHELD: &str = "output withheld: a secrets scanner may print the secrets it found";
+
+/// One check's result, with the tool's output kept whole, except for secret
+/// scanners, whose output can contain the secrets themselves.
 pub(crate) fn check(report: &Report) -> Value {
+    let output = if report.check.name == "Secrets" {
+        WITHHELD
+    } else {
+        &report.output
+    };
     json!({
         "name": report.check.name,
         "tool": report.check.tool,
         "scope": report.check.scope,
         "status": status(report),
         "duration_ms": u64::try_from(report.duration.as_millis()).unwrap_or(u64::MAX),
-        "output": report.output,
+        "output": output,
     })
 }
 

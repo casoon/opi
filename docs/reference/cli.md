@@ -102,7 +102,10 @@ A check, in `--health`, `--check` and as a `Secrets` section of `--security`:
 ```
 
 `scope` is the workspace member or `null` for the root. `status` is `passed`, `warning`,
-`failed`, or `unavailable` when the tool could not be started. `output` is not truncated.
+`failed`, or `unavailable` when the tool could not be started. `output` is not truncated,
+except for `Secrets` checks: a scanner may print the secrets it found, so `output` there is
+the fixed text `output withheld: …` and `status` is the whole answer. Run `opi --security`
+without `--json` to read the findings.
 
 **`--security`** — `{schema, command: "security", project, ok, sections}`. `ok` is false
 for a serious (critical or high) advisory, a signature that does not verify, a secret
@@ -120,7 +123,7 @@ and `Sources` only when they have something to report.
 | `Install scripts` | `packages`: `{package, policy}`, policy `allowed`, `ignored` or `unreviewed` |
 | `Licenses`, `Licenses (rust)` | `counts`: `{license, count}`; `notable`: `{license, package}` |
 | `GitHub Actions` | `unpinned`: `{file, line, reference}` |
-| `Sources` | `outside_registry`: `{package, source}` |
+| `Sources` | `outside_registry`: `{package, source}`; a password or token in the URL is masked (`user:***@host`) |
 
 `severity` is `critical`, `high`, `moderate`, `low` or `info`.
 

@@ -74,8 +74,28 @@ fn outside_registry(spec: &str) -> bool {
 fn foreign(name: &str, source: &str) -> Foreign {
     Foreign {
         name: name.to_owned(),
-        source: source.to_owned(),
+        source: mask_credentials(source),
     }
+}
+
+/// Hides credentials in a URL's userinfo: `user:secret@` becomes `user:***@`,
+/// and a lone token before `@` on an http(s) URL becomes `***@`. The user of
+/// an ssh URL (`git@`) is not a secret and stays.
+fn mask_credentials(source: &str) -> String {
+    let Some((scheme, rest)) = source.split_once("://") else {
+        return source.to_owned();
+    };
+    let end = rest.find(['/', '?', '#']).unwrap_or(rest.len());
+    let Some(at) = rest[..end].rfind('@') else {
+        return source.to_owned();
+    };
+    let (userinfo, tail) = (&rest[..at], &rest[at..]);
+    let masked = match userinfo.split_once(':') {
+        Some((user, _)) => format!("{user}:***"),
+        None if scheme.ends_with("http") || scheme.ends_with("https") => "***".to_owned(),
+        None => userinfo.to_owned(),
+    };
+    format!("{scheme}://{masked}{tail}")
 }
 
 fn npm(json: &str) -> Vec<Foreign> {
@@ -271,6 +291,37 @@ fn cargo(toml: &str) -> Vec<Foreign> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn password_and_token_are_masked() {
+        assert_eq!(
+            mask_credentials("git+https://user:tok3n@host.example/a/b.git#abc"),
+            "git+https://user:***@host.example/a/b.git#abc"
+        );
+        assert_eq!(
+            mask_credentials("https://ghp_secret@host.example/a.tgz"),
+            "https://***@host.example/a.tgz"
+        );
+    }
+
+    #[test]
+    fn ssh_user_and_plain_urls_stay_readable() {
+        for url in [
+            "git+ssh://git@github.com/org/repo.git#abc",
+            "ssh://git@github.com/org/repo.git",
+            "git@github.com:org/repo.git",
+            "https://host.example/a@b/c.tgz",
+            "file:../local",
+        ] {
+            assert_eq!(mask_credentials(url), url);
+        }
+    }
+
+    #[test]
+    fn lockfile_entries_are_masked() {
+        let found = foreign("x", "git+https://u:p@h.example/r.git");
+        assert_eq!(found.source, "git+https://u:***@h.example/r.git");
+    }
 
     fn pairs(found: Vec<Foreign>) -> Vec<(String, String)> {
         found.into_iter().map(|f| (f.name, f.source)).collect()
