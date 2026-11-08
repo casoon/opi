@@ -5,7 +5,10 @@
 //! `outdated` and emit the same JSON map — so that is what this reads.
 //!
 //! The other two do not: bun ignores `--json` and prints a table, and yarn
-//! emits its own line-delimited shape where it still has the command at all.
+//! emits its own line-delimited shape where it still has the command at all —
+//! yarn classic only; Yarn Berry (2 and newer) dropped it. Both are read here
+//! anyway, bun's table by its header row, yarn classic's NDJSON by its `table`
+//! line; Yarn Berry stays [`OutdatedError::Unsupported`].
 //!
 //! Rust arrives through `cargo outdated`, which answers the same question and
 //! fills the same [`Update`] — a second source, not a second model. [`Jump`]
@@ -180,19 +183,23 @@ pub fn run(
     root: &Path,
     workspace: bool,
 ) -> Result<Vec<Update>, OutdatedError> {
-    // bun prints a table whether or not `--json` is passed, and yarn reports
-    // line by line in a shape of its own — yarn 2 and newer dropped the
-    // command altogether. Reading either as npm's map fails, and a parse
-    // error reads like a broken project rather than a missing feature.
-    if !matches!(manager, PackageManager::Npm | PackageManager::Pnpm) {
+    // Yarn 2 and newer dropped the command altogether, and reading a refusal
+    // as yarn classic's output fails like a broken project rather than a
+    // missing feature.
+    if matches!(manager, PackageManager::Yarn) && !yarn_classic(root) {
         return Err(OutdatedError::Unsupported(manager));
     }
 
     let mut args = vec!["outdated"];
-    if workspace && matches!(manager, PackageManager::Pnpm) {
+    // bun's `-r` adds a Workspace column to its table; measured with 1.3.3,
+    // without it only the root's packages are listed.
+    if workspace && matches!(manager, PackageManager::Pnpm | PackageManager::Bun) {
         args.push("-r");
     }
-    args.push("--json");
+    // bun ignores `--json`, so it is left off rather than passed in vain.
+    if !matches!(manager, PackageManager::Bun) {
+        args.push("--json");
+    }
 
     let output = Command::new(manager.program())
         .args(&args)
@@ -218,10 +225,16 @@ pub fn run(
         )));
     }
 
-    let raw: BTreeMap<String, RawEntry> =
-        serde_json::from_str(json_from(&text)).map_err(|error| {
-            OutdatedError::Failed(format!("could not read {manager}'s output: {error}"))
-        })?;
+    let raw = match manager {
+        PackageManager::Bun => read_bun(&text)?,
+        PackageManager::Yarn => read_yarn(&text)?,
+        _ => serde_json::from_str::<BTreeMap<String, RawEntry>>(json_from(&text))
+            .map_err(|error| {
+                OutdatedError::Failed(format!("could not read {manager}'s output: {error}"))
+            })?
+            .into_iter()
+            .collect(),
+    };
 
     let mut updates: Vec<Update> = raw
         .into_iter()
@@ -238,6 +251,132 @@ pub fn run(
     // Riskiest last: the safe ones are what someone acts on.
     updates.sort_by(|a, b| a.jump.cmp(&b.jump).then_with(|| a.name.cmp(&b.name)));
     Ok(updates)
+}
+
+/// Whether `yarn` here is yarn classic (1.x), the only one with `outdated`.
+///
+/// Asked in the project's directory because the version depends on it: Volta
+/// and Corepack pick the yarn named by the project.
+fn yarn_classic(root: &Path) -> bool {
+    Command::new("yarn")
+        .arg("--version")
+        .current_dir(root)
+        .output()
+        .is_ok_and(|output| {
+            String::from_utf8_lossy(&output.stdout)
+                .trim()
+                .starts_with("1.")
+        })
+}
+
+/// Reads `bun outdated`'s table, which is all bun prints.
+///
+/// Measured with bun 1.3.3, piped: a banner line, then a box of `|`-separated
+/// rows — `Package | Current | Update | Latest`, plus `Workspace` under `-r`.
+/// Columns are found by their header, so an added column does not shift the
+/// others. The package carries a ` (dev)` suffix where it is not a plain
+/// dependency. Nothing outdated prints the banner alone, with exit code 0.
+///
+/// A table whose header is not recognised is an error, not "everything is
+/// current": that would be the false acquittal this area refuses elsewhere.
+fn read_bun(text: &str) -> Result<Vec<(String, RawEntry)>, OutdatedError> {
+    let mut rows = text
+        .lines()
+        .filter(|line| line.starts_with('|') && !line.starts_with("|-"))
+        .map(|line| {
+            line.trim_matches('|')
+                .split('|')
+                .map(str::trim)
+                .collect::<Vec<_>>()
+        });
+    let Some(head) = rows.next() else {
+        return Ok(Vec::new());
+    };
+    let column = |name: &str| head.iter().position(|cell| *cell == name);
+    let (Some(package), Some(current), Some(update), Some(latest)) = (
+        column("Package"),
+        column("Current"),
+        column("Update"),
+        column("Latest"),
+    ) else {
+        return Err(OutdatedError::Failed(
+            "could not read bun's outdated table".to_owned(),
+        ));
+    };
+    Ok(rows
+        .filter_map(|cells| {
+            let name = cells.get(package)?.split_whitespace().next()?.to_owned();
+            Some((
+                name,
+                RawEntry {
+                    current: (*cells.get(current)?).to_owned(),
+                    wanted: (*cells.get(update)?).to_owned(),
+                    latest: (*cells.get(latest)?).to_owned(),
+                },
+            ))
+        })
+        .collect())
+}
+
+/// One line of `yarn outdated --json` (yarn classic): `{"type": ..., "data": ...}`.
+#[derive(Debug, Deserialize)]
+struct YarnLine {
+    #[serde(rename = "type")]
+    kind: String,
+    data: serde_json::Value,
+}
+
+/// Reads yarn classic's line-delimited output: the one line of type `table`
+/// holds `head` (column names) and `body` (rows). Other lines are ignored.
+fn read_yarn(text: &str) -> Result<Vec<(String, RawEntry)>, OutdatedError> {
+    let Some(table) = text
+        .lines()
+        .filter_map(|line| serde_json::from_str::<YarnLine>(line).ok())
+        .find(|line| line.kind == "table")
+    else {
+        // No table line: yarn prints only `info` lines when nothing is outdated.
+        return Ok(Vec::new());
+    };
+    let strings = |value: &serde_json::Value| -> Vec<String> {
+        value
+            .as_array()
+            .map(|cells| {
+                cells
+                    .iter()
+                    .map(|cell| cell.as_str().unwrap_or_default().to_owned())
+                    .collect()
+            })
+            .unwrap_or_default()
+    };
+    let head = strings(&table.data["head"]);
+    let column = |name: &str| head.iter().position(|cell| cell == name);
+    let (Some(package), Some(current), Some(wanted), Some(latest)) = (
+        column("Package"),
+        column("Current"),
+        column("Wanted"),
+        column("Latest"),
+    ) else {
+        return Err(OutdatedError::Failed(
+            "could not read yarn's outdated table".to_owned(),
+        ));
+    };
+    Ok(table.data["body"]
+        .as_array()
+        .map(Vec::as_slice)
+        .unwrap_or_default()
+        .iter()
+        .filter_map(|row| {
+            let cells = strings(row);
+            Some((
+                cells.get(package)?.clone(),
+                RawEntry {
+                    current: cells.get(current)?.clone(),
+                    wanted: cells.get(wanted)?.clone(),
+                    latest: cells.get(latest)?.clone(),
+                },
+            ))
+        })
+        .collect())
 }
 
 /// One line of `cargo outdated --format json`.
@@ -710,16 +849,56 @@ mod tests {
     }
 
     #[test]
-    fn a_manager_opi_cannot_read_is_refused_rather_than_run() {
-        // The guard has to sit in front of the process: a table parsed as JSON
-        // would be reported as a broken project instead of a missing feature.
-        for manager in [PackageManager::Bun, PackageManager::Yarn] {
-            let error = run(manager, Path::new("."), false).expect_err("unsupported");
-            assert!(
-                matches!(error, OutdatedError::Unsupported(_)),
-                "for {manager}"
-            );
-        }
+    fn bun_table_is_read_by_its_header() {
+        // Recorded from bun 1.3.3, piped, in a two-member workspace with `-r`.
+        let text = "bun outdated v1.3.3 (274e01c7)
+|------------------------------------------------------|
+| Package      | Current | Update | Latest | Workspace |
+|--------------|---------|--------|--------|-----------|
+| left-pad     | 1.0.0   | 1.0.0  | 1.3.0  | a         |
+|--------------|---------|--------|--------|-----------|
+| is-odd (dev) | 2.0.0   | 2.0.0  | 3.0.1  | b         |
+|------------------------------------------------------|
+";
+        let rows = read_bun(text).expect("parse");
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[0].0, "left-pad");
+        assert_eq!(rows[1].0, "is-odd");
+        assert_eq!(rows[1].1.latest, "3.0.1");
+        assert_eq!(rows[1].1.wanted, "2.0.0");
+    }
+
+    #[test]
+    fn bun_with_nothing_outdated_prints_the_banner_alone() {
+        assert!(
+            read_bun("bun outdated v1.3.3 (274e01c7)\n")
+                .expect("parse")
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn a_bun_table_without_the_known_header_is_an_error() {
+        let text = "| Name | Now |\n|------|-----|\n| x | 1.0.0 |\n";
+        assert!(read_bun(text).is_err());
+    }
+
+    #[test]
+    fn yarn_classic_table_line_is_read() {
+        // The shape yarn 1.x documents for `outdated --json`; written from
+        // that shape, not recorded — no yarn classic was at hand.
+        let text = r#"{"type":"info","data":"Color legend : ..."}
+{"type":"table","data":{"head":["Package","Current","Wanted","Latest","Package Type","URL"],"body":[["left-pad","1.0.0","1.0.0","1.3.0","dependencies","https://github.com/left-pad/left-pad"],["@types/node","20.0.0","20.19.0","26.0.0","devDependencies","https://example.org"]]}}
+"#;
+        let rows = read_yarn(text).expect("parse");
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[1].0, "@types/node");
+        assert_eq!(rows[1].1.wanted, "20.19.0");
+        assert!(
+            read_yarn("{\"type\":\"info\",\"data\":\"x\"}\n")
+                .expect("parse")
+                .is_empty()
+        );
     }
 
     #[test]

@@ -56,10 +56,12 @@ Raising ranges — and with it the per-package list — is offered for pnpm only
 has no command that keeps the range operator: `npm install x@1.1.1` turns an exact `2.1.2`
 into `^2.1.3`.
 
-bun's `outdated` prints a table rather than JSON, so `opi` has no list of its own there.
-Instead it offers **Choose in bun's own list**, which opens `bun update --interactive` —
-with `-r` in a workspace, so members' packages are included — and runs the commit checks
-once bun is done. yarn is not offered anything: Yarn Berry has no `outdated` at all.
+bun's `outdated` prints a table rather than JSON; `opi` reads that table by its header row, so
+bun gets the same list as npm, and **Within the declared ranges** applies to it. Besides, it
+offers **Choose in bun's own list**, which opens `bun update --interactive` — with `-r` in a
+workspace, so members' packages are included — and runs the commit checks once bun is done.
+yarn classic (1.x) is listed from `yarn outdated --json`. Yarn Berry has no `outdated` at all, so
+there nothing is listed or offered.
 
 `opi` writes nothing itself. It calls the package manager with a list of names — no
 `package.json`, no lockfile is touched by `opi`. Where two lockfiles disagree and no
@@ -86,6 +88,15 @@ sees every member, measured both ways on a two-member workspace.
 
 **pnpm's JSON is keyed by package name**, so a package present at two versions in two members
 shows one of them. `pnpm outdated -r` prints both rows itself.
+
+**bun's table is not a documented format.** It was measured with bun 1.3.3 only, piped: a banner,
+then `Package | Current | Update | Latest` (plus `Workspace` under `-r`). Columns are found by
+header name, and a table without that header is reported as unreadable, never as "everything is
+current". yarn classic's `table` line is read the same way but written from yarn's documented
+shape, not measured against a real yarn 1.x.
+
+**Yarn Berry and a registry fallback are not covered.** `opi` has no network client of its own,
+and querying the registry directly would be one, so Berry stays without a list.
 
 **`Jump` never learns where a version came from.** Cargo treating `0.12 → 0.13` as breaking
 needed no rule of its own: that rule was already there, and already applied to npm.

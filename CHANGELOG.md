@@ -10,6 +10,9 @@ minor release may change existing behaviour.
 ### Changed
 
 - **Pages:** the project site uses the current shared theme (0.12.6).
+### Added
+
+- **Updates:** `--updates` lists outdated packages for bun (read from the table `bun outdated` prints, with `-r` in a workspace) and for yarn classic (`yarn outdated --json`). Yarn Berry stays unsupported. Details: [Updates](https://casoon.github.io/opi/docs/guides/updates/#limits).
 
 ### Fixed
 
