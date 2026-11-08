@@ -1033,20 +1033,33 @@ mod tests {
 
     #[test]
     fn yarn_classic_table_line_is_read() {
-        // The shape yarn 1.x documents for `outdated --json`; written from
-        // that shape, not recorded — no yarn classic was at hand.
+        // Recorded with yarn 1.22.22 (`npx yarn@1.22.22 outdated --json`,
+        // exit 1) on 2026-11-08 in a throwaway project with ms@2.0.0 and
+        // lodash@4.17.20; the info line's legend is shortened.
         let text = r#"{"type":"info","data":"Color legend : ..."}
-{"type":"table","data":{"head":["Package","Current","Wanted","Latest","Package Type","URL"],"body":[["left-pad","1.0.0","1.0.0","1.3.0","dependencies","https://github.com/left-pad/left-pad"],["@types/node","20.0.0","20.19.0","26.0.0","devDependencies","https://example.org"]]}}
+{"type":"table","data":{"head":["Package","Current","Wanted","Latest","Package Type","URL"],"body":[["lodash","4.17.20","4.17.20","4.18.1","devDependencies","https://lodash.com/"],["ms","2.0.0","2.0.0","2.1.3","dependencies","https://github.com/vercel/ms#readme"]]}}
 "#;
         let rows = read_yarn(text).expect("parse");
         assert_eq!(rows.len(), 2);
-        assert_eq!(rows[1].0, "@types/node");
-        assert_eq!(rows[1].1.wanted, "20.19.0");
-        assert!(
-            read_yarn("{\"type\":\"info\",\"data\":\"x\"}\n")
-                .expect("parse")
-                .is_empty()
-        );
+        assert_eq!(rows[1].0, "ms");
+        assert_eq!(rows[1].1.latest, "2.1.3");
+    }
+
+    #[test]
+    fn yarn_classic_prints_nothing_when_everything_is_current() {
+        // Measured with yarn 1.22.22: empty stdout and stderr, exit 0.
+        assert!(read_yarn("").expect("parse").is_empty());
+    }
+
+    #[test]
+    fn yarn_classic_failure_is_an_info_line_on_stdout_and_a_json_error_on_stderr() {
+        // Measured with yarn 1.22.22 and `--registry http://127.0.0.1:9`
+        // (exit 1): stdout holds only the documentation `info` line, stderr
+        // one `{"type":"error",...}` line.
+        let stdout = "{\"type\":\"info\",\"data\":\"Visit https://yarnpkg.com/en/docs/cli/outdated for documentation about this command.\"}\n";
+        assert!(read_yarn(stdout).expect("parse").is_empty());
+        let stderr = b"{\"type\":\"error\",\"data\":\"Error: connect ECONNREFUSED 127.0.0.1:9\"}\n";
+        assert!(stderr_reason(stderr).contains("ECONNREFUSED"));
     }
 
     #[test]

@@ -565,6 +565,50 @@ fn a_silent_outdated_is_everything_is_current() {
 }
 
 #[test]
+fn yarn_whose_version_cannot_be_read_is_a_failure_not_a_missing_feature() {
+    let fixture = Fixture::new();
+    fixture
+        .file("package.json", r#"{"name":"app"}"#)
+        .file("yarn.lock", "")
+        .shim("yarn", "exit 1");
+
+    let output = fixture.opi(".", &["--updates"]);
+    let printed = stdout(&output);
+    assert_eq!(output.status.code(), Some(1), "{printed}");
+    assert!(
+        printed.contains("could not read yarn's version"),
+        "{printed}"
+    );
+    assert!(!printed.contains("everything is current"), "{printed}");
+}
+
+#[test]
+fn yarn_classic_outdated_is_listed_and_nothing_is_applied() {
+    // Output as measured with yarn 1.22.22: exit 1 with a table when
+    // something is outdated.
+    let fixture = Fixture::new();
+    fixture
+        .file("package.json", r#"{"name":"app"}"#)
+        .file("yarn.lock", "")
+        .shim(
+            "yarn",
+            r#"if [ "$1" = "--version" ]; then echo 1.22.22; exit 0; fi
+printf '%s\n' '{"type":"table","data":{"head":["Package","Current","Wanted","Latest","Package Type","URL"],"body":[["ms","2.0.0","2.0.0","2.1.3","dependencies","https://github.com/vercel/ms#readme"]]}}'
+exit 1"#,
+        );
+
+    let output = fixture.opi(".", &["--updates"]);
+    let printed = stdout(&output);
+    assert!(printed.contains("ms"), "{printed}");
+    assert!(
+        fixture
+            .calls("yarn")
+            .is_some_and(|calls| calls.iter().all(|call| !call.contains("upgrade"))),
+        "yarn upgrade ran"
+    );
+}
+
+#[test]
 fn bun_is_never_asked_to_update_without_a_terminal() {
     // The handover to `bun update --interactive` is an offer; a pipe gets the
     // offer's absence explained. bun is still asked what is outdated, never

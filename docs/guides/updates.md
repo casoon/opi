@@ -94,8 +94,13 @@ shows one of them. `pnpm outdated -r` prints both rows itself.
 then `Package | Current | Update | Latest` (plus `Workspace` under `-r`). Columns are found by
 header name, and output without a readable table is reported as unreadable, never as "everything
 is current". bun is called with `FORCE_COLOR=0`, since colour replaces the table with box
-characters. Under `-r` a package in two members is listed once. yarn classic's `table` line is read the same way but written from yarn's documented
-shape, not measured against a real yarn 1.x.
+characters. Under `-r` a package in two members is listed once.
+
+yarn classic's `outdated --json` was measured with yarn 1.22.22: one `info` line and one
+`table` line (`head`/`body`, exit 1) when something is outdated; no output and exit 0 when
+everything is current; with an unreachable registry only an `info` line on stdout, a JSON
+`error` line on stderr and exit 1. `opi` reads exactly that. Other 1.x versions are not
+measured.
 
 **Yarn Berry and a registry fallback are not covered.** `opi` has no network client of its own,
 and querying the registry directly would be one, so Berry stays without a list.

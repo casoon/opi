@@ -219,13 +219,12 @@ state — it is not a history.
 > **bun's and yarn classic's `outdated` are read, though the rule says to parse only documented formats**
 >
 > `opi` reads the table `bun outdated` prints (undocumented; measured with bun 1.3.3 only)
-> and yarn classic's `outdated --json` (documented shape, never measured against a real
-> yarn 1.x).
+> and yarn classic's `outdated --json` (measured with yarn 1.22.22).
 >
 > *Reason:* without a list, bun and yarn had the weakest updates side of the four package
 > managers.
 >
 > *Consequence:* a shape `opi` does not recognise is an error, never "everything is current":
 > no table header, output beyond the banner, or stderr with no rows. bun is called with
-> `FORCE_COLOR=0`. Only bun 1.3.x is backed by measurement. yarn is listed but nothing is
+> `FORCE_COLOR=0`. Only bun 1.3.x and yarn 1.22.22 are backed by measurement. yarn is listed but nothing is
 > applied, since `yarn upgrade` is unmeasured.
