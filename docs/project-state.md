@@ -72,7 +72,7 @@ gets a usable list, which is the point of the whole arrangement.
 | --- | --- |
 | Language | Rust, edition 2024, MSRV `1.85` |
 | Distribution | `install.sh` fetches the release binary and checks its SHA-256; `cargo binstall opi` fetches the same release binary; crates.io as `opi` via `cargo install opi` for those with a toolchain |
-| Terminal presentation | [runemark](https://github.com/casoon/runemark) `0.9` with its `select` feature — the only presentation dependency |
+| Terminal presentation | [runemark](https://github.com/casoon/runemark) `0.10` with its `select` feature — the only presentation dependency |
 | Project input | `package.json` and `Cargo.toml` for commands; optional `.opi/checks.json` for workflow selections |
 | Platforms | Unix only; building on Windows fails with an explicit message |
 | Dependencies | `runemark`, `serde`, `serde_json`, `glob`, and the nosecrets core, filter and rules crates |

@@ -16,6 +16,7 @@ minor release may change existing behaviour.
 ### Changed
 
 - **Pages:** the project site uses the current shared theme (0.12.6).
+- **Terminal:** runemark 0.10: an empty `NO_COLOR` no longer switches colour off and `TERM=dumb` does, and the selection menu follows the console's symbol theme and supports Home, End, PgUp and PgDn.
 
 ### Fixed
 
