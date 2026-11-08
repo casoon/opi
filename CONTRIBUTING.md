@@ -2,7 +2,7 @@
 
 ## Before you start
 
-`opi` is pre-release and its scope is deliberately narrow. Read
+`opi` is published on crates.io and its scope is deliberately narrow. Read
 [docs/constraints.md](docs/constraints.md) and [docs/decisions.md](docs/decisions.md)
 first — most feature ideas are already answered there, usually by a decision not
 to build them.
