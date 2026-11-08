@@ -13,6 +13,7 @@ minor release may change existing behaviour.
 ### Added
 
 - **Updates:** `--updates` lists outdated packages for bun (read from the table `bun outdated` prints, with `-r` in a workspace) and for yarn classic (`yarn outdated --json`). Yarn Berry stays unsupported. Details: [Updates](https://casoon.github.io/opi/docs/guides/updates/#limits).
+- **CLI:** `opi --completions <bash|zsh|fish>` prints a completion script for flags, workflow names and the script names of the current project. Setup: [Installation](https://casoon.github.io/opi/docs/getting-started/installation/#shell-completions).
 
 ### Fixed
 

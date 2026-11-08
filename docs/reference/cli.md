@@ -28,6 +28,7 @@ Options:
       --sbom [dir]        Write CycloneDX SBOMs, one file per ecosystem
       --hooks             Install the push workflow as the pre-push hook
       --checks [workflow] Select checks for a workflow
+      --completions <sh>  Print a completion script: bash, zsh or fish
   -h, --help              Show this help
   -V, --version           Show the version
 
@@ -41,6 +42,12 @@ hotkey instead.
 project root. It needs a terminal. Without a workflow name it first asks which
 workflow to configure. [Configuration](../../guides/configuration/#workflow-checks)
 describes the selections and defaults.
+
+`--completions <shell>` prints a completion script for `bash`, `zsh` or `fish`; setup is in
+[Installation](../../getting-started/installation/#shell-completions). The scripts complete flags
+and workflow names statically and ask `opi --list-names` for the script names of the current
+project. That hidden flag prints one name per line, without the interface, and skips scripts
+`opi` keeps out of the list.
 
 ## Check scope
 

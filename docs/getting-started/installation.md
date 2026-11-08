@@ -63,6 +63,22 @@ cargo install opi
 
 This builds `opi` locally. It needs Rust `1.85` or newer.
 
+## Shell completions
+
+`opi --completions <shell>` prints a script that completes flags, workflow names and the
+script names of the project you are standing in.
+
+```sh
+# bash: add to ~/.bashrc
+source <(opi --completions bash)
+
+# zsh: put it on the fpath before compinit (e.g. in ~/.zshrc)
+opi --completions zsh > "${fpath[1]}/_opi"
+
+# fish
+opi --completions fish > ~/.config/fish/completions/opi.fish
+```
+
 ## Unix only
 
 `opi` runs a script by replacing its own process with `exec`, so `Ctrl-C` reaches the dev

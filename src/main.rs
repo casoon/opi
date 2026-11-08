@@ -17,6 +17,7 @@ mod check_config;
 mod clean;
 mod cli;
 mod cmd;
+mod completions;
 mod manifest;
 mod osv;
 mod outdated;
@@ -79,6 +80,17 @@ fn main() -> ExitCode {
         Invocation::Version => {
             println!("opi {VERSION}");
             return ExitCode::SUCCESS;
+        }
+        Invocation::Completions(shell) => {
+            return if let Some(script) = completions::script(shell) {
+                print!("{script}");
+                ExitCode::SUCCESS
+            } else {
+                let block = ErrorBlock::new(format!("No completions for {shell}"))
+                    .with_remedy("Choose bash, zsh or fish.");
+                write_block(&block, Console::stderr(ColorMode::Auto));
+                ExitCode::FAILURE
+            };
         }
         _ => {}
     }
@@ -197,7 +209,16 @@ fn main() -> ExitCode {
             write_block(&block, console);
             ExitCode::FAILURE
         }
-        Invocation::Help | Invocation::Version => unreachable!("handled above"),
+        // Names only, for the completion scripts: no heading, no interface.
+        Invocation::ListNames => {
+            for task in tasks.iter().filter(|task| !task.hidden) {
+                println!("{}", task.name);
+            }
+            ExitCode::SUCCESS
+        }
+        Invocation::Help | Invocation::Version | Invocation::Completions(_) => {
+            unreachable!("handled above")
+        }
     }
 }
 

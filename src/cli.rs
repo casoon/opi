@@ -37,6 +37,10 @@ pub enum Invocation {
     Checks(Option<String>),
     /// Write CycloneDX SBOMs, into the given directory or the project root.
     Sbom(Option<String>),
+    /// Print a shell completion script for the named shell.
+    Completions(String),
+    /// Print the script names, one per line, for the completion scripts.
+    ListNames,
     /// A flag `opi` does not know, before any script name.
     UnknownFlag(String),
 }
@@ -80,6 +84,11 @@ where
         "--updates" => Invocation::Updates,
         "--hooks" => Invocation::Hooks,
         "--checks" => Invocation::Checks(args.next()),
+        "--list-names" => Invocation::ListNames,
+        "--completions" => args.next().map_or(
+            Invocation::UnknownFlag("--completions".to_owned()),
+            Invocation::Completions,
+        ),
         // The directory is optional, and a following flag is not a directory.
         "--sbom" => Invocation::Sbom(args.next().filter(|dir| !dir.starts_with('-'))),
         // The name follows the flag rather than standing alone, so a project
@@ -127,6 +136,7 @@ Options:
       --sbom [dir]        Write CycloneDX SBOMs, one file per ecosystem
       --hooks             Install the push workflow as the pre-push hook
       --checks [workflow] Select checks for a workflow
+      --completions <sh>  Print a completion script: bash, zsh or fish
   -h, --help              Show this help
   -V, --version           Show the version
 
@@ -178,6 +188,21 @@ mod tests {
             Invocation::Sbom(Some("out".to_owned()))
         );
         assert_eq!(parse(["--sbom", "--yes"]), Invocation::Sbom(None));
+    }
+
+    #[test]
+    fn completions_take_a_shell_and_list_names_stands_alone() {
+        assert_eq!(
+            parse(["--completions", "zsh"]),
+            Invocation::Completions("zsh".to_owned())
+        );
+        assert_eq!(
+            parse(["--completions"]),
+            Invocation::UnknownFlag("--completions".to_owned())
+        );
+        assert_eq!(parse(["--list-names"]), Invocation::ListNames);
+        // "completions" as a bare word is a project's script.
+        assert_eq!(parse(["completions"]), run("completions", &[]));
     }
 
     #[test]

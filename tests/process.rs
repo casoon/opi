@@ -583,3 +583,34 @@ fn bun_is_never_asked_to_update_without_a_terminal() {
         "bun update ran without asking"
     );
 }
+
+#[test]
+fn list_names_prints_only_script_names_one_per_line() {
+    let fixture = Fixture::new();
+    fixture
+        .file(
+            "package.json",
+            r#"{"scripts":{"build":"x","dev":"y","prebuild":"z"}}"#,
+        )
+        .file("package-lock.json", "{}");
+
+    let output = fixture.opi(".", &["--list-names"]);
+    assert!(output.status.success(), "{}", stderr(&output));
+    let names: Vec<String> = stdout(&output).lines().map(str::to_owned).collect();
+    assert!(names.contains(&"build".to_owned()), "{names:?}");
+    assert!(names.contains(&"dev".to_owned()), "{names:?}");
+    assert!(!names.contains(&"prebuild".to_owned()), "{names:?}");
+    assert!(names.iter().all(|name| !name.contains(' ')), "{names:?}");
+}
+
+#[test]
+fn completions_print_without_a_project_and_refuse_an_unknown_shell() {
+    let fixture = Fixture::new();
+
+    let output = fixture.opi(".", &["--completions", "bash"]);
+    assert!(output.status.success(), "{}", stderr(&output));
+    assert!(stdout(&output).contains("complete -F _opi opi"));
+
+    let output = fixture.opi(".", &["--completions", "tcsh"]);
+    assert!(!output.status.success());
+}
