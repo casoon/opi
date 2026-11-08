@@ -70,8 +70,9 @@ One module per layer, named for what it produces:
 Each carries a module-level doc comment saying what it owns and, where it is
 not obvious, what it deliberately does not.
 
-`main.rs` holds the wiring and **all** user-facing output. No other module
-prints.
+`main.rs` holds the dispatch, the list and starting a task; the command
+handlers live in `cmd/`, one module per area. Together they hold **all**
+user-facing output. No other module prints.
 
 ## Output
 
