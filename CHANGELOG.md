@@ -7,6 +7,8 @@ minor release may change existing behaviour.
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-11-09
+
 ### Added
 
 - **Updates:** `--updates` lists outdated packages for bun (from its table) and yarn classic (`yarn outdated --json`, listing only). Unreadable output is an error, never "everything current". Yarn Berry stays unsupported. Details: [Updates](https://casoon.github.io/opi/docs/guides/updates/#limits).
@@ -539,7 +541,8 @@ minor release may change existing behaviour.
   establishing the repository skeleton. The binary prints its version and a
   development notice; no functionality is implemented.
 
-[Unreleased]: https://github.com/casoon/opi/compare/v0.13.4...HEAD
+[Unreleased]: https://github.com/casoon/opi/compare/v0.14.0...HEAD
+[0.14.0]: https://github.com/casoon/opi/compare/v0.13.4...v0.14.0
 [0.13.4]: https://github.com/casoon/opi/compare/v0.13.3...v0.13.4
 [0.13.3]: https://github.com/casoon/opi/compare/v0.13.2...v0.13.3
 [0.13.2]: https://github.com/casoon/opi/releases/tag/v0.13.2
