@@ -154,9 +154,10 @@ impl std::fmt::Display for OutdatedError {
             // Only about this section. Rust is answered by the one below it,
             // so claiming opi checks npm alone stopped being true.
             Self::NoManifest => f.write_str("no package.json here"),
-            Self::Unsupported(manager) => {
-                write!(f, "opi cannot read {manager}'s outdated output")
-            }
+            Self::Unsupported(manager) => write!(
+                f,
+                "{manager} 2 and newer has no outdated command; yarn upgrade-interactive lists updates"
+            ),
             Self::NotInstalled => {
                 f.write_str("cargo outdated is not installed; cargo install cargo-outdated adds it")
             }
