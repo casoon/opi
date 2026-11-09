@@ -7,6 +7,10 @@ minor release may change existing behaviour.
 
 ## [Unreleased]
 
+### Changed
+
+- **Contributors:** the site builds with chartlet `0.23.0` and the recordings are rendered with castwright `0.6.0`; the architecture diagram is drawn 605 pixels wide, the width chartlet asks for.
+
 ## [0.14.0] - 2026-11-09
 
 ### Added

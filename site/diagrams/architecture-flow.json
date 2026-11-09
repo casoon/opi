@@ -4,7 +4,7 @@
   "title": "One run of opi, from argv to the process that replaces it",
   "description": "opi reads the command line into an Invocation. That starts two discoveries, one for package.json and one for Cargo.toml; either may come back empty and only both being empty is an error. Both feed project::Project, which holds the name and the package manager, and task::Task, which holds the entries. A script named on the command line goes straight to run::execute. Otherwise the tasks become a runemark menu: a selected entry runs, a hotkey opens one of the four areas health, security, updates and clean, and where no terminal can answer the menu prints itself to stdout instead. A flag on the command line reaches the areas without the menu. run::execute then replaces the opi process with the script, so the exit code and Ctrl-C are the script's.",
   "source": "src/cli.rs, src/manifest.rs, src/cargo.rs, src/project.rs, src/task.rs, src/run.rs",
-  "width": 560,
+  "width": 605,
   "height": 1180,
   "flow": {
     "nodes": [

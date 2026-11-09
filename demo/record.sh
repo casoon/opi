@@ -18,7 +18,7 @@ root="$(cd "$(dirname "$0")/.." && pwd)"
 work="${OPI_DEMO_DIR:-/tmp/opi-demo}"
 # The version the SVGs in assets/ are built with; a different one changes
 # every file without a change to any scene.
-castwright_version=0.5.0
+castwright_version=0.6.0
 
 echo "building opi…"
 cargo build --release --manifest-path "$root/Cargo.toml" --quiet

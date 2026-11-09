@@ -188,6 +188,8 @@ word stays theirs.
 | | `opi --check release` | Everything plus the build, a clean tree and an untagged version |
 | | `opi --hooks` | Installs `opi --check push` as the pre-push hook |
 | | `opi --sbom [dir]` | CycloneDX SBOMs, one file per ecosystem, written to `dir` or `.opi/sbom/` |
+| | `--json` | With `--health`, `--security`, `--updates` or `--check <workflow>`: one JSON document instead of the text report |
+| | `opi --completions <shell>` | Completion script for `bash`, `zsh` or `fish` |
 
 `--sbom` writes `sbom-npm.cdx.json` (from `npm sbom`, or `pnpm sbom` in a pnpm
 project; Yarn and Bun projects use `npm sbom` too, which reads their
