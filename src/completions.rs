@@ -71,6 +71,11 @@ const FISH: &str = r#"function __opi_first_word
     test (count $words) -eq 1; or test (count $words) -eq 2 -a "$words[2]" = --yes; or test (count $words) -eq 2 -a "$words[2]" = -y
 end
 
+function __opi_after
+    set -l words (commandline -opc)
+    test "$words[-1]" = $argv[1]
+end
+
 complete -c opi -f
 complete -c opi -n __opi_first_word -a '(opi --list-names 2>/dev/null)'
 complete -c opi -n __opi_first_word -s y -l yes -d 'Answer a script\'s confirmation in advance'
@@ -78,11 +83,15 @@ complete -c opi -n __opi_first_word -l health -d 'Run the project\'s checks'
 complete -c opi -n __opi_first_word -l clean -d 'Show and remove build artefacts'
 complete -c opi -n __opi_first_word -l security -d 'Scan for secrets and vulnerable dependencies'
 complete -c opi -n __opi_first_word -l updates -d 'Show dependencies with newer versions'
-complete -c opi -n __opi_first_word -l check -x -a 'commit push release deploy' -d 'Run a workflow'
+complete -c opi -n __opi_first_word -l check -x -d 'Run a workflow'
+complete -c opi -n '__opi_after --check' -a 'commit push release deploy'
 complete -c opi -n __opi_first_word -l sbom -r -d 'Write CycloneDX SBOMs'
+complete -c opi -n '__opi_after --sbom' -F
 complete -c opi -n __opi_first_word -l hooks -d 'Install the push workflow as the pre-push hook'
-complete -c opi -n __opi_first_word -l checks -x -a 'commit push release deploy' -d 'Select checks for a workflow'
-complete -c opi -n __opi_first_word -l completions -x -a 'bash zsh fish' -d 'Print a completion script'
+complete -c opi -n __opi_first_word -l checks -x -d 'Select checks for a workflow'
+complete -c opi -n '__opi_after --checks' -a 'commit push release deploy'
+complete -c opi -n __opi_first_word -l completions -x -d 'Print a completion script'
+complete -c opi -n '__opi_after --completions' -a 'bash zsh fish'
 complete -c opi -n __opi_first_word -s h -l help -d 'Show help'
 complete -c opi -n __opi_first_word -s V -l version -d 'Show the version'
 "#;
