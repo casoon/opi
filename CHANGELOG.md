@@ -7,6 +7,10 @@ minor release may change existing behaviour.
 
 ## [Unreleased]
 
+### Added
+
+- **Site:** a [Use cases](https://casoon.github.io/opi/use-cases/) page with five jobs opi gets used for, coding agents among them, and what it does not do; the start page shows how a check runs in three steps and links each use case.
+
 ### Changed
 
 - **Pages:** the project site uses the current shared theme (0.17.0).

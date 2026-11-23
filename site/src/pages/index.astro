@@ -16,10 +16,13 @@ import {
   ReleaseHighlights,
   Spotlight,
   Tabs,
+  Tour,
+  UseCases,
 } from '@casoon/pages-theme/components';
 import Base from '@casoon/pages-theme/layouts/Base.astro';
 import { parseChangelog } from '@casoon/pages-theme/lib/changelog';
 import config from 'virtual:casoon-pages/config';
+import { useCases } from 'virtual:casoon-pages/use-cases';
 import { url } from '@casoon/pages-theme/url';
 // The README's recordings, imported rather than copied so there is one file each. The hero
 // GIFs are recorded with vhs (keys pressed inside the interface): demo/tapes/hero.tape at about
@@ -46,6 +49,29 @@ const latestRelease = config.changelog
     )
   : undefined;
 
+// What opi --health found in the demo project (demo/fixtures/pulse, dependencies installed
+// with npm ci as in demo/record.sh), and its --json verdict cut down to each check's name and
+// status so it fits the stage.
+const detected = `pulse/
+├── package-lock.json → Lockfile
+├── Cargo.toml        → Format, Lint,
+│                       Docs, Tests
+└── every file        → Secrets`;
+const healthJson = `{
+  "command": "health",
+  "project": "pulse-dashboard",
+  "ok": false,
+  "schema": 1,
+  "checks": [
+    { "name": "Docs",     "status": "passed" },
+    { "name": "Format",   "status": "failed" },
+    { "name": "Lint",     "status": "passed" },
+    { "name": "Lockfile", "status": "passed" },
+    { "name": "Secrets",  "status": "passed" },
+    { "name": "Tests",    "status": "passed" }
+  ]
+}`;
+
 const usage = `opi                 # pick a script
 opi dev             # run one directly
 opi --check commit  # checks before a commit
@@ -55,7 +81,7 @@ opi --hooks         # checks before every push`;
 <Base>
   <Hero
     title="Run a repository. Check it before it ships."
-    lead="opi gives every project the same terminal interface: its scripts in one keyboard-driven list, and the checks its own tools can answer — before a commit, a push, a release or a deployment. npm, pnpm, Yarn, bun and Cargo, without configuring anything first."
+    lead="Every project's scripts in one keyboard-driven list, and the checks its own tools can answer before a commit, a push or a release. Nothing to configure."
   >
     <Install
       commands={[
@@ -145,14 +171,52 @@ opi --hooks         # checks before every push`;
     ]}
   />
 
-  <section id="checks" class="block intro anchor" aria-labelledby="checks-heading">
-    <p class="eyebrow">Check</p>
-    <h2 id="checks-heading">Four areas, one key each</h2>
-    <p class="lead">
-      opi detects the tools a project already depends on, runs them concurrently and relays what
-      they said. It reimplements no rules and keeps no score.
-    </p>
-  </section>
+  <Tour
+    id="checks"
+    eyebrow="Check"
+    title="Your tools, not its rules."
+    lead="opi detects the tools a project already depends on, runs them concurrently and relays what they said. **It reimplements no rules and keeps no score.**"
+    steps={[
+      {
+        title: 'Detect',
+        body: 'package.json, Cargo.toml and the lockfile name the tools; nothing is configured first.',
+      },
+      {
+        title: 'Run',
+        body: 'Every check at once, each in the workspace member it belongs to.',
+      },
+      {
+        title: 'Relay',
+        body: 'A mark per check and an exit code, or one JSON document for CI and coding agents.',
+      },
+    ]}
+    link={{ label: 'Health in the docs', href: url('docs/guides/health/') }}
+  >
+    <div slot="step-1">
+      <CodeBlock code={detected} title="What opi found in the demo project" copy={false} />
+      <p class="stage-note">
+        npm answers for the lockfile, cargo for the rest, and the secret scan is bundled. A project with Biome or Vitest among its dependencies gets those too.
+      </p>
+    </div>
+    <div slot="step-2">
+      <img
+        class="scene"
+        src={healthSvg}
+        width="796.8"
+        height="404"
+        loading="lazy"
+        alt="opi --health running six checks concurrently in the demo project: Docs, Secrets, Lockfile, Lint and Tests pass, Format (rust) fails and rustfmt's diff is shown under it"
+      />
+      <p class="stage-note">Six checks, one of them red, its output relayed whole.</p>
+    </div>
+    <div slot="step-3">
+      <CodeBlock code={healthJson} lang="json" title="opi --health --json" copy={false} />
+      <p class="stage-note">
+        The same run as JSON, here cut down to name and status; each check also carries
+        <code>tool</code>, <code>scope</code> and <code>output</code>. The exit code is non-zero.
+      </p>
+    </div>
+  </Tour>
 
   <Features
     layout="grid"
@@ -297,6 +361,17 @@ opi --hooks         # checks before every push`;
     </div>
   </section>
 
+  <UseCases
+    title="What it gets used for"
+    link={{ label: 'All use cases', href: url('use-cases/') }}
+    items={useCases.map((item) => ({
+      title: item.title,
+      body: item.body,
+      tags: item.tags,
+      href: url(`use-cases/#${item.slug}`),
+    }))}
+  />
+
   {latestRelease && <ReleaseHighlights release={latestRelease} />}
 
   <Quickstart
@@ -361,8 +436,15 @@ opi --hooks         # checks before every push`;
     text-decoration: underline;
     text-underline-offset: 2px;
   }
-  .intro {
-    padding-bottom: 32px;
+  .stage-note {
+    margin: 16px 0 0;
+    font-size: 14.5px;
+  }
+  .stage-note code {
+    padding: 1px 5px;
+    border-radius: 5px;
+    background: var(--code-bg);
+    font-size: 0.9em;
   }
   .eyebrow {
     margin: 0 0 16px;
@@ -384,11 +466,6 @@ opi --hooks         # checks before every push`;
     max-width: 72ch;
     margin: 12px 0 0;
     font-size: 14px;
-  }
-  .lead {
-    max-width: 72ch;
-    margin: 0 0 20px;
-    font-size: 15.5px;
   }
   .text {
     display: grid;
