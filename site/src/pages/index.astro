@@ -171,52 +171,56 @@ opi --hooks         # checks before every push`;
     ]}
   />
 
-  <Tour
-    id="checks"
-    eyebrow="Check"
-    title="Your tools, not its rules."
-    lead="opi detects the tools a project already depends on, runs them concurrently and relays what they said. **It reimplements no rules and keeps no score.**"
-    steps={[
-      {
-        title: 'Detect',
-        body: 'package.json, Cargo.toml and the lockfile name the tools; nothing is configured first.',
-      },
-      {
-        title: 'Run',
-        body: 'Every check at once, each in the workspace member it belongs to.',
-      },
-      {
-        title: 'Relay',
-        body: 'A mark per check and an exit code, or one JSON document for CI and coding agents.',
-      },
-    ]}
-    link={{ label: 'Health in the docs', href: url('docs/guides/health/') }}
-  >
-    <div slot="step-1">
-      <CodeBlock code={detected} title="What opi found in the demo project" copy={false} />
-      <p class="stage-note">
-        npm answers for the lockfile, cargo for the rest, and the secret scan is bundled. A project with Biome or Vitest among its dependencies gets those too.
-      </p>
-    </div>
-    <div slot="step-2">
-      <img
-        class="scene"
-        src={healthSvg}
-        width="796.8"
-        height="404"
-        loading="lazy"
-        alt="opi --health running six checks concurrently in the demo project: Docs, Secrets, Lockfile, Lint and Tests pass, Format (rust) fails and rustfmt's diff is shown under it"
-      />
-      <p class="stage-note">Six checks, one of them red, its output relayed whole.</p>
-    </div>
-    <div slot="step-3">
-      <CodeBlock code={healthJson} lang="json" title="opi --health --json" copy={false} />
-      <p class="stage-note">
-        The same run as JSON, here cut down to name and status; each check also carries
-        <code>tool</code>, <code>scope</code> and <code>output</code>. The exit code is non-zero.
-      </p>
-    </div>
-  </Tour>
+  <!-- The Integrations band above is a ground of its own and ends flush; Tour has no top
+       padding of its own, so the gap is set here. -->
+  <div class="after-band">
+    <Tour
+      id="checks"
+      eyebrow="Check"
+      title="Your tools, not its rules."
+      lead="opi detects the tools a project already depends on, runs them concurrently and relays what they said. **It reimplements no rules and keeps no score.**"
+      steps={[
+        {
+          title: 'Detect',
+          body: 'package.json, Cargo.toml and the lockfile name the tools; nothing is configured first.',
+        },
+        {
+          title: 'Run',
+          body: 'Every check at once, each in the workspace member it belongs to.',
+        },
+        {
+          title: 'Relay',
+          body: 'A mark per check and an exit code, or one JSON document for CI and coding agents.',
+        },
+      ]}
+      link={{ label: 'Health in the docs', href: url('docs/guides/health/') }}
+    >
+      <div slot="step-1">
+        <CodeBlock code={detected} title="What opi found in the demo project" copy={false} />
+        <p class="stage-note">
+          npm answers for the lockfile, cargo for the rest, and the secret scan is bundled. A project with Biome or Vitest among its dependencies gets those too.
+        </p>
+      </div>
+      <div slot="step-2">
+        <img
+          class="scene"
+          src={healthSvg}
+          width="796.8"
+          height="404"
+          loading="lazy"
+          alt="opi --health running six checks concurrently in the demo project: Docs, Secrets, Lockfile, Lint and Tests pass, Format (rust) fails and rustfmt's diff is shown under it"
+        />
+        <p class="stage-note">Six checks, one of them red, its output relayed whole.</p>
+      </div>
+      <div slot="step-3">
+        <CodeBlock code={healthJson} lang="json" title="opi --health --json" copy={false} />
+        <p class="stage-note">
+          The same run as JSON, here cut down to name and status; each check also carries
+          <code>tool</code>, <code>scope</code> and <code>output</code>. The exit code is non-zero.
+        </p>
+      </div>
+    </Tour>
+  </div>
 
   <Features
     layout="grid"
@@ -435,6 +439,9 @@ opi --hooks         # checks before every push`;
   :global(.release-highlights li a) {
     text-decoration: underline;
     text-underline-offset: 2px;
+  }
+  .after-band {
+    padding-top: var(--section-y);
   }
   .stage-note {
     margin: 16px 0 0;
