@@ -245,8 +245,9 @@ opi --hooks         # checks before every push`;
     ]}
   />
 
-  <section class="block" aria-label="Recorded output">
+  <section class="block recorded" aria-label="Recorded output">
     <Tabs
+      bare
       label="opi areas"
       tabs={[
         { id: 'health', label: 'Health' },
@@ -484,13 +485,9 @@ opi --hooks         # checks before every push`;
     height: auto;
     margin: 16px auto 0;
   }
-  /* On a phone the narrow scene takes part of the tab panel's padding, for a larger font. */
-  @media (max-width: 640px) {
-    .scene {
-      width: calc(100% + 20px);
-      max-width: none;
-      margin-inline: -10px;
-    }
+  /* The bare tab panel leaves the gap under the tab row; the scene lines up with the tabs. */
+  .recorded .scene {
+    margin: 0;
   }
   .links {
     display: flex;
