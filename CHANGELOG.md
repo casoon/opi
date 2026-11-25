@@ -7,6 +7,8 @@ minor release may change existing behaviour.
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-11-25
+
 ### Added
 
 - **Workflows:** every run is remembered in `.git/opi/checks.jsonl`, and a push of a clean tree that already passed the push workflow skips the checks; the start screen names the last result for the commit checked out (#26). Details: [What a workflow remembers](https://casoon.github.io/opi/docs/guides/workflows/#what-a-workflow-remembers).
@@ -553,7 +555,8 @@ minor release may change existing behaviour.
   establishing the repository skeleton. The binary prints its version and a
   development notice; no functionality is implemented.
 
-[Unreleased]: https://github.com/casoon/opi/compare/v0.14.0...HEAD
+[Unreleased]: https://github.com/casoon/opi/compare/v0.15.0...HEAD
+[0.15.0]: https://github.com/casoon/opi/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/casoon/opi/compare/v0.13.4...v0.14.0
 [0.13.4]: https://github.com/casoon/opi/compare/v0.13.3...v0.13.4
 [0.13.3]: https://github.com/casoon/opi/compare/v0.13.2...v0.13.3
