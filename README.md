@@ -392,6 +392,10 @@ the shared presentation layer for these CLI tools.
 owns the `opi-*` crate namespace on crates.io. Installing both puts two `opi`
 binaries in `~/.cargo/bin`.
 
+## Author
+
+Built and maintained by [Jörn Seidel](https://www.casoon.de/joern-seidel/) ([CASOON](https://www.casoon.de/)). Background and design decisions are described in an article on Insights (in German): [Node-Projekte bedienbar machen – package.json als Bedienoberfläche](https://insights.casoon.de/artikel/node-projekte-bedienbar-machen-package-json/).
+
 ## License
 
 MIT ([LICENSE](LICENSE)).
