@@ -30,7 +30,8 @@ list, health and clean cover npm and Rust together rather than choosing one.
 
 Past 15 entries or 5 groups the list shows its groups as a row of tabs and
 lists only the active one, with the first group preselected so `opi ↵` runs
-what it always ran. A line under the heading counts what was found.
+what it always ran. A line under the heading counts what was found and names
+the last workflow run on the commit checked out.
 
 Every area now answers for both ecosystems where both are present, in a section
 each: `cargo audit` and `cargo outdated` beside the package manager's own.
@@ -49,11 +50,11 @@ Five areas sit beside the list:
 | Security | `S` | `--security` |
 | Updates | `U` | `--updates` |
 | Clean | `C` | `--clean` |
-| Workflows | — | `--check commit`, `--check push`, `--check release`, `--check deploy`, `--checks`, `--hooks` |
+| Workflows | — | `--check commit`, `--check push`, `--check release`, `--check deploy` (each with `--clean` but commit), `--checks`, `--hooks` |
 
 A project can say more about a script through the `opi` key in `package.json`:
 a description that wins over `scripts-info`, an explicit group, a favourite, a
-confirmation before running. All optional — a project with none of it still
+confirmation before running, a workflow that must have passed first. All optional — a project with none of it still
 gets a usable list, which is the point of the whole arrangement.
 
 ## What it does not do
@@ -62,7 +63,8 @@ gets a usable list, which is the point of the whole arrangement.
   `--updates` calls the package manager with a list of names; `opi` itself
   writes no manifest, no lockfile and no catalog, and no check runs in a
   fixing mode. Exceptions are hook installation and optional workflow selections:
-  `opi --checks` saves `.opi/checks.json` and its Git ignore exceptions. See [Constraints](../constraints/).
+  `opi --checks` saves `.opi/checks.json` and its Git ignore exceptions. Workflow
+  results go to `.git/opi/checks.jsonl`, outside the project's files. See [Constraints](../constraints/).
 - **.NET.** No standalone marker appeared in the 231 directories measured.
 - **Windows.** See [Decisions](../decisions/).
 

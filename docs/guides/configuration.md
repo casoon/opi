@@ -29,6 +29,7 @@ Workflow check selections are optional and live in `.opi/checks.json`.
 | `group` | Replaces the group the script's name implies |
 | `favorite` | Lifts it out of its group, to the top |
 | `confirm` | Asks before running it; `opi --yes <script>` answers in advance |
+| `requires` | A workflow, such as `"push"`, that must have passed on exactly this tree first; see [Workflows](../workflows/#scripts-that-require-a-workflow) |
 
 None of it is required: a project with neither an `opi` block nor `scripts-info` still gets a
 usable list, which is the point. The block is held as unparsed JSON and read field by field,

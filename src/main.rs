@@ -18,6 +18,7 @@ mod clean;
 mod cli;
 mod cmd;
 mod completions;
+mod history;
 mod manifest;
 mod osv;
 mod outdated;
@@ -195,6 +196,9 @@ fn main() -> ExitCode {
             &root,
             json,
         ),
+        Invocation::CleanWorkflow(name) => {
+            cmd::workflow::run_clean(&name, &members, rust_root.as_deref(), &root, json)
+        }
         Invocation::Hooks => cmd::hooks::hooks(&root),
         Invocation::Checks(name) => cmd::checks::configure_checks(
             name.as_deref(),
@@ -211,7 +215,7 @@ fn main() -> ExitCode {
             name,
             args,
             confirmed,
-        } => start(&project, &tasks, &name, &args, confirmed),
+        } => start(&project, &tasks, &root, &name, &args, confirmed),
         // An unknown flag is only reported once a project is present, so the
         // missing-package.json message wins where both are true — that is the
         // problem the user has to fix first.
@@ -334,7 +338,7 @@ fn list(
     };
 
     match outcome {
-        Outcome::Selected(id) => start(project, tasks, &id, &[], false),
+        Outcome::Selected(id) => start(project, tasks, directory, &id, &[], false),
         // Nothing was chosen; that is not a failure.
         Outcome::Cancelled => ExitCode::SUCCESS,
         Outcome::Hotkey('H') => {
@@ -397,7 +401,12 @@ fn layout(entries: usize, groups: usize) -> Layout {
 /// saying "1 package" would answer a question nobody in it has. The same goes
 /// for task runner files beside the manifest: named when present, so the list
 /// does not pass for everything the project can do.
-fn summary(sections: &[(&task::Group, &[Task])], entries: usize, others: &[String]) -> String {
+fn summary(
+    sections: &[(&task::Group, &[Task])],
+    entries: usize,
+    others: &[String],
+    checked: Option<String>,
+) -> String {
     let mut parts = vec![
         plural(entries, "entry", "entries"),
         plural(sections.len(), "group", "groups"),
@@ -413,8 +422,15 @@ fn summary(sections: &[(&task::Group, &[Task])], entries: usize, others: &[Strin
     if !others.is_empty() {
         parts.push(format!("also {}", others.join(", ")));
     }
+    parts.extend(checked);
 
     parts.join(" · ")
+}
+
+/// The last workflow run on the commit checked out, if any was recorded.
+fn last_check(directory: &Path) -> Option<String> {
+    let state = history::state(directory)?;
+    history::latest(directory, &state.commit).map(|entry| entry.status(history::now()))
 }
 
 pub(crate) fn plural(count: usize, one: &str, many: &str) -> String {
@@ -431,7 +447,12 @@ fn build_menu(project: &Project, tasks: &[Task], directory: &Path) -> Menu {
     let mut menu = Menu::new()
         .with_heading(project.display_name(directory))
         .with_note(toolchains(tasks, project))
-        .with_summary(summary(&sections, entries, &task::other_runners(directory)))
+        .with_summary(summary(
+            &sections,
+            entries,
+            &task::other_runners(directory),
+            last_check(directory),
+        ))
         .with_layout(layout(entries, sections.len()));
 
     let mut packaged = false;
@@ -477,6 +498,7 @@ fn build_menu(project: &Project, tasks: &[Task], directory: &Path) -> Menu {
 fn start(
     project: &Project,
     tasks: &[Task],
+    root: &Path,
     name: &str,
     args: &[String],
     confirmed: bool,
@@ -498,6 +520,15 @@ fn start(
         write_block(&block, console);
         return ExitCode::FAILURE;
     };
+
+    // Before the question: there is no point confirming a deploy that is not
+    // allowed to run, and `--yes` answers the question, not the requirement.
+    if let Some(required) = &task.requires {
+        if let Err(block) = cmd::workflow::required(root, &task.name, required) {
+            write_block(&block, Console::stderr(ColorMode::Auto));
+            return ExitCode::FAILURE;
+        }
+    }
 
     if task.confirm && !confirmed && !confirm(task) {
         return ExitCode::FAILURE;
@@ -601,6 +632,7 @@ mod tests {
             group,
             exec: task::Exec::Script,
             confirm: false,
+            requires: None,
             workspace: None,
             hidden: false,
         }
@@ -645,7 +677,7 @@ mod tests {
             (TaskGroup::Quality, 4),
         ]);
         let sections = by_group(&tasks);
-        assert_eq!(summary(&sections, 15, &[]), "15 entries · 3 groups");
+        assert_eq!(summary(&sections, 15, &[], None), "15 entries · 3 groups");
     }
 
     #[test]
@@ -654,8 +686,12 @@ mod tests {
         // project has.
         let tasks = sections(&[(TaskGroup::Development, 1)]);
         let sections = by_group(&tasks);
-        assert!(!summary(&sections, 1, &[]).contains("package"));
-        assert_eq!(summary(&sections, 1, &[]), "1 entry · 1 group");
+        assert!(!summary(&sections, 1, &[], None).contains("package"));
+        assert_eq!(summary(&sections, 1, &[], None), "1 entry · 1 group");
+        assert_eq!(
+            summary(&sections, 1, &[], Some("✓ push 4 min ago".to_owned())),
+            "1 entry · 1 group · ✓ push 4 min ago"
+        );
     }
 
     #[test]
@@ -667,7 +703,7 @@ mod tests {
         ]);
         let sections = by_group(&tasks);
         assert_eq!(
-            summary(&sections, 4, &[]),
+            summary(&sections, 4, &[], None),
             "4 entries · 3 groups · 2 packages"
         );
     }
@@ -677,7 +713,7 @@ mod tests {
         let tasks = sections(&[(TaskGroup::Development, 2)]);
         let sections = by_group(&tasks);
         assert_eq!(
-            summary(&sections, 2, &["Makefile".to_owned()]),
+            summary(&sections, 2, &["Makefile".to_owned()], None),
             "2 entries · 1 group · also Makefile"
         );
     }

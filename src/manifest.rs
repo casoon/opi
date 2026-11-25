@@ -136,6 +136,12 @@ impl Manifest {
                 .get("confirm")
                 .and_then(serde_json::Value::as_bool)
                 .unwrap_or(false),
+            requires: entry
+                .get("requires")
+                .and_then(serde_json::Value::as_str)
+                .map(str::trim)
+                .filter(|text| !text.is_empty())
+                .map(str::to_owned),
         }
     }
 
@@ -191,6 +197,8 @@ pub struct ScriptMeta {
     pub favorite: bool,
     /// Asked about before it runs.
     pub confirm: bool,
+    /// A workflow that must have passed on exactly this tree before it runs.
+    pub requires: Option<String>,
 }
 
 /// Why `package.json` could not be turned into a [`Manifest`].
@@ -359,6 +367,7 @@ mod tests {
         let meta = manifest.script_meta("deploy");
         assert_eq!(meta.group.as_deref(), Some("Deployment"));
         assert!(meta.confirm);
+        assert_eq!(meta.requires, None);
         assert!(!meta.favorite, "absent means false, not unknown");
     }
 

@@ -28,7 +28,8 @@ src/
 ├── supply.rs    signatures, release age, licenses — asked of the package manager
 ├── outdated.rs  package manager and cargo outdated → updates by semver jump
 ├── clean.rs     removable artefacts, measured before they are offered
-└── workflow.rs  named sequences of checks, plus repository gates
+├── workflow.rs  named sequences of checks, plus repository gates
+└── history.rs   workflow runs per clone in .git/opi/checks.jsonl
 ```
 
 ## Flow

@@ -761,3 +761,138 @@ fn a_workflow_json_gives_the_verdict_and_prints_nothing_else() {
             .any(|check| check["name"] == "Lockfile" && check["status"] == "passed")
     );
 }
+
+// --- Workflow history and the clean checkout ---
+
+/// The fixture as a git repository with one commit, and the real `git` among
+/// the stand-ins: these tests are about what git reports, so git is not stubbed.
+fn committed(fixture: &Fixture) {
+    let found = Command::new("sh")
+        .args(["-c", "command -v git"])
+        .output()
+        .expect("sh runs");
+    let git = String::from_utf8_lossy(&found.stdout).trim().to_owned();
+    assert!(!git.is_empty(), "git must be installed");
+    std::os::unix::fs::symlink(&git, fixture.root.path().join("bin").join("git"))
+        .expect("link git");
+    let project = fixture.project();
+    for args in [
+        &["init", "-q"][..],
+        &["config", "user.email", "test@example.com"],
+        &["config", "user.name", "Test"],
+        &["config", "commit.gpgsign", "false"],
+        &["add", "."],
+        &["commit", "-qm", "init"],
+    ] {
+        let status = Command::new(&git)
+            .args(args)
+            .current_dir(&project)
+            .status()
+            .expect("git runs");
+        assert!(status.success(), "git {args:?}");
+    }
+}
+
+#[test]
+fn a_tree_that_passed_the_push_checks_is_not_checked_again() {
+    let fixture = Fixture::new();
+    fixture
+        .file(
+            "package.json",
+            r#"{"name":"app","scripts":{"build":"build"}}"#,
+        )
+        .file(".gitignore", "node_modules\n")
+        .shim("npm", "exit 0");
+    committed(&fixture);
+
+    let first = fixture.opi(".", &["--check", "push"]);
+    assert!(first.status.success(), "{}", stdout(&first));
+    assert!(fixture.calls("npm").is_some(), "the first run builds");
+
+    fs::remove_file(fixture.root.path().join("log").join("npm")).expect("reset log");
+    let second = fixture.opi(".", &["--check", "push"]);
+    assert!(second.status.success(), "{}", stdout(&second));
+    assert!(stdout(&second).contains("passed on this tree"));
+    assert!(
+        fixture.calls("npm").is_none(),
+        "the second run trusts the first"
+    );
+
+    // A program asking for JSON gets a fresh run.
+    let json = fixture.opi(".", &["--check", "push", "--json"]);
+    assert!(json.status.success());
+    assert!(fixture.calls("npm").is_some());
+}
+
+#[test]
+fn a_clean_checkout_misses_what_is_not_committed() {
+    let fixture = Fixture::new();
+    fixture
+        .file(
+            "package.json",
+            r#"{"name":"app","scripts":{"build":"build"}}"#,
+        )
+        .file(".gitignore", "node_modules/\nlocal.txt\n")
+        .shim("npm", "[ -f local.txt ]");
+    committed(&fixture);
+    fixture.file("local.txt", "only here");
+
+    let here = fixture.opi(".", &["--check", "push"]);
+    assert!(here.status.success(), "{}", stdout(&here));
+
+    let clean = fixture.opi(".", &["--check", "push", "--clean"]);
+    assert!(!clean.status.success(), "{}", stdout(&clean));
+    assert!(stdout(&clean).contains("in a clean checkout of HEAD"));
+    assert!(fixture.project().join("local.txt").is_file());
+
+    // The checkout is gone again.
+    let list = Command::new(fixture.root.path().join("bin").join("git"))
+        .args(["worktree", "list"])
+        .current_dir(fixture.project())
+        .output()
+        .expect("git runs");
+    assert_eq!(String::from_utf8_lossy(&list.stdout).lines().count(), 1);
+}
+
+#[test]
+fn the_commit_workflow_has_no_clean_checkout() {
+    let fixture = Fixture::new();
+    fixture.file("package.json", r#"{"name":"app"}"#);
+    committed(&fixture);
+    let output = fixture.opi(".", &["--check", "commit", "--clean"]);
+    assert!(!output.status.success());
+    assert!(stderr(&output).contains("cannot run in a clean checkout"));
+}
+
+#[test]
+fn a_script_that_requires_push_runs_only_on_a_tree_that_passed_it() {
+    let fixture = Fixture::new();
+    fixture
+        .file(
+            "package.json",
+            r#"{"name":"app","scripts":{"build":"build","deploy":"ship"},
+                "opi":{"scripts":{"deploy":{"requires":"push"}}}}"#,
+        )
+        .file(".gitignore", "node_modules\n")
+        .shim("npm", "exit 0");
+    committed(&fixture);
+
+    let refused = fixture.opi(".", &["--yes", "deploy"]);
+    assert!(!refused.status.success());
+    assert!(stderr(&refused).contains("deploy requires opi --check push"));
+    assert!(fixture.calls("npm").is_none(), "nothing ran");
+
+    assert!(fixture.opi(".", &["--check", "push"]).status.success());
+    fs::remove_file(fixture.root.path().join("log").join("npm")).expect("reset log");
+
+    let allowed = fixture.opi(".", &["deploy"]);
+    assert!(allowed.status.success(), "{}", stderr(&allowed));
+    let calls = fixture.calls("npm").expect("npm ran");
+    assert!(calls.contains(&"deploy".to_owned()), "{calls:?}");
+
+    // A change after the check is not what was checked.
+    fixture.file("new.txt", "x");
+    let dirty = fixture.opi(".", &["deploy"]);
+    assert!(!dirty.status.success());
+    assert!(stderr(&dirty).contains("uncommitted changes"));
+}

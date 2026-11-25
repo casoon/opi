@@ -159,6 +159,8 @@ pub struct Task {
     pub exec: Exec,
     /// Whether to ask before running it.
     pub confirm: bool,
+    /// The workflow that must have passed on this tree before it runs.
+    pub requires: Option<String>,
     /// The workspace member this belongs to, if any. Running it needs the
     /// package manager to be pointed at that member.
     pub workspace: Option<String>,
@@ -198,6 +200,7 @@ impl Task {
                     },
                     exec: Exec::Script,
                     confirm: meta.confirm,
+                    requires: meta.requires,
                     workspace: None,
                     hidden: is_implicit_lifecycle(name, manifest),
                 }
@@ -247,6 +250,7 @@ impl Task {
                         group: Group::Workspace(member.name.clone()),
                         exec: Exec::Script,
                         confirm: meta.confirm,
+                        requires: meta.requires,
                         workspace: Some(member.name.clone()),
                         hidden: is_implicit_lifecycle(name, &member.manifest),
                     }
@@ -433,6 +437,7 @@ pub fn from_cargo(project: &crate::cargo::Project) -> Vec<Task> {
                 args: command.args.iter().map(|arg| (*arg).to_owned()).collect(),
             },
             confirm: false,
+            requires: None,
             workspace: None,
             hidden: false,
         })

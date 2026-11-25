@@ -42,7 +42,7 @@ pub(crate) fn exit(ok: bool) -> ExitCode {
 }
 
 /// `passed`, `warning`, `failed`, or `unavailable` where the tool could not run.
-fn status(report: &Report) -> &'static str {
+pub(crate) fn status(report: &Report) -> &'static str {
     if report.warned() {
         "warning"
     } else if report.passed() {

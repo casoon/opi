@@ -114,6 +114,11 @@ the `opi` key that escape the project (`..`, absolute paths). `node_modules/` is
 never preselected.
 
 `opi --hooks` appends a line to the pre-push hook, preserving existing contents.
+Every workflow appends one line to `.git/opi/checks.jsonl`, inside git's own
+directory and never versioned, keeping the last 500 runs. `--check <workflow> --clean`
+adds a temporary `git worktree` of HEAD, links `node_modules` into it and removes
+the links before the worktree, so removing it never reaches the working tree's
+dependencies.
 `opi --checks` writes `.opi/checks.json` and updates `.opi/.gitignore` so the
 selection can be shared while generated SBOMs stay ignored. `--updates` can
 apply what it found, but only by calling the package manager with a list of

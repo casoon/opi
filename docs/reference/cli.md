@@ -25,6 +25,7 @@ Options:
       --security          Scan for secrets and vulnerable dependencies
       --updates           Show dependencies with newer versions
       --check <workflow>  Run a workflow: commit, push, release or deploy
+        --clean           … in a temporary checkout of HEAD, not the working tree
       --json              With --health, --security, --updates or --check: print JSON
       --sbom [dir]        Write CycloneDX SBOMs, one file per ecosystem
       --hooks             Install the push workflow as the pre-push hook
@@ -68,7 +69,9 @@ larger than 500 KiB. Other project tools retain their usual scope. It does not m
 - A literal `--` directly after the script name is dropped; a second one is passed on.
 - `--yes` (`-y`) is the only flag that may precede a script. After the script name it
   belongs to the script.
-- `--check` needs a workflow name: `commit`, `push`, `release` or `deploy`.
+- `--check` needs a workflow name: `commit`, `push`, `release` or `deploy`. `--clean`
+  directly after the name runs it in a temporary checkout of HEAD
+  ([Workflows](../../guides/workflows/#a-clean-checkout)); `commit` has no clean variant.
 - An unknown flag before the script is an error, and so is an unknown script name — with
   a suggestion where one is close, matched by optimal string alignment, so a transposition
   counts as one edit rather than two.

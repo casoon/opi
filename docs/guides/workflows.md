@@ -80,6 +80,82 @@ with Git, Husky, Lefthook or pre-commit.
 
 A workflow exits non-zero when it is not ready.
 
+## What a workflow remembers
+
+Each run is recorded in `.git/opi/checks.jsonl`: the commit, the tree when nothing was
+uncommitted, the result of every check, how long it took and which opi ran it. The file lives in
+git's own directory, so it is never committed and belongs to the one clone (its worktrees share
+it). Deleting it loses nothing but the shortcut below.
+
+**A tree that already passed `push` is not checked again.** When the working tree is clean and
+exactly that tree passed the push workflow with the same opi version, the gates still run, and
+the checks are reported as passed instead of being repeated:
+
+```
+opi  before push
+
+✓ Working tree clean
+✓ Not behind upstream
+✓ Checks  passed on this tree 4 min ago (fd999c0)
+
+Ready to push.
+```
+
+So the second push of the same commits, to another remote or after a rejected push, costs a
+second instead of minutes. A new commit, any uncommitted change or a newer opi runs everything
+again. With `--json`, the workflow always runs fresh. Dependencies are not part of the tree:
+after installing new ones, delete the file to have the next push check again.
+
+The start screen names the last run on the commit checked out, after the entry count:
+`✓ push 12 min ago`, or `✗ push: Tests (rust) 3 min ago` with the first check that failed.
+
+## A clean checkout
+
+```sh
+opi --check push --clean
+```
+
+runs the workflow in a temporary `git worktree` of HEAD instead of the working tree. It checks
+what is committed, so a source file you forgot to add, an ignored `.env` the build relies on or
+a local edit no longer hide a failure that the next fresh clone would hit. The checkout is
+removed again afterwards.
+
+Nothing is installed for it. `node_modules` of the project and its workspace members are linked
+in from the working tree, and Rust builds keep the project's `target` directory, so the run costs
+a checkout rather than an install. "Working tree clean" is not asked in the fresh checkout, and
+"not behind upstream" is asked of your branch before the checkout is made, since the checkout's
+HEAD is detached. A tree that already passed is checked anyway: avoiding the working tree is the
+point.
+
+It is slower than a normal run, so it is a switch, never the default in the hook. `commit` has
+no clean variant, since it checks what is staged.
+
+## Scripts that require a workflow
+
+A script can require that a workflow has passed before it runs:
+
+```json
+{
+  "opi": { "scripts": { "deploy": { "requires": "push" } } }
+}
+```
+
+`opi deploy`, or Enter on it in the list, then runs only when exactly the tree checked out has
+passed `opi --check push`. Otherwise it stops and names the command to run:
+
+```
+[FAIL] deploy requires opi --check push
+
+  fd999c0 has not passed it yet.
+
+  $ opi --check push
+```
+
+opi does not start the checks on its own: a deploy that quietly turns into minutes of checks is
+opi acting where it should report. Uncommitted changes stop the script too, since what would be
+deployed is then not a checked commit. `--yes` answers a `confirm` question, not the
+requirement.
+
 ## The pre-push hook
 
 ```sh

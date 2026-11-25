@@ -9,6 +9,9 @@ minor release may change existing behaviour.
 
 ### Added
 
+- **Workflows:** every run is remembered in `.git/opi/checks.jsonl`, and a push of a clean tree that already passed the push workflow skips the checks; the start screen names the last result for the commit checked out (#26). Details: [What a workflow remembers](https://casoon.github.io/opi/docs/guides/workflows/#what-a-workflow-remembers).
+- **Workflows:** `opi --check <workflow> --clean` runs a workflow in a temporary checkout of HEAD, so an uncommitted file cannot hide a failure (#28). Details: [A clean checkout](https://casoon.github.io/opi/docs/guides/workflows/#a-clean-checkout).
+- **Scripts:** `"requires": "push"` in a script's `opi` entry lets it run only on a tree that passed that workflow, and names the command otherwise (#27). Details: [Scripts that require a workflow](https://casoon.github.io/opi/docs/guides/workflows/#scripts-that-require-a-workflow).
 - **Site:** a [Use cases](https://casoon.github.io/opi/use-cases/) page with five jobs opi gets used for, coding agents among them, and what it does not do; the start page shows how a check runs in three steps and links each use case.
 
 ### Changed

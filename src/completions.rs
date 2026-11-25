@@ -24,6 +24,10 @@ const BASH: &str = r#"_opi() {
             COMPREPLY=($(compgen -d -- "$cur"))
             return ;;
     esac
+    if [[ "${COMP_WORDS[COMP_CWORD-2]}" == "--check" ]]; then
+        COMPREPLY=($(compgen -W "--clean --json" -- "$cur"))
+        return
+    fi
     [[ $COMP_CWORD -eq 1 || "$prev" == "--yes" || "$prev" == "-y" ]] || return
     if [[ "$cur" == -* ]]; then
         COMPREPLY=($(compgen -W "-y --yes --health --clean --security --updates --check --sbom --hooks --checks --completions -h --help -V --version" -- "$cur"))
@@ -54,6 +58,10 @@ _opi() {
         --completions) compadd bash zsh fish; return ;;
         --sbom) _directories; return ;;
     esac
+    if [[ "$words[CURRENT-2]" == --check ]]; then
+        compadd -- --clean --json
+        return
+    fi
     if (( CURRENT == 2 )) || [[ "$words[CURRENT-1]" == (--yes|-y) ]]; then
         if [[ "$words[CURRENT]" == -* ]]; then
             compadd -- -y --yes --health --clean --security --updates --check --sbom --hooks --checks --completions -h --help -V --version
@@ -76,6 +84,11 @@ function __opi_after
     test "$words[-1]" = $argv[1]
 end
 
+function __opi_after_workflow
+    set -l words (commandline -opc)
+    test (count $words) -ge 3; and test "$words[-2]" = --check
+end
+
 complete -c opi -f
 complete -c opi -n __opi_first_word -a '(opi --list-names 2>/dev/null)'
 complete -c opi -n __opi_first_word -s y -l yes -d 'Answer a script\'s confirmation in advance'
@@ -85,6 +98,8 @@ complete -c opi -n __opi_first_word -l security -d 'Scan for secrets and vulnera
 complete -c opi -n __opi_first_word -l updates -d 'Show dependencies with newer versions'
 complete -c opi -n __opi_first_word -l check -x -d 'Run a workflow'
 complete -c opi -n '__opi_after --check' -a 'commit push release deploy'
+complete -c opi -n '__opi_after_workflow' -l clean -d 'In a temporary checkout of HEAD'
+complete -c opi -n '__opi_after_workflow' -l json -d 'Print JSON'
 complete -c opi -n __opi_first_word -l sbom -r -d 'Write CycloneDX SBOMs'
 complete -c opi -n '__opi_after --sbom' -F
 complete -c opi -n __opi_first_word -l hooks -d 'Install the push workflow as the pre-push hook'

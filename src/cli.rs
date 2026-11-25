@@ -29,6 +29,8 @@ pub enum Invocation {
     Security,
     /// Run a named workflow.
     Workflow(String),
+    /// Run a named workflow in a temporary checkout of HEAD.
+    CleanWorkflow(String),
     /// Show dependencies with newer versions.
     Updates,
     /// Install the push workflow as the pre-push hook.
@@ -96,7 +98,11 @@ where
         "--check" => args
             .next()
             .map_or(Invocation::UnknownFlag("--check".to_owned()), |name| {
-                Invocation::Workflow(name)
+                if args.next().is_some_and(|arg| arg == "--clean") {
+                    Invocation::CleanWorkflow(name)
+                } else {
+                    Invocation::Workflow(name)
+                }
             }),
         _ if first.starts_with('-') => Invocation::UnknownFlag(first),
         _ => {
@@ -129,6 +135,7 @@ pub fn parse_with_json(args: &[String]) -> (Invocation, bool) {
                 | Invocation::Security
                 | Invocation::Updates
                 | Invocation::Workflow(_)
+                | Invocation::CleanWorkflow(_)
         ) {
             return (invocation, true);
         }
@@ -160,6 +167,7 @@ Options:
       --security          Scan for secrets and vulnerable dependencies
       --updates           Show dependencies with newer versions
       --check <workflow>  Run a workflow: commit, push, release or deploy
+        --clean           … in a temporary checkout of HEAD, not the working tree
       --json              With --health, --security, --updates or --check: print JSON
       --sbom [dir]        Write CycloneDX SBOMs, one file per ecosystem
       --hooks             Install the push workflow as the pre-push hook
@@ -203,6 +211,10 @@ mod tests {
             Invocation::Checks(Some("push".to_owned()))
         );
         assert_eq!(
+            parse(["--check", "push", "--clean"]),
+            Invocation::CleanWorkflow("push".to_owned())
+        );
+        assert_eq!(
             parse(["--check", "deploy"]),
             Invocation::Workflow("deploy".to_owned())
         );
@@ -218,6 +230,10 @@ mod tests {
         assert_eq!(
             parse_with_json(&args(&["--check", "push", "--json"])),
             (Invocation::Workflow("push".to_owned()), true)
+        );
+        assert_eq!(
+            parse_with_json(&args(&["--check", "push", "--clean", "--json"])),
+            (Invocation::CleanWorkflow("push".to_owned()), true)
         );
         assert_eq!(
             parse_with_json(&args(&["--json", "--updates"])),
