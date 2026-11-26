@@ -56,6 +56,40 @@ pub fn discover(dir: &Path) -> Option<(Project, PathBuf)> {
     Some((read(&root_text, &here), root))
 }
 
+/// The version in the `Cargo.toml` at `root`: the package's own, or the one a
+/// workspace hands down in `[workspace.package]`. `version.workspace = true`
+/// is not a version and is passed over.
+pub fn version(root: &Path) -> Option<String> {
+    let text = std::fs::read_to_string(root.join("Cargo.toml")).ok()?;
+    let mut table = String::new();
+    let mut package = None;
+    let mut workspace = None;
+    for line in text.lines() {
+        let line = line.trim();
+        if line.starts_with('[') {
+            table = line.to_owned();
+            continue;
+        }
+        let Some(value) = line.strip_prefix("version") else {
+            continue;
+        };
+        let Some(value) = value.trim_start().strip_prefix('=') else {
+            continue;
+        };
+        let value = value.trim();
+        let Some(quote) = value.chars().next().filter(|c| *c == '"' || *c == '\'') else {
+            continue;
+        };
+        let value = value[1..].split(quote).next().map(str::to_owned);
+        match table.as_str() {
+            "[package]" if package.is_none() => package = value,
+            "[workspace.package]" if workspace.is_none() => workspace = value,
+            _ => {}
+        }
+    }
+    package.or(workspace).filter(|version| !version.is_empty())
+}
+
 /// Whether this manifest is a workspace root.
 ///
 /// A member declares `[package]` and nothing more; only the root carries a
@@ -543,6 +577,34 @@ mod tests {
 
     fn project(toml: &str, root: &Path) -> Project {
         read(toml, root)
+    }
+
+    #[test]
+    fn the_version_comes_from_the_package_or_the_workspace() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let write =
+            |text: &str| std::fs::write(dir.path().join("Cargo.toml"), text).expect("write");
+
+        write(
+            "[package]\nname = \"a\"\nversion = \"1.2.3\"\n\n[dependencies]\nx = { version = \"9\" }\n",
+        );
+        assert_eq!(version(dir.path()).as_deref(), Some("1.2.3"));
+
+        write("[workspace]\nmembers = [\"a\"]\n\n[workspace.package]\nversion = \"0.4.0\"\n");
+        assert_eq!(version(dir.path()).as_deref(), Some("0.4.0"));
+
+        write(
+            "[package]\nname = \"a\"\nversion.workspace = true\n\n[workspace.package]\nversion = \"2.0.0\"\n",
+        );
+        assert_eq!(version(dir.path()).as_deref(), Some("2.0.0"));
+
+        write(
+            "[package]\nname = \"a\"\nversion = { workspace = true }\n\n[workspace.package]\nversion = \"3.0.0\"\n",
+        );
+        assert_eq!(version(dir.path()).as_deref(), Some("3.0.0"));
+
+        write("[workspace]\nmembers = [\"a\"]\n");
+        assert_eq!(version(dir.path()), None);
     }
 
     #[test]

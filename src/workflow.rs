@@ -23,7 +23,7 @@ use runemark::Verdict;
 pub enum Gate {
     /// Nothing uncommitted.
     WorkingTreeClean,
-    /// The version in `package.json` has no tag yet.
+    /// The version in `package.json` or `Cargo.toml` has no tag yet.
     VersionUnreleased,
     /// The upstream branch has nothing this one lacks.
     NotBehindUpstream,
@@ -51,7 +51,7 @@ impl Gate {
             },
             Self::VersionUnreleased => {
                 let Some(version) = version else {
-                    return GateResult::skip("package.json has no version");
+                    return GateResult::skip("no version in package.json or Cargo.toml");
                 };
                 match git(root, &["tag", "--list", &format!("v{version}")]) {
                     Some(output) if output.trim().is_empty() => GateResult::pass(),
@@ -333,7 +333,7 @@ mod tests {
         assert_eq!(result.verdict, Verdict::Skipped);
         assert_eq!(
             result.detail.as_deref(),
-            Some("package.json has no version")
+            Some("no version in package.json or Cargo.toml")
         );
     }
 

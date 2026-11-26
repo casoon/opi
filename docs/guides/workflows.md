@@ -39,7 +39,9 @@ asking the remote, so the hook never waits on the network. A branch without an u
 it.
 
 The release gate on the version looks for a `v<version>` tag matching the `version` in
-`package.json`. Without a version there it is skipped rather than failed.
+`package.json`, or in `Cargo.toml` when `package.json` has none: the package's own version, or
+the one a workspace hands down in `[workspace.package]`. Without a version in either it is skipped
+rather than failed.
 
 Run on `opi`'s own repository:
 

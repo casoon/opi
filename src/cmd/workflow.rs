@@ -58,6 +58,12 @@ pub(crate) fn run_workflow(
         println!();
     }
 
+    // package.json first, as before; a Rust project without one has its
+    // version in Cargo.toml, and a release of it is tagged just the same.
+    let version = manifest
+        .version
+        .clone()
+        .or_else(|| rust_root.and_then(crate::cargo::version));
     let started = Instant::now();
     let state = history::state(root);
     let mut blocked = false;
@@ -76,7 +82,7 @@ pub(crate) fn run_workflow(
             ))
     });
     for gate in asked {
-        let result = gate.check(root, manifest.version.as_deref());
+        let result = gate.check(root, version.as_deref());
         let (tone, mark) = match result.verdict {
             runemark::Verdict::Passed => (Tone::Success, "✓"),
             runemark::Verdict::Skipped => (Tone::Muted, "–"),
