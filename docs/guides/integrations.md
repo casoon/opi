@@ -174,7 +174,7 @@ jobs:
       - name: Install opi
         run: curl -fsSL https://raw.githubusercontent.com/casoon/opi/main/install.sh | sh
         env:
-          OPI_VERSION: 0.15.0
+          OPI_VERSION: 0.15.1
       - run: ~/.local/bin/opi --health
 ```
 

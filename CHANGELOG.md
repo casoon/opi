@@ -7,6 +7,12 @@ minor release may change existing behaviour.
 
 ## [Unreleased]
 
+## [0.15.1] - 2026-11-26
+
+### Fixed
+
+- **Workflows:** the release gate "Version not yet tagged" reads the version from `Cargo.toml` when `package.json` has none, so a Rust project is no longer released twice under one tag by accident. Details: [Workflows](https://casoon.github.io/opi/docs/guides/workflows/).
+
 ## [0.15.0] - 2026-11-25
 
 ### Added
@@ -555,7 +561,8 @@ minor release may change existing behaviour.
   establishing the repository skeleton. The binary prints its version and a
   development notice; no functionality is implemented.
 
-[Unreleased]: https://github.com/casoon/opi/compare/v0.15.0...HEAD
+[Unreleased]: https://github.com/casoon/opi/compare/v0.15.1...HEAD
+[0.15.1]: https://github.com/casoon/opi/compare/v0.15.0...v0.15.1
 [0.15.0]: https://github.com/casoon/opi/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/casoon/opi/compare/v0.13.4...v0.14.0
 [0.13.4]: https://github.com/casoon/opi/compare/v0.13.3...v0.13.4
